@@ -26,6 +26,7 @@ file_path$output <- ".\\output\\"
 file_path$intermediate_data<- ".\\intermediate_data\\" 
 file_path$raw_data_root <- raw_data_root
 
+
 #### functions
 read_rhapsody_multi_assay_tibble_based <- function(dbec_counts_path, project_name){##reads in rhapsody combined file into seurat mutltiassay
         counts <- vroom(dbec_counts_path, skip = 7) 
@@ -34,17 +35,13 @@ read_rhapsody_multi_assay_tibble_based <- function(dbec_counts_path, project_nam
         #colnames(counts) <- features
         #counts <- as(counts, "sparseMatrix")
         print("count table loaded")
-        gc() #freeing up memory
-        
+
         protein <- counts[grep(names(counts),pattern = "pAbO")] |> clean_names() |>  #get rid of special chraacters that would interfere with downstream functions in feature names
                 tidyfst::t_dt() #efficiently transposes dataframes 
-        colnames(protein) <- barcodes
+        colnames(protein) <- barcodes # reapply cell index
         
-        sample_tags <- counts[grep(names(counts),pattern = "Rik")] |> tidyfst::t_dt()
-        colnames(sample_tags) <- barcodes
-        gc()
         
-        transcriptome <- counts[grep(names(counts),pattern = c("Rik|pAbO|Cell"), invert = T)] 
+        transcriptome <- counts[grep(names(counts),pattern = c("pAbO|Cell"), invert = T)] 
         print("transposing transcriptome tibble")
         transcriptome <- transcriptome |> tidyfst::t_dt()
         colnames(transcriptome) <- barcodes
@@ -56,7 +53,6 @@ read_rhapsody_multi_assay_tibble_based <- function(dbec_counts_path, project_nam
         
         print("adding assay objects")
         seurat[['protein']] <- CreateAssayObject(counts = protein)
-        seurat[['sampletags']] <- CreateAssayObject(counts = sample_tags)
         return(seurat)
 }
 
