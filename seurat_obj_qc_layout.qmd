@@ -1,0 +1,284 @@
+---
+title: "seurat_obj_qc_layout"
+execute: 
+  echo: false
+format: 
+  html:
+    grid:
+      margin-width: 10px
+      body-width: 1500px
+editor: visual
+---
+
+## Quarto
+
+```{r}
+#| warning: false
+#| echo: false
+#load packeges
+
+# packages <- c("Seurat", "tidyverse", "here", "janitor", "forcats","tidyseurat","Matrix", "vroom", "tidyfst", "ggExtra", "viridis", "ggridges", "CytoExploreR", "patchwork")
+# 
+# #
+# lapply(packages, require, character.only = TRUE)
+
+library("easypackages")
+libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","patchwork","Matrix", "ggpp")
+
+set.seed(2023)
+#set up file paths
+file_path <- vector("list") 
+file_path$output <- ".\\output\\" 
+file_path$intermediate_data<- ".\\intermediate_data\\" 
+#file_path$raw_data <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_Expression_Data_Unfiltered.st.gz"
+
+seurat_obj <- read_rds(file = paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_bal_raw_dbec_workflowed.rds")
+                       )
+gc()
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 7
+DimPlot(seurat_obj,label = T)+ggtitle("UMAP of first 10 Principal Components")+
+        ElbowPlot(seurat_obj)
+```
+
+```{r}
+print(names(seurat_obj@meta.data))
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 15
+theme_1 <- theme_minimal()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none", axis.title = element_blank())
+
+p1 <- seurat_obj |> ggplot(aes(sampletag_name, fill=sampletag_name)) + geom_bar() + theme_minimal()+ theme_1+ ggtitle("sampletag_name")
+p2 <- seurat_obj |> ggplot(aes(RNA_snn_res.0.5, fill=RNA_snn_res.0.5)) + geom_bar() + theme_minimal()+ theme_1+ ggtitle("seurat_slusters RNA_snn_res.0.5")
+p3 <- seurat_obj |> ggplot(aes(sampletag_Ms4a3, fill=sampletag_Ms4a3)) + geom_bar() + theme_minimal()+ theme_1+ ggtitle("sampletag_Ms4a3")
+p4 <- seurat_obj |> ggplot(aes(sampletag_multiplets, fill=sampletag_multiplets)) + geom_bar() + theme_1+ ggtitle("sampletag_multiplets")
+
+(p1+p2)/(p3+p4)
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 7
+protein_counts <- t(seurat_obj@assays$protein@counts) |>
+        as_tibble(rownames="cell") 
+
+p7 <- protein_counts |> 
+  pivot_longer(cols = -cell, names_to = "protein", values_to = "value")|>
+  group_by(protein) |>
+  summarise(all_cells_sum=sum(value)) |>
+  filter(all_cells_sum>100) |>
+  separate(protein, sep = "-", into = c("prot_1", "prot_2", "prot_3", "prot_4")) |>
+  mutate(protein= paste(prot_1,prot_2,prot_3,prot_4, sep = "_"))|> 
+  ggplot(aes(protein, all_cells_sum)) +
+  geom_col() +theme_bw()+
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +ggtitle("Ab-Seq, all targets w/ > 100 reads")
+
+(p7+geom_text(aes(x=protein, y=5000000, label=format(all_cells_sum, scientific = T, digits=2)),color="red", angle=90))+
+        (p7+  scale_y_continuous(trans='log10',name="log10 scale"))
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 7
+sampletags_counts <- t(seurat_obj@assays$sampletags@counts) |>
+        as_tibble(rownames="cell") 
+
+p8 <- sampletags_counts |> 
+  pivot_longer(cols = -cell, names_to = "tags", values_to = "value")|>
+  group_by(tags) |>
+  summarise(all_cells_sum=sum(value)) |>
+  filter(all_cells_sum>1000) |>
+  ggplot(aes(tags, all_cells_sum)) +
+  geom_col() +theme_bw()+
+       # geom_text(aes(x=protein, y=5000000, label=format(all_cells_sum, scientific = T, digits=2)),color="red", angle=90)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +ggtitle("sample tags, all targets with more than 100 reads")
+
+p8+
+        (p8+  scale_y_continuous(trans='log10',name="log10 scale"))
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 7
+plot_nCount_RNA_nFeature_RNA_dens <-  seurat_obj |> ggplot(aes(nCount_RNA, nFeature_RNA)) + geom_density_2d() +theme_bw()+ 
+        theme(legend.position = "none") #+xlim(c(-1000,70000)) +ylim(c(-100,8000))
+
+plot_nCount_RNA_nFeature_RNA_point <- seurat_obj |> ggplot(aes(nCount_RNA, nFeature_RNA)) + geom_point(size=0.5) +theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000))
+
+p10.1 <- ggMarginal(plot_nCount_RNA_nFeature_RNA_point +theme(legend.position = "none") , type = "density"#, groupColour = TRUE, groupFill = TRUE
+           )
+p10.2 <- plot_nCount_RNA_nFeature_RNA_dens 
+
+p10.1
+p10.2
+```
+
+```{r}
+#| fig-width: 7
+#| fig-height: 7
+h_line_quantile <- 0.96
+v_line_quantile <- 0.12
+xlim_max <- 70000
+ylim_max <- 6
+h_line=seurat_obj$percent_mito |>
+        quantile(probs = h_line_quantile)
+
+v_line=seurat_obj$nCount_RNA |>
+        quantile(probs = v_line_quantile)
+
+plot_percent_mito_nFeature_RNA_dens <-  seurat_obj |> ggplot(aes(nCount_RNA, percent_mito)) + geom_density_2d() +theme_bw() +theme(legend.position = "none")+
+        xlim(c(-1000,xlim_max)) +ylim(c(-0,ylim_max))
+
+plot_percent_mito_nFeature_RNA_point <- seurat_obj |> ggplot(aes(nCount_RNA, percent_mito)) + geom_point(size=0.5) +theme_bw() +
+        xlim(c(-1000,xlim_max)) +ylim(c(-0,6)) +
+        geom_hline(aes(yintercept = h_line))+
+        geom_vline(aes(xintercept = v_line))+
+        geom_text(aes(xlim_max, h_line, label = as.character(h_line_quantile)))+
+        geom_text(aes(v_line,ylim_max, label = as.character(v_line_quantile)))
+        
+ plot_percent_mito_nFeature_RNA_dens
+
+quantile_table <- tibble(
+mito_quantiles=seurat_obj$percent_mito |>
+        quantile(probs = (seq(0.93,0.99,by=0.01))),
+nCount_quantiles=seurat_obj$nCount_RNA |>
+        quantile(probs = (seq(0.93,0.99,by=0.01)))
+)
+
+quantile_table <- tibble(quantile_=c(
+        seq(0.01,0.06,by=0.01),seq(0.93,0.99,by=0.01)) ) |> mutate(
+        per_mito=round(seurat_obj$percent_mito |> quantile(probs = quantile_),2),
+        nCount_RNA=round(seurat_obj$nCount_RNA |> quantile(probs = quantile_),2))
+
+
+plot_percent_mito_nFeature_RNA_point <- plot_percent_mito_nFeature_RNA_point + annotate(geom = 'table',
+           x=70000,
+           y=6,
+           size = 2,
+           label=list(round(quantile_table, 2))) 
+
+
+ggMarginal(plot_percent_mito_nFeature_RNA_point +
+                   theme(legend.position = "none") , type = "density")
+                   
+```
+```{r}
+#| fig-width: 7
+#| fig-height: 7
+ seurat_obj <- seurat_obj |>mutate(
+   damged_cells=ifelse(percent_mito>h_line& nCount_RNA>v_line_quantile,"damaged","other"))
+
+damaged_cells <- seurat_obj |> filter(damged_cells=="damaged") |> as_tibble()
+
+seurat_obj |> ggplot()+
+  geom_point(aes(UMAP_1,UMAP_2),color="grey")+
+  geom_point(
+    data=damaged_cells,aes(UMAP_1, UMAP_2), color="red")+
+  annotate("text",
+           x=7,y=-10,label =
+           paste("upper treshold:",
+             as.character(round(h_line+100,digits = 4)
+                 )))+
+    annotate("text",
+           x=7,y=-11,
+           label =paste("percent mito genes;",
+                 as.character(nrow(damaged_cells)),
+                 "damaged cells"
+                 ))
+
+
+```
+
+
+##Sample Tags
+```{r}
+#| fig-width: 15
+#| fig-height: 15
+seurat_obj <- NormalizeData(seurat_obj, assay = "sampletags", normalization.method = "CLR")
+
+seurat_obj |>
+  join_features(all=T, assay="sampletags",) |> mutate(log10_abundance=log(.abundance_sampletags+1)) |> 
+  ggplot(aes(log10_abundance,.feature,
+             fill=.feature))+
+  geom_density_ridges() +theme(legend.position = "none")+
+  ggtitle("sample tag distribution") +facet_wrap(~sampletag_name)
+```
+
+```{r}
+#| fig-width: 7
+#| fig-height: 7
+multiplet_n_count_RNA_n_Feature<- seurat_obj |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=sampletag_multiplets)) + geom_point(size=0.5) +theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000)) +scale_color_manual(values = c( "red","green","grey"))
+
+multiplet_n_count_RNA_n_Feature_density<- seurat_obj |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=sampletag_multiplets)) +geom_density_2d()+theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000)) 
+
+ggMarginal(multiplet_n_count_RNA_n_Feature +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3, )  
+
+multiplet_n_count_RNA_n_Feature_density
+```
+
+
+```{r}
+ seurat_obj |>  
+  mutate(ncount_bin=cut_number(nCount_RNA,100)) |> 
+  group_by(ncount_bin) |>
+  count(sampletag_multiplets) |> 
+  mutate(percentage= 100*n/sum(n)) |> 
+  ungroup() |> 
+  ggplot(aes(ncount_bin, percentage, color=sampletag_multiplets)) + 
+  geom_point(size=0.5) +
+  theme_1
+
+
+ seurat_obj |>  
+  mutate(ncount_bin=cut_width(x=nCount_RNA,width=1000, boundary = 0)) |> 
+  group_by(ncount_bin) |>
+  count(sampletag_multiplets) |> 
+  mutate(percentage= 100*n/sum(n)) |> 
+  ungroup() |> 
+  ggplot(aes(ncount_bin, percentage, color=sampletag_multiplets)) + 
+  geom_point(size=3) +
+  theme_1
+ 
+ 
+#quantile
+
+ # seurat_obj |>  
+ #  mutate(ncount_bin=quantile(pull(.,nCount_RNA))) |> 
+ #  group_by(ncount_bin) |>
+ #  count(sampletag_multiplets) |> 
+ #  mutate(percentage= 100*n/sum(n)) |> 
+ #  ungroup() |> 
+ #  ggplot(aes(ncount_bin, percentage, color=sampletag_multiplets)) + 
+ #  geom_point(size=0.5) +
+ #  theme_bw()
+
+```
+
+```{r}
+nCount_RNA_thresh <- 30000
+ seurat_obj <- seurat_obj |>mutate(
+   high_RNA_singlets=ifelse(nCount_RNA>nCount_RNA_thresh& sampletag_multiplets=="single_hashtag","high_RNA_singlet", "other"))
+
+high_RNA_singlet_tbl <- seurat_obj |> filter(high_RNA_singlets=="high_RNA_singlet") |> as_tibble()
+
+seurat_obj |> ggplot()+
+  geom_point(aes(UMAP_1,UMAP_2),color="grey")+
+  geom_point(
+    data=high_RNA_singlet_tbl,aes(UMAP_1, UMAP_2), color="red")+
+  annotate("text",
+           x=7,y=-10,label =
+           paste("upper treshold:",
+             as.character(nCount_RNA_thresh),
+             "counts/cell;",
+                 as.character(nrow(high_RNA_singlet_tbl)),
+                 "cells discarded"
+                 
+                 ))+ggtitle("high RNA count singlets")
+
+```
+
