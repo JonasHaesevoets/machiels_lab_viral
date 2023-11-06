@@ -1,0 +1,903 @@
+---
+title: "QC Experiemnt x, day y, library z"
+format: 
+  dashboard:
+    orientation: columns
+    
+
+---
+```{r}
+#| warning: false
+#| echo: false
+#load packeges
+
+# packages <- c("Seurat", "tidyverse", "here", "janitor", "forcats","tidyseurat","Matrix", "vroom", "tidyfst", "ggExtra", "viridis", "ggridges", "CytoExploreR", "patchwork")
+# 
+# #
+# lapply(packages, require, character.only = TRUE)
+
+library("easypackages")
+libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","patchwork","Matrix", "ggpp","ggpubr","ggmosaic", "DT"#, "lemon", "gridExtra"
+          )
+
+set.seed(2023)
+#set up file paths
+file_path <- vector("list") 
+file_path$output <- ".\\output\\" 
+file_path$intermediate_data<- ".\\intermediate_data\\" 
+#file_path$raw_data <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_Expression_Data_Unfiltered.st.gz"
+
+# seurat_obj <- read_rds(file = paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed.rds")
+#                        )
+
+seurat_obj <-   read_rds(file = paste0(file_path$intermediate_data,"SAMPLED_2000cells_seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed.rds")
+                       )
+
+de_genes_tbl <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\experiment_1._lung__QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds" |> read_rds() #|> select(cluster:gene)
+
+
+de_genes_tbl <- read_csv("intermediate_data/experiment_1.Lung_QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.csv")|>
+        relocate(gene) 
+
+file_path_output <- paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_lung_raw_dbec_cleaned.rds")
+
+
+#visualisation parameters
+protein_all_cells_sum_tresh <- 100
+tags_all_cells_sum_thresh <- 1000
+xlim_max <- 70000
+ylim_max <- 6
+ylim_max_mito <- 6
+
+
+#cutoff quantiles
+upper_mito_thresh_quantile <- 0.98
+lower_nCount_RNA_thresh_quantile <- 0.12
+upper_nCount_RNA_thresh_quantile <- 0.97
+
+# cut off absolut values
+upper_mito_thresh <- seurat_obj$percent_mito |>
+        quantile(probs = upper_mito_thresh_quantile)
+
+lower_nCount_RNA_thresh <- seurat_obj$nCount_RNA |>
+        quantile(probs = lower_nCount_RNA_thresh_quantile)
+upper_nCount_RNA_thresh <- seurat_obj$nCount_RNA |>
+        quantile(probs = upper_nCount_RNA_thresh_quantile)
+
+deleted_clusters=c(0,5,7,9,10)
+
+del_clusters_string <- paste0(as.character(deleted_clusters))
+
+upper_nCount_RNA_thresh_non_scientific <- format(round(upper_nCount_RNA_thresh,digits = 4), scientific = FALSE)
+
+
+theme_1 <- theme_minimal()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none", axis.title = element_blank())
+```
+
+
+# {.sidebar }
+
+
+Thresholds applied to library:
+
+|                       |                **lower**               |  **upper**                                           |
+|-----------------------|----------------------------------------|------------------------------------------------------|
+| **nCount quantile**   | `{r} lower_nCount_RNA_thresh_quantile` | `{r} upper_nCount_RNA_thresh_quantile`               |
+| **nCount RNA**        | `{r} lower_nCount_RNA_thresh         ` | `{r} upper_nCount_RNA_thresh_non_scientific`               |
+
+
+|                         |                **lower**               |  **upper**                                           |
+|-------------------------|----------------------------------------|------------------------------------------------------|
+| **quantile**            | none                                   |  `{r} upper_mito_thresh_quantile`                    |
+| **mitochondrial genes** | none                                   |`{r} upper_mito_thresh`                               |        
+
+
+|                       |                                        |  
+|-----------------------|----------------------------------------|
+| **deleted clusters** | `{r} deleted_clusters`                      |    
+
+
+# global 
+
+## Column {width=35%}
+
+### Row {.tabset}
+
+
+```{r}
+#| title: UMAP
+DimPlot(seurat_obj,label = T)+ggtitle("UMAP of first 10 Principal Components")
+
+```
+        
+```{r}
+#| title: UMAP filtered
+filtered_seurat_obj <- seurat_obj |>
+  filter(!(seurat_clusters %in% deleted_clusters)) |> 
+  filter(nCount_RNA<upper_nCount_RNA_thresh) |> 
+  filter(nCount_RNA>lower_nCount_RNA_thresh) |> 
+  filter(percent_mito<upper_mito_thresh) |> 
+  filter(sampletag_multiplets=="single_hashtag")
+filtered_seurat_obj |> DimPlot(label = T)
+```
+
+
+
+### Row {.tabset}
+```{r}
+#| title: sample tags
+p1 <- seurat_obj |> ggplot(aes(sampletag_name, fill=sampletag_name)) + geom_bar() + theme_minimal()+ theme_1+ ggtitle("sampletag_name")
+p1
+```
+
+```{r}
+#| title: clusters
+# p2 <- seurat_obj |>add_count(RNA_snn_res.0.5) |> mutate(percent=n/nrow(seurat_obj)) |> ggplot(aes(RNA_snn_res.0.5, fill=RNA_snn_res.0.5)) + geom_bar() + 
+#   geom_text(tally(seurat_obj,RNA_snn_res.0.5) aes(label=percent, x=RNA_snn_res.0.5, y=0.1*max(n)))+
+#   theme_minimal()+ theme_1+ ggtitle("seurat_slusters RNA_snn_res.0.5")
+# p2
+
+seurat_obj |> count(RNA_snn_res.0.5) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),4)) |>
+  ggplot(aes(RNA_snn_res.0.5, y=n, fill=RNA_snn_res.0.5)) +
+  geom_col()+ 
+  geom_text(aes(label=percent, x=RNA_snn_res.0.5, y=n))+
+  theme_minimal()+
+  theme_1+
+  ggtitle("seurat_slusters RNA_snn_res.0.5")
+
+```
+
+
+```{r}
+#| title: Ms4a3
+p3 <- seurat_obj |> ggplot(aes(sampletag_Ms4a3, fill=sampletag_Ms4a3)) + geom_bar() + theme_minimal()+ theme_1+ ggtitle("sampletag_Ms4a3")
+p3
+```
+
+
+```{r}
+#| title: singlets
+p4 <- seurat_obj |> ggplot(aes(sampletag_multiplets, fill=sampletag_multiplets)) + geom_bar() + theme_1+ ggtitle("sampletag_multiplets")
+p4
+```
+
+
+
+## Column {width=40%}
+### Row {.tabset}
+```{r}
+#| title: nCount marginal
+multiplet_n_count_RNA_n_Feature<- seurat_obj |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=sampletag_multiplets)) + geom_point(size=0.5) +theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000)) +scale_color_manual(values = c( "grey","red","green"))    +   geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")
+
+ggMarginal(multiplet_n_count_RNA_n_Feature +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3)  
+```
+
+```{r}
+#| title: mito
+
+
+plot_percent_mito_nFeature_RNA_dens <-  seurat_obj |> ggplot(aes(nCount_RNA, percent_mito)) + geom_density_2d() +theme_bw() +theme(legend.position = "none")+
+        xlim(c(-1000,xlim_max)) +ylim(c(-0,ylim_max))
+
+plot_percent_mito_nFeature_RNA_point <- seurat_obj |> ggplot(aes(nCount_RNA, percent_mito)) + geom_point(size=0.5) +theme_bw() +
+        xlim(c(-1000,xlim_max)) +ylim(c(-0,6)) +
+        geom_hline(aes(yintercept = upper_mito_thresh),linetype = "dashed")+
+        geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+
+  geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+
+        geom_text(aes(xlim_max, upper_mito_thresh, label = as.character(upper_mito_thresh_quantile)), nudge_y =upper_mito_thresh/23)+
+        geom_text(aes(lower_nCount_RNA_thresh,ylim_max, label = as.character(lower_nCount_RNA_thresh_quantile)), nudge_x =upper_nCount_RNA_thresh/23)+        geom_text(aes(upper_nCount_RNA_thresh,ylim_max, label = as.character(upper_nCount_RNA_thresh_quantile)), nudge_x =upper_nCount_RNA_thresh/20)
+
+        
+ plot_percent_mito_nFeature_RNA_dens
+
+quantile_table <- tibble(
+mito_quantiles=seurat_obj$percent_mito |>
+        quantile(probs = (seq(0.93,0.99,by=0.01))),
+nCount_quantiles=seurat_obj$nCount_RNA |>
+        quantile(probs = (seq(0.93,0.99,by=0.01)))
+)
+
+quantile_table <- tibble(quantile_=c(
+        seq(0.01,0.06,by=0.01),seq(0.93,0.99,by=0.01)) ) |> mutate(
+        per_mito=round(seurat_obj$percent_mito |> quantile(probs = quantile_),2),
+        nCount_RNA=round(seurat_obj$nCount_RNA |> quantile(probs = quantile_),2))
+
+
+plot_percent_mito_nFeature_RNA_point <- plot_percent_mito_nFeature_RNA_point + annotate(geom = 'table',
+           x=70000,
+           y=6,
+           size = 2,
+           label=list(round(quantile_table, 2))) 
+
+
+ggMarginal(plot_percent_mito_nFeature_RNA_point +
+                   theme(legend.position = "none") , type = "density")
+                   
+```
+
+```{r}
+#| title: nCount density
+multiplet_n_count_RNA_n_Feature_density<- seurat_obj |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=sampletag_multiplets)) +geom_density_2d()+theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000)) +    geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")
+
+multiplet_n_count_RNA_n_Feature_density
+```
+
+
+
+### Row {.tabset}
+```{r}
+#| title: Elbow Plot
+ElbowPlot(seurat_obj)
+```
+
+```{r}
+#| title: PC 1/2
+DimPlot(seurat_obj, reduction = "pca")
+```
+```{r}
+#| title: PC  3/4
+DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
+```
+```{r}
+#| title: PC  4/5
+DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
+```
+```{r}
+#| title: PC  6/7
+DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
+```
+```{r}
+#| title: PC  8/9
+DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
+```
+
+## Column {.tabset}
+```{r}
+#| fig-width: 12
+#| fig-height: 12
+#| echo: false
+#| title: all cells
+
+seurat_obj <- seurat_obj |>
+  mutate(rna_group=ifelse(nCount_RNA<lower_nCount_RNA_thresh,"low_RNA",
+                                    ifelse(nCount_RNA>upper_nCount_RNA_thresh,"high_RNA",
+                                           "norm_RNA"
+                                    )),
+                     mito_group=ifelse(percent_mito>upper_mito_thresh,"high_mito","norm_mito")) |> 
+  mutate(rna_mito=as_factor(paste(rna_group,mito_group, sep="..."))) #|> 
+
+seurat_obj |> 
+  ggplot()+
+  geom_mosaic(aes(x=product(rna_mito,sampletag_multiplets),fill=rna_mito, alpha=sampletag_multiplets))+theme_1+theme(axis.text  = element_blank())+
+  theme(legend.position = "right",axis.title = element_text(size=22),
+        legend.text=element_text(size=22),
+        axis.text = element_text(size = 22),
+        axis.text.y = element_blank()
+        )+
+  scale_fill_discrete(guide= guide_legend(reverse=TRUE))
+
+```
+
+
+```{r}
+#| fig-width: 7
+#| fig-height: 15
+#| title: seurat clusters
+#| warning: false
+cluster_mosaic_plot <- seurat_obj  |> 
+        ggplot()+
+        geom_mosaic(aes(x=product(rna_mito,sampletag_multiplets),
+                        fill=rna_mito, alpha=sampletag_multiplets))+
+        theme_1+
+        theme(axis.text  = element_blank(),
+              axis.text.x = element_blank())+facet_wrap(~seurat_clusters,ncol = 3)#+ theme(strip.text = element_text(size=22))
+
+cluster_mosaic_plot
+
+```
+
+
+
+```{r}
+#| fig-width: 7
+#| fig-height: 15
+#| title: condition
+#| warning: false
+
+seurat_obj  |> 
+        ggplot()+
+        geom_mosaic(aes(x=product(rna_mito,sampletag_multiplets),
+                        fill=rna_mito, alpha=sampletag_multiplets))+
+        theme_1+
+        theme(axis.text  = element_blank(),
+              axis.text.x = element_blank())+
+                      facet_wrap(~sampletag_name,
+                                 ncol = 3) + theme(strip.text = element_text(size=22))
+```
+# gene-level
+
+## Column 
+
+### Row {,.tabset}
+```{r}
+seurat_obj <- BuildClusterTree(seurat_obj)
+PlotClusterTree(seurat_obj, direction = "downwards")
+```
+
+### Row {}
+```{r}
+#| title: Data
+
+de_genes_tbl |> mutate(cluster=as_factor(cluster)) |>
+  relocate(cluster) |> 
+  datatable(
+    colnames = c("cluster ","gene","pval", "avg_log2FC", "pct.1", "pct.2","p_val_adj"),
+    filter = 'top',
+    options = list(dom = 'tp',
+     paging = TRUE,
+    #   lengthMenu = c(5, 10, 25),
+    #   pageLength = 10, 
+      scrollY = TRUE
+     ),
+  )
+```
+## Column 
+
+### Row{.tabset}
+```{r}
+#| warning: false
+#| echo: false
+#load packeges
+
+feature_umap <- function(genes){
+        seurat_obj |> join_features(genes) |> mutate(.feature=factor(.feature,levels=genes)) |> ggplot(aes(UMAP_1,UMAP_2,color=.abundance_RNA))+geom_point() +
+  scale_color_viridis_c()+ theme_void()+coord_fixed()+
+  facet_wrap(~.feature, ncol = 7) 
+}
+
+```
+
+
+```{r}
+#| title: cluster 0
+feature_umap(c("Prf1","Il2rb","Gzmb","Gzma","Eomes","Ms4a4b","Il12rb2","H2-Q7", "Cd3g", "Cd8a", "Cd4", "Ifng","Il2ra", "Foxp3","Ncr1", "Rorc", "Ncam1", "Tbx21", "Il7r", "Klrc1", "Klrk1", "Ncr3")) +labs(caption = "likely MHC2 expressing NK cells")+theme(plot.caption = element_text(size=6, face="bold"))
+
+```
+
+```{r}
+#| title: cluster 1
+feature_umap(c("Ccr2","Ifitm3","Thbs1", "Ms4a4c"))
+
+
+```
+
+
+
+```{r}
+#| title: cluster 2
+plot1 <- feature_umap(c("Ace", "Csf1r"))
+plot1
+```
+
+
+```{r}
+#| title: cluster 3
+feature_umap(c("Fpr", "Chil3","Lpl", "Cd9", "Ctsd", "Mertk"))+labs(caption = "scavanger Macrophages")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+```{r}
+#| title: cluster 4
+feature_umap(c("Pld3", "Ftl1"))
+```
+
+```{r}
+#| title: cluster 5
+clus_5_genes <- c("Cd79a", "Cd19", "Ms4a1")
+feature_umap(clus_5_genes) +labs(caption = "-> B lineage")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+```{r}
+#| title: cluster 6
+clus_5_genes <- c("Cd209a", "Flt3", "H2-Ab1", "H2-Aa")
+feature_umap(clus_5_genes) +labs(caption = "MHC-2 high")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+```{r}
+#| title: cluster 7
+clus_5_genes <- c("Cd3e", "Cd8a")
+feature_umap(clus_5_genes) +labs(caption = "CD8 T cells")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+```{r}
+#| title: cluster 8
+
+clus_5_genes <- c("C1qb", "CD81", "Apoe", "H2-Aa")
+feature_umap(clus_5_genes) +labs(caption = "Apoe alveolar macrophages")+theme(plot.caption = element_text(size=12, face="bold"))
+
+
+```
+```{r}
+#| title: cluster 9
+
+clus_5_genes <- c("H2-Eb1", "Mgl2", "Tnfsf9", "H2-Aa")
+
+feature_umap(clus_5_genes) +labs(caption = "CD137L?, Apoe alveolar macrophages")+theme(plot.caption = element_text(size=12, face="bold"))
+
+
+```
+```{r}
+#| title: cluster 10
+
+clus_10_genes <- c("mt-Nd3", "mt-Co3" ,"Lpp")
+feature_umap(clus_10_genes) +labs(caption = "mt high")+theme(plot.caption = element_text(size=12, face="bold"))
+clus=10
+
+seurat_obj |> mutate(cluster_10=ifelse(RNA_snn_res.0.5==clus, paste("cluster", as.character(clus)), "other"))|> 
+  arrange(desc(cluster_10)) |> 
+  ggplot(aes(nCount_RNA,percent_mito, color=cluster_10)) +geom_point()
+```
+
+
+```{r}
+#| title: cluster 11
+
+clus_11_genes <- c("Clec9a", "Cst3", "Cd24a", "H2-Ab1")
+
+feature_umap(clus_11_genes) +labs(caption = "Clec9a, MHC2")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+
+
+```{r}
+#| title: cluster 12
+
+clus_12_genes <- c("Mki67", "Cks1b", "Ctsk" , "Tpx2", "Spp1", "H2-Aa")
+
+feature_umap(clus_12_genes) +labs(subtitle ="Proliferating/Spp1+" ,  caption =   "Ki-67, Tpx: Spindle assembly factor required for normal assembly of mitotic spindles")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+
+
+
+```{r}
+#| title: cluster 13
+
+clus_12_genes <- c("Ccr7", "Il4i1", "Ccl22" , "Socs2", "Relb", "	Il12b")
+
+
+feature_umap(clus_12_genes) +labs(subtitle ="Ccr7/Il4i1" ,  caption =   "")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+```{r}
+
+#| title: cluster 14
+
+clus_14_genes <- c("Mki67", "Top2a", "H2-Ab1")
+
+
+feature_umap(clus_14_genes) +labs(subtitle ="Proliferating" ,  caption =   "")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+```{r}
+
+#| title: cluster 15
+
+clus_15_genes <- c("Stmn1", "Mcm5", "Top2a")
+
+
+feature_umap(clus_15_genes) +labs(subtitle ="Proliferating" ,  caption =   "")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+
+
+```{r}
+#| title: cluster 16
+
+clus_16_genes <- c( "Cldn5", "Col4a1","Ly6c1", "H2-Aa")
+
+feature_umap(clus_16_genes) +labs(subtitle = "Macrophage - Epithelial cell doublet/phagocytosed",  caption =   "Caudin5, collagen 4, tight junction, Col4 producing, MHC2 positive, Epidermal Growth Factor Receptor 5 expressing")+theme(plot.caption = element_text(size=12, face="bold"))
+
+
+
+
+```
+
+```{r}
+#| title: cluster 16 expr
+seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==16, "cluster 16", "other")) |> 
+  join_features(clus_16_genes) |> mutate(.feature=factor(.feature, levels=clus_16_genes)) |> 
+  ggplot(aes(cluster_highlight,.abundance_RNA), color=cluster_highlight) + 
+  geom_violin()+geom_jitter()+
+  theme_minimal()+
+  facet_wrap(~.feature)
+
+```
+
+
+```{r}
+#| title: cluster 17
+
+clus_17_genes <- c( "Csf1", "Ms4a2", "Il6","Cd63")
+
+feature_umap(clus_17_genes) +labs(subtitle = "Csf1 producing, IgE-R+",  caption =   "Ms4a2= IgE-R, Fcer1a, ")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+```{r}
+#| title: cluster 18
+
+clus_18_genes <- c( "S100a9","Mmp9", "S100a8", "H2-Q10")
+
+feature_umap(clus_18_genes) +labs(subtitle = "Procalcitonin/Mmp9",  caption =   "")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+```{r}
+#| title: cluster 19
+
+clus_18_genes <- c( "Cidec", "Kcnn3","F7", "Mertk", "Cd24a")
+
+feature_umap(clus_18_genes) +labs(subtitle = "?? ",  caption =   "Cidec: Lipid transferase, ")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+```{r}
+#| title: cluster 20
+
+clus_18_genes <- c( "F5", "Acod1", "Cd24a", "Ccr3")
+
+feature_umap(clus_18_genes) +labs(subtitle = "?? ",  caption =   "Cidec: Lipid transferase, ")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+
+```{r}
+#| title: cluster 21
+
+clus_18_genes <- c( "F13a1", "Mafb", "Csf3r", "Ccr2", "Gzmb", "S100a4")
+
+feature_umap(clus_18_genes) +labs(subtitle = "?? ",  caption =   "")+theme(plot.caption = element_text(size=12, face="bold"))
+
+```
+### Row {.tabset}
+```{r}
+#| title: cluster 0
+clus_highlight <- function(clus){
+  seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==clus, paste("cluster", as.character(clus)), "other")) |>
+  ggplot(aes(UMAP_1,UMAP_2,color=cluster_highlight ))+geom_point() +theme_minimal()+ theme(legend.position = "none")
+  
+}
+
+clus_highlight(0)
+
+```
+```{r}
+#| title: cluster 1
+
+clus_highlight(1)
+
+```
+
+```{r}
+#| title: cluster 2
+
+clus_highlight(2)
+
+```
+```{r}
+#| title: cluster 3
+
+clus_highlight(3)
+
+```
+```{r}
+#| title: cluster 4
+
+clus_highlight(4)
+
+```
+```{r}
+#| title: cluster 5
+
+clus_highlight(5)
+
+```
+```{r}
+#| title: cluster 6
+
+clus_highlight(6)
+
+```
+```{r}
+#| title: cluster 7
+
+clus_highlight(7)
+
+```
+
+```{r}
+#| title: cluster 8
+
+clus_highlight(8)
+
+```
+```{r}
+#| title: cluster 9
+
+clus_highlight(9)
+
+```
+
+```{r}
+#| title: cluster 10
+
+clus_highlight(10)
+
+```
+
+```{r}
+#| title: cluster 11
+
+clus_highlight(11)
+
+```
+
+
+
+
+```{r}
+#| title: cluster 12
+
+clus_highlight(12)
+
+```
+
+```{r}
+#| title: cluster 13
+
+clus_highlight(13)
+
+```
+
+```{r}
+#| title: cluster 14
+
+clus_highlight(14)
+
+```
+
+```{r}
+#| title: cluster 15
+
+clus_highlight(15)
+
+```
+
+```{r}
+#| title: cluster 16
+
+clus_highlight(16)
+
+```
+
+```{r}
+#| title: cluster 17
+
+clus_highlight(17)
+
+```
+
+
+```{r}
+#| title: cluster 17
+clus_highlight(17)
+```
+```{r}
+#| title: cluster 18
+clus_highlight(18)
+```
+```{r}
+#| title: cluster 19
+clus_highlight(19)
+```
+```{r}
+#| title: cluster 20
+clus_highlight(20)
+```
+```{r}
+#| title: cluster 21
+
+clus_highlight(21)
+
+```
+
+
+# cluster 0 - cause of underdetermined
+
+
+## Column 
+
+### Row {.tabset}
+```{r}
+#| title: Features 0
+feature_umap(c("Prf1","Il2rb","Gzmb","Gzma","Eomes","Ms4a4b","Il12rb2","H2-Q7", "Cd3g", "Cd8a", "Cd4", "Ifng","Il2ra", "Foxp3","Ncr1", "Rorc", "Ncam1", "Tbx21", "Il7r")) +
+  labs(caption =paste("Tbet+", "Eomes+", "IL2rb+", "Gzmb/a +", "CD3 neg" ,"IL7ra neg." , "Likely NK cells") )
+
+
+```
+```{r}
+DimPlot(seurat_obj,group.by = "sampletag_Ms4a3" , pt.size = 0.01)
+```
+
+
+
+```{r}
+seurat_obj |> filter(RNA_snn_res.0.5==0) |> ggplot(aes(nCount_RNA, sampletag_multiplets,fill=sampletag_multiplets)) + geom_density_ridges()
+```
+```{r}
+
+seurat_obj |> filter(RNA_snn_res.0.5==0) |> ggplot(aes(nFeature_RNA, sampletag_multiplets,fill=sampletag_multiplets)) + geom_density_ridges()
+```
+### Row {.tabset}
+
+```{r}
+#| title: seurat dehash
+seurat_obj[['sampletags']] <-  CreateAssayObject(counts = seurat_obj@assays$sampletags@counts[1:10,])
+
+cluster_0 <- seurat_obj |> filter(RNA_snn_res.0.5==0)
+DefaultAssay(object = cluster_0) <- "sampletags"
+cluster_0 <- NormalizeData(cluster_0, assay = "sampletags", normalization.method = "CLR") |> ScaleData(assay = "sampletags") |> RunPCA(rownames(cluster_0@assays$sampletags@counts),assay = "sampletags",npcs = 3) |> RunUMAP(features=rownames(cluster_0@assays$sampletags@counts))
+cluster_0 <- MULTIseqDemux(cluster_0, assay = "sampletags", autoThresh = TRUE, maxiter = 10)
+DimPlot(cluster_0, group.by = "MULTI_ID")
+
+```
+```{r}
+#| title: table
+cluster_0$MULTI_ID |> table()
+
+```
+
+```{r}
+#| title: rhapsody dehash
+DimPlot(cluster_0, group.by = "sampletag_name")
+
+```
+```{r}
+#| title: rhapsody dehash
+DimPlot(cluster_0, group.by = "sampletag_multiplets")
+```
+```{r}
+cluster_0 <- cluster_0 |> mutate(bad_cells = ifelse(
+  UMAP_1>-10 & UMAP_1<3&UMAP_2<15,"bad","good"))
+
+cluster_0 |> ggplot(aes(UMAP_1, UMAP_2, color=bad_cells))+geom_point()
+
+
+
+```
+```{r}
+cluster_0  |> ggplot(aes(nCount_RNA, bad_cells,fill=bad_cells)) + geom_density_ridges()
+
+cluster_0  |> ggplot(aes(log10(nCount_sampletags+1), bad_cells,fill=bad_cells)) + geom_density_ridges()
+
+cluster_0 |> ggplot(aes(UMAP_1, UMAP_2, color=nCount_RNA))+geom_point()+scale_color_viridis_b()
+
+
+```
+```{r}
+Idents(cluster_0) <- "bad_cells"
+bad_cells_markers <- FindAllMarkers(cluster_0, assay = "RNA")
+
+bad_cells_markers_sampletags <- FindAllMarkers(cluster_0, assay = "sampletags")
+
+bad_cells_markers_protein <- FindAllMarkers(cluster_0, assay = "protein")
+
+
+```
+
+```{r}
+#| title: cluster 1
+cluster_1 <- seurat_obj |> filter(RNA_snn_res.0.5==1)
+DefaultAssay(object = cluster_1) <- "sampletags"
+cluster_1 <- NormalizeData(cluster_1, assay = "sampletags", normalization.method = "CLR") |> ScaleData(assay = "sampletags") |> RunPCA(rownames(cluster_1@assays$sampletags@counts),assay = "sampletags",npcs = 3) |> RunUMAP(features=rownames(cluster_1@assays$sampletags@counts))
+cluster_1 <- MULTIseqDemux(cluster_1, assay = "sampletags", autoThresh = TRUE, maxiter = 10)
+DimPlot(cluster_1)
+cluster_1$MULTI_ID |> table()
+```
+
+```{r}
+#| title: cluster 2
+cluster_2 <- seurat_obj |> filter(RNA_snn_res.0.5==1)
+DefaultAssay(object = cluster_2) <- "sampletags"
+cluster_2 <- NormalizeData(cluster_2, assay = "sampletags", normalization.method = "CLR") |> ScaleData(assay = "sampletags") |> RunPCA(rownames(cluster_2@assays$sampletags@counts),assay = "sampletags",npcs = 3) |> RunUMAP(features=rownames(cluster_2@assays$sampletags@counts))
+cluster_2 <- MULTIseqDemux(cluster_2, assay = "sampletags", autoThresh = TRUE, maxiter = 10)
+DimPlot(cluster_2)
+cluster_2$MULTI_ID |> table()
+
+```
+
+```{r}
+
+DefaultAssay(object = seurat_obj) <- "sampletags"
+
+
+
+seurat_obj |> filter(RNA_snn_res.0.5==2)|>
+  #join_features(assay="sampletags",   all = TRUE) |> 
+ggplot(aes(PC_1,PC_2,color=sampletag_name ))+geom_point()
+
+
+DefaultAssay(object = seurat_obj) <- "RNA"
+
+seurat_obj |> filter(RNA_snn_res.0.5==2)|>
+  #join_features(assay="sampletags",   all = TRUE) |> 
+ggplot(aes(PC_1,PC_2,color=sampletag_name ))+geom_point()
+```
+
+
+```{r}
+Idents(seurat_obj) <- "sampletag_multiplets"
+sig_protein <- seurat_obj|> 
+  filter(RNA_snn_res.0.5==0) |>filter(sampletag_multiplets  %in% c( "undeterminded", "single_hashtag")) |> 
+  FindMarkers(ident.1="undeterminded", ident.2= "single_hashtag" , assay = "RNA")
+
+Idents(seurat_obj) <- "RNA_snn_res.0.5"
+sig_protein |> datatable()
+```
+
+## Column 
+
+### Row {.tabset}
+
+```{r}
+seurat_obj |> 
+  filter(RNA_snn_res.0.5==0) |> 
+  join_features("i-a-i-e-h2-ab-ad-aq-ed-ek-amm2019-p-ab-o", assay = "protein",  slot = "counts") |>
+  ggplot(aes(log10(.abundance_protein+1), sampletag_multiplets,fill=sampletag_multiplets)) + geom_density_ridges()+ggtitle("i-a-i-e-h2-ab-ad-aq-ed-ek-amm2019-p-ab-o") +ggtitle("cluster 0")
+```
+
+### Row {.tabset}
+
+```{r}
+seurat_obj|> mutate(clus0=as_factor(ifelse(RNA_snn_res.0.5==0,"0","other"))) |> 
+  join_features(all=T, assay="sampletags") |>
+        mutate(log10_abundance=log(.abundance_sampletags+1)) |> 
+  ggplot(aes(log10_abundance,.feature,
+             fill=.feature))+
+  geom_density_ridges() +
+        theme(legend.position = "none")+
+  ggtitle("sample tag distribution")+
+        facet_wrap(~clus0)
+```
+
+```{r}
+seurat_obj |>
+  filter(RNA_snn_res.0.5==0) |> 
+  join_features(all=T, assay="sampletags",) |> mutate(log10_abundance=log(.abundance_sampletags+1)) |> 
+  ggplot(aes(log10_abundance,.feature,
+             fill=.feature))+
+  geom_density_ridges() +theme(legend.position = "none")+
+  ggtitle("sample tag distribution") +facet_wrap(~sampletag_name)
+```
+```{r}
+seurat_obj |>
+  filter(RNA_snn_res.0.5==0) |> 
+  join_features(all=T, assay="sampletags",) |> mutate(log10_abundance=log(.abundance_sampletags+1)) |> 
+  ggplot(aes(log10_abundance,.feature,
+             fill=.feature))+
+  geom_density_ridges() +theme(legend.position = "none")+
+  ggtitle("sample tag distribution") +facet_wrap(~sampletag_name)
+```
+
+
+
+
+
+
+
