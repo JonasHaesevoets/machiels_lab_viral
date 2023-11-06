@@ -69,7 +69,7 @@ seurat_basic_workflow <- function(seurat_obj, sample_tag_calls){
         sampletag_name=="Undetermined" ~"undeterminded",
         TRUE ~ "single_hashtag")
     ) |> 
-        mutate(sampletag_multiplets=as_factor(sampletag_multiplets))
+        mutate(sampletag_multiplets=factor(sampletag_multiplets, levels=c("undeterminded" , "multiplet"  ,   "single_hashtag"))) 
     
     seurat_obj <- seurat_obj |>  mutate(sampletag_Ms4a3=case_when(
         sampletag_name=="Multiplet" ~ "multiplet",
@@ -79,7 +79,6 @@ seurat_basic_workflow <- function(seurat_obj, sample_tag_calls){
         TRUE ~ "single_hashtag")
     )|> 
         mutate(sampletag_Ms4a3=as_factor(sampletag_Ms4a3))
-    levels(seurat_obj$sampletag_multiplets) <- c("undeterminded" , "multiplet"  ,   "single_hashtag")
     
     seurat_obj$condition <- seurat_obj |> pull(sampletag_name) |> str_split_i(i=1, pattern = "_") |> as_factor()
     
