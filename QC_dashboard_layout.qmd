@@ -1,5 +1,5 @@
 ---
-title: "QC Experiemnt x, day y, library z"
+title: "QC Experiemnt 1, day 60, library: LUNG"
 format: 
   dashboard:
     orientation: columns
@@ -29,11 +29,9 @@ file_path$intermediate_data<- ".\\intermediate_data\\"
 
 file_name_obj <- "seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed.rds"
 
-seurat_obj <- read_rds(file = paste0(file_path$intermediate_data,file_name_obj)
-                       )
+seurat_obj <- read_rds(file = paste0(file_path$intermediate_data,file_name_obj)) |> mutate(sampletag_multiplets=factor(sampletag_multiplets, levels=c("undeterminded" , "multiplet"  ,   "single_hashtag"))) #level change can be ommited later when intermediate data has been asjusted
 
-#seurat_obj <-   read_rds(file = paste0(file_path$intermediate_data,"SAMPLED_2000cells_seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed.rds")
-                       )
+#seurat_obj <-   read_rds(file = paste0(file_path$intermediate_data,"SAMPLED_2000cells_seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed.rds") )
 
 de_genes_tbl <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\experiment_1._lung__QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds" |> read_rds() #|> select(cluster:gene)
 
@@ -66,7 +64,7 @@ lower_nCount_RNA_thresh <- seurat_obj$nCount_RNA |>
 upper_nCount_RNA_thresh <- seurat_obj$nCount_RNA |>
         quantile(probs = upper_nCount_RNA_thresh_quantile)
 
-deleted_clusters=c(0,5,7,9,10)
+deleted_clusters=c(0,5,7,10,15,16)
 
 del_clusters_string <- paste0(as.character(deleted_clusters))
 
@@ -123,7 +121,7 @@ filtered_seurat_obj <- seurat_obj |>
 filtered_seurat_obj |> DimPlot(label = T)
 
 write_rds(filtered_seurat_obj, file = paste0(file_path$intermediate_data,file_name_obj,"_filtered"))
-filtered_seurat_obj <- NULL
+
 ```
 
 
@@ -176,6 +174,23 @@ p4
 multiplet_n_count_RNA_n_Feature<- seurat_obj |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=sampletag_multiplets)) + geom_point(size=0.5) +theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000)) +scale_color_manual(values = c( "grey","red","green"))    +   geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")
 
 ggMarginal(multiplet_n_count_RNA_n_Feature +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3)  
+```
+
+
+```{r}
+#| title: nCount marginal filtered
+filtered_seurat_obj 
+
+
+multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=seurat_clusters)) + 
+  geom_point(size=0.5) +
+  theme_bw() +
+  xlim(c(-100,70000)) +
+  ylim(c(-1000,8000)) +
+  #scale_color_manual(values = c( "grey","red","green"))  +  
+  geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+ guides(colour = guide_legend(override.aes = list(size=7)))
+
+ggMarginal(multiplet_n_count_RNA_n_Feature_filtered +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3) 
 ```
 
 ```{r}
@@ -366,7 +381,8 @@ feature_umap <- function(genes){
 
 ```{r}
 #| title: cluster 0
-feature_umap(c("Prf1","Il2rb","Gzmb","Gzma","Eomes","Ms4a4b","Il12rb2","H2-Q7", "Cd3g", "Cd8a", "Cd4", "Ifng","Il2ra", "Foxp3","Ncr1", "Rorc", "Ncam1", "Tbx21", "Il7r", "Klrc1", "Klrk1", "Ncr3")) +labs(caption = "likely MHC2 expressing NK cells")+theme(plot.caption = element_text(size=6, face="bold"))
+clus_0_genes <- c("Prf1","Il2rb","Gzmb","Gzma","Eomes","Ms4a4b","Il12rb2","H2-Q7", "Cd3g", "Cd8a", "Cd4", "Ifng","Il2ra", "Foxp3","Ncr1", "Rorc", "Ncam1", "Tbx21", "Il7r", "Klrc1", "Klrk1", "Ncr3")
+feature_umap(clus_0_genes) +labs(caption = "likely MHC2 expressing NK cells")+theme(plot.caption = element_text(size=6, face="bold"))
 
 ```
 
@@ -440,6 +456,9 @@ clus_10_genes <- c("mt-Nd3", "mt-Co3" ,"Lpp")
 feature_umap(clus_10_genes) +labs(caption = "mt high")+theme(plot.caption = element_text(size=12, face="bold"))
 clus=10
 
+```
+```{r}
+#| title: cluster 10 mt graph
 seurat_obj |> mutate(cluster_10=ifelse(RNA_snn_res.0.5==clus, paste("cluster", as.character(clus)), "other"))|> 
   arrange(desc(cluster_10)) |> 
   ggplot(aes(nCount_RNA,percent_mito, color=cluster_10)) +geom_point()
@@ -480,7 +499,6 @@ feature_umap(clus_12_genes) +labs(subtitle ="Ccr7/Il4i1" ,  caption =   "")+them
 ```
 
 ```{r}
-
 #| title: cluster 14
 
 clus_14_genes <- c("Mki67", "Top2a", "H2-Ab1")
@@ -491,7 +509,6 @@ feature_umap(clus_14_genes) +labs(subtitle ="Proliferating" ,  caption =   "")+t
 ```
 
 ```{r}
-
 #| title: cluster 15
 
 clus_15_genes <- c("Stmn1", "Mcm5", "Top2a")
@@ -723,31 +740,32 @@ clus_highlight(21)
 ```
 
 
-# cluster 0 - cause of underdetermined
+# cluster 0 - cause of undetermined
 
 
 ## Column 
 
 ### Row {.tabset}
 ```{r}
-#| title: Features 0
-feature_umap(c("Prf1","Il2rb","Gzmb","Gzma","Eomes","Ms4a4b","Il12rb2","H2-Q7", "Cd3g", "Cd8a", "Cd4", "Ifng","Il2ra", "Foxp3","Ncr1", "Rorc", "Ncam1", "Tbx21", "Il7r")) +
+#| title: Features cluster 0
+feature_umap(clus_0_genes) +
   labs(caption =paste("Tbet+", "Eomes+", "IL2rb+", "Gzmb/a +", "CD3 neg" ,"IL7ra neg." , "Likely NK cells") )
-
 
 ```
 ```{r}
+#| title: umap MS4a3
 DimPlot(seurat_obj,group.by = "sampletag_Ms4a3" , pt.size = 0.01)
 ```
 
 
 
 ```{r}
-seurat_obj |> filter(RNA_snn_res.0.5==0) |> ggplot(aes(nCount_RNA, sampletag_multiplets,fill=sampletag_multiplets)) + geom_density_ridges()
+#| title: nCount RNA -demuliplex groups 
+seurat_obj |> filter(RNA_snn_res.0.5==0) |> ggplot(aes(nCount_RNA, sampletag_multiplets,fill=sampletag_multiplets)) + geom_density_ridges()+labs(title = "cluster 0 only",caption="undetermined not low in RNA")
 ```
 ```{r}
-
-seurat_obj |> filter(RNA_snn_res.0.5==0) |> ggplot(aes(nFeature_RNA, sampletag_multiplets,fill=sampletag_multiplets)) + geom_density_ridges()
+#| title: nFeature RNA -demuliplex groups 
+seurat_obj |> filter(RNA_snn_res.0.5==0) |> ggplot(aes(nFeature_RNA, sampletag_multiplets,fill=sampletag_multiplets)) + geom_density_ridges() +labs(title = "cluster 0 only", caption="undetermined not low in complexity")
 ```
 ### Row {.tabset}
 
@@ -763,7 +781,7 @@ DimPlot(cluster_0, group.by = "MULTI_ID")
 
 ```
 ```{r}
-#| title: table
+#| title: table seurat dehash
 cluster_0$MULTI_ID |> table()
 
 ```
@@ -771,43 +789,46 @@ cluster_0$MULTI_ID |> table()
 ```{r}
 #| title: rhapsody dehash
 DimPlot(cluster_0, group.by = "sampletag_name")
-
 ```
 ```{r}
-#| title: rhapsody dehash
+#| title: rhapsody dehash multiplet
 DimPlot(cluster_0, group.by = "sampletag_multiplets")
 ```
 ```{r}
+#| title: umap based grouping
 cluster_0 <- cluster_0 |> mutate(bad_cells = ifelse(
   UMAP_1>-10 & UMAP_1<3&UMAP_2<15,"bad","good"))
 
 cluster_0 |> ggplot(aes(UMAP_1, UMAP_2, color=bad_cells))+geom_point()
-
-
-
 ```
 ```{r}
+#| title: umap based grouping nCount_RNA
 cluster_0  |> ggplot(aes(nCount_RNA, bad_cells,fill=bad_cells)) + geom_density_ridges()
 
-cluster_0  |> ggplot(aes(log10(nCount_sampletags+1), bad_cells,fill=bad_cells)) + geom_density_ridges()
-
-cluster_0 |> ggplot(aes(UMAP_1, UMAP_2, color=nCount_RNA))+geom_point()+scale_color_viridis_b()
-
-
 ```
 ```{r}
+#| title: umap based grouping nCount sampletags
+cluster_0  |> ggplot(aes(log10(nCount_sampletags+1), bad_cells,fill=bad_cells)) + geom_density_ridges()
+
+```
+
+```{r}
+#| title: umap nCount RNA
+cluster_0 |> ggplot(aes(UMAP_1, UMAP_2, color=nCount_RNA))+geom_point()+scale_color_viridis_b()
+```
+
+
+
+```{r}
+#| title: alt example  cluster 1
 Idents(cluster_0) <- "bad_cells"
 bad_cells_markers <- FindAllMarkers(cluster_0, assay = "RNA")
 
 bad_cells_markers_sampletags <- FindAllMarkers(cluster_0, assay = "sampletags")
 
 bad_cells_markers_protein <- FindAllMarkers(cluster_0, assay = "protein")
+###
 
-
-```
-
-```{r}
-#| title: cluster 1
 cluster_1 <- seurat_obj |> filter(RNA_snn_res.0.5==1)
 DefaultAssay(object = cluster_1) <- "sampletags"
 cluster_1 <- NormalizeData(cluster_1, assay = "sampletags", normalization.method = "CLR") |> ScaleData(assay = "sampletags") |> RunPCA(rownames(cluster_1@assays$sampletags@counts),assay = "sampletags",npcs = 3) |> RunUMAP(features=rownames(cluster_1@assays$sampletags@counts))
@@ -817,7 +838,7 @@ cluster_1$MULTI_ID |> table()
 ```
 
 ```{r}
-#| title: cluster 2
+#| title: alt example cluster 1
 cluster_2 <- seurat_obj |> filter(RNA_snn_res.0.5==1)
 DefaultAssay(object = cluster_2) <- "sampletags"
 cluster_2 <- NormalizeData(cluster_2, assay = "sampletags", normalization.method = "CLR") |> ScaleData(assay = "sampletags") |> RunPCA(rownames(cluster_2@assays$sampletags@counts),assay = "sampletags",npcs = 3) |> RunUMAP(features=rownames(cluster_2@assays$sampletags@counts))
