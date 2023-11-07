@@ -1,12 +1,12 @@
 ---
-title: "QC Experiemnt 1, day 60, library: LUNG"
+title: "QC Experiment 1, day 60, library: LUNG"
 format: 
   dashboard:
     orientation: columns
     
 
 ---
-```{r}
+```{r setup}
 #| warning: false
 #| echo: false
 #load packeges
@@ -122,6 +122,86 @@ title_feature_umap_clus_10 <- ""
 caption_feature_umap_clus_10 <-"mt high"
 
 
+clus_11_genes <- c("Clec9a", "Cst3", "Cd24a", "H2-Ab1")
+title_feature_umap_clus_11 <- ""
+caption_feature_umap_clus_11 <- "Clec9a, MHC2"
+
+
+clus_12_genes <- c("Mki67", "Cks1b", "Ctsk" , "Tpx2", "Spp1", "H2-Aa")
+title_feature_umap_clus_12 <- "Proliferating/Spp1+" 
+caption_feature_umap_clus_12 <- "Ki-67, Tpx: Spindle assembly factor required for normal assembly of mitotic spindles"
+
+clus_13_genes <- c("Ccr7", "Il4i1", "Ccl22" , "Socs2", "Relb", "Il12b")
+title_feature_umap_clus_13 <- "Ccr7/Il4i1" 
+caption_feature_umap_clus_13 <- ""
+
+
+clus_14_genes <- c("Mki67", "Top2a", "H2-Ab1")
+title_feature_umap_clus_14 <- "Proliferating"
+caption_feature_umap_clus_14 <- ""
+
+
+clus_15_genes <- c("Stmn1", "Mcm5", "Top2a")
+title_feature_umap_clus_15 <- "Proliferating"
+caption_feature_umap_clus_15 <- ""
+
+clus_16_genes <- c( "Cldn5", "Col4a1","Ly6c1", "H2-Aa")
+title_feature_umap_clus_16 <- "Macrophage - Epithelial cell doublet/phagocytosed" 
+caption_feature_umap_clus_16 <- "Caudin5, collagen 4, tight junction, Col4 producing, MHC2 positive, Epidermal Growth Factor Receptor 5 expressing"
+
+clus_17_genes <- c( "Csf1", "Ms4a2", "Il6","Cd63")
+title_feature_umap_clus_17 <- "Csf1 producing, IgE-R+"
+caption_feature_umap_clus_17 <- "Ms4a2= IgE-R, Fcer1a, "
+
+clus_18_genes <- c( "S100a9","Mmp9", "S100a8", "H2-Q10")
+title_feature_umap_clus_18 <- "Procalcitonin/Mmp9"
+caption_feature_umap_clus_18 <- ""
+
+clus_19_genes <- c( "Cidec", "Kcnn3","F7", "Mertk", "Cd24a")
+title_feature_umap_clus_19 <- "??"
+caption_feature_umap_clus_19 <- "Cidec: Lipid transferase, "
+
+clus_20_genes <- c( "F5", "Acod1", "Cd24a", "Ccr3")
+title_feature_umap_clus_20 <- "??"
+caption_feature_umap_clus_20 <- ""
+
+clus_21_genes <- c( "F13a1", "Mafb", "Csf3r", "Ccr2", "Gzmb", "S100a4")
+title_feature_umap_clus_21 <- ""
+caption_feature_umap_clus_21 <- ""
+
+
+###---evaluation helpers for chunks
+ids_of_clusters <- unique(seurat_obj$seurat_clusters)
+eval_0 <- 0 %in% ids_of_clusters
+eval_1 <- 1 %in% ids_of_clusters
+eval_2 <- 2 %in% ids_of_clusters
+eval_3 <- 3 %in% ids_of_clusters
+eval_4 <- 4 %in% ids_of_clusters
+eval_5 <- 5 %in% ids_of_clusters
+eval_6 <- 6 %in% ids_of_clusters
+eval_7 <- 7 %in% ids_of_clusters
+eval_8 <- 8 %in% ids_of_clusters
+eval_9 <- 9 %in% ids_of_clusters
+eval_10 <- 10 %in% ids_of_clusters
+eval_11 <- 11 %in% ids_of_clusters
+eval_12 <- 12 %in% ids_of_clusters
+eval_13 <- 13 %in% ids_of_clusters
+eval_14 <- 14 %in% ids_of_clusters
+eval_15 <- 15 %in% ids_of_clusters
+eval_16 <- 16 %in% ids_of_clusters
+eval_17 <- 17 %in% ids_of_clusters
+eval_18 <- 18 %in% ids_of_clusters
+eval_19 <- 19 %in% ids_of_clusters
+eval_20 <- 20 %in% ids_of_clusters
+eval_21 <- 21 %in% ids_of_clusters
+eval_22 <- 22 %in% ids_of_clusters
+eval_23 <- 23 %in% ids_of_clusters#
+
+
+eval_10_extra <- TRUE
+eval_16_extra <-  TRUE
+###---
+
 theme_1 <- theme_minimal()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "none", axis.title = element_blank())
 ```
 
@@ -175,13 +255,16 @@ write_rds(filtered_seurat_obj, file = paste0(file_path$intermediate_data,file_na
 
 ```
 
-
-
 ### Row {.tabset}
 ```{r}
 #| title: sample tags
-p1 <- seurat_obj |> ggplot(aes(sampletag_name, fill=sampletag_name)) + geom_bar() + theme_minimal()+ theme_1+ ggtitle("sampletag_name")
-p1
+seurat_obj |> count(sampletag_name) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),2)) |>
+  ggplot(aes(sampletag_name, y=n, fill=sampletag_name)) +
+  geom_col()+ 
+  geom_text(aes(label=percent, x=sampletag_name, y=n))+
+  theme_minimal()+
+  theme_1+ ggtitle("sampletag_name")
 ```
 
 ```{r}
@@ -192,7 +275,7 @@ p1
 # p2
 
 seurat_obj |> count(RNA_snn_res.0.5) |>
-  mutate(percent=round(100*(n/ncol(seurat_obj)),4)) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),2)) |>
   ggplot(aes(RNA_snn_res.0.5, y=n, fill=RNA_snn_res.0.5)) +
   geom_col()+ 
   geom_text(aes(label=percent, x=RNA_snn_res.0.5, y=n))+
@@ -207,7 +290,7 @@ seurat_obj |> count(RNA_snn_res.0.5) |>
 #| title: Ms4a3
 
 seurat_obj |> count(sampletag_Ms4a3) |>
-  mutate(percent=round(100*(n/ncol(seurat_obj)),4)) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),2)) |>
   ggplot(aes(sampletag_Ms4a3, y=n, fill=sampletag_Ms4a3)) +
   geom_col()+ 
   geom_text(aes(label=percent, x=sampletag_Ms4a3, y=n))+
@@ -223,7 +306,7 @@ p4 <- seurat_obj |> ggplot(aes(sampletag_multiplets, fill=sampletag_multiplets))
 p4
 
 seurat_obj |> count(sampletag_multiplets) |>
-  mutate(percent=round(100*(n/ncol(seurat_obj)),4)) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),2)) |>
   ggplot(aes(sampletag_multiplets, y=n, fill=sampletag_multiplets)) +
   geom_col()+ 
   geom_text(aes(label=percent, x=sampletag_multiplets, y=n))+
@@ -449,100 +532,103 @@ feature_umap <- function(genes, title_="", caption_=""){
 ```
 
 
-```{r}
+```{r, cluster_0_feature_umap, eval= eval_0}
 #| title: cluster 0
 feature_umap(clus_1_genes, title_= title_feature_umap_clus_1, caption_ = caption_feature_umap_clus_1) 
 ```
 
-```{r}
+```{r, cluster_1_feature_umap, eval= eval_1}
 #| title: cluster 1
 feature_umap(clus_1_genes,title_feature_umap_clus_1, caption=caption_feature_umap_clus_1)
 ```
 
-```{r}
+```{r, cluster_2_feature_umap, eval= eval_2}
 #| title: cluster 2
 feature_umap(clus_2_genes,title_feature_umap_clus_2, caption=caption_feature_umap_clus_2)
 ```
 
-```{r}
+```{r, cluster_3_feature_umap, eval= eval_3}
 #| title: cluster 3
 feature_umap(clus_3_genes,title_feature_umap_clus_3, caption=caption_feature_umap_clus_3)
 ```
 
-```{r}
+```{r, cluster_4_feature_umap, eval= eval_4}
 #| title: cluster 4
 feature_umap(clus_4_genes,title_feature_umap_clus_4, caption=caption_feature_umap_clus_4)
 ```
 
-```{r}
+```{r, cluster_5_feature_umap, eval= eval_5}
+
 #| title: cluster 5
 
 feature_umap(clus_5_genes,title_feature_umap_clus_5, caption=caption_feature_umap_clus_5)
 ```
-```{r}
+
+```{r, cluster_6_feature_umap, eval= eval_6}
 #| title: cluster 6
 feature_umap(clus_6_genes,title_feature_umap_clus_6, caption=caption_feature_umap_clus_6)
 ```
 
-```{r}
+```{r, cluster_7_feature_umap, eval= eval_7}
 #| title: cluster 7
 
 feature_umap(clus_7_genes,title_feature_umap_clus_7, caption=caption_feature_umap_clus_7)
 ```
-```{r}
+```{r, cluster_8_feature_umap, eval= eval_8}
 #| title: cluster 8
 feature_umap(clus_8_genes,title_feature_umap_clus_8, caption=caption_feature_umap_clus_8)
 
 ```
-```{r}
+```{r, cluster_9_feature_umap, eval= eval_9}
 #| title: cluster 9
 
 feature_umap(clus_9_genes,title_feature_umap_clus_9, caption=caption_feature_umap_clus_9)
 ```
-```{r}
+```{r, cluster_10_feature_umap, eval= eval_10}
 #| title: cluster 10
 
 feature_umap(clus_10_genes,title_feature_umap_clus_10, caption=caption_feature_umap_clus_10)
 ```
-```{r}
+
+```{r, cluster_10_extra, eval= eval_10_extra}
+
 #| title: cluster 10 mt graph
+clus=10
 seurat_obj |> mutate(cluster_10=ifelse(RNA_snn_res.0.5==clus, paste("cluster", as.character(clus)), "other"))|> 
   arrange(desc(cluster_10)) |> 
   ggplot(aes(nCount_RNA,percent_mito, color=cluster_10)) +geom_point()
 ```
 
 
-```{r}
+```{r, cluster_11_feature_umap, eval= eval_11}
 #| title: cluster 11
 feature_umap(clus_11_genes,title_feature_umap_clus_11, caption=caption_feature_umap_clus_11)
 
 ```
 
+```{r, cluster_12_feature_umap, eval= eval_12}
 
-
-```{r}
 #| title: cluster 12
 feature_umap(clus_12_genes,title_feature_umap_clus_12, caption=caption_feature_umap_clus_12)
 
 ```
+```{r, cluster_13_feature_umap, eval= eval_13}
 
-
-
-
-```{r}
 #| title: cluster 13
 
 feature_umap(clus_13_genes,title_feature_umap_clus_13, caption=caption_feature_umap_clus_13)
 
 ```
 
-```{r}
+```{r, cluster_14_feature_umap, eval= eval_14}
+
 #| title: cluster 14
 
 feature_umap(clus_14_genes,title_feature_umap_clus_14, caption=caption_feature_umap_clus_14)
 ```
 
-```{r}
+```{r, cluster_15_feature_umap, eval= eval_15}
+
 #| title: cluster 15
 
 feature_umap(clus_15_genes,title_feature_umap_clus_15, caption=caption_feature_umap_clus_15)
@@ -551,19 +637,13 @@ feature_umap(clus_15_genes,title_feature_umap_clus_15, caption=caption_feature_u
 
 
 
-```{r}
+```{r, cluster_16_feature_umap, eval= eval_16}
 #| title: cluster 16
 
-clus_16_genes <- c( "Cldn5", "Col4a1","Ly6c1", "H2-Aa")
-
-feature_umap(clus_16_genes) +labs(subtitle = "Macrophage - Epithelial cell doublet/phagocytosed",  caption =   "Caudin5, collagen 4, tight junction, Col4 producing, MHC2 positive, Epidermal Growth Factor Receptor 5 expressing")+theme(plot.caption = element_text(size=12, face="bold"))
-
-
-
-
+feature_umap(clus_16_genes,title_feature_umap_clus_16, caption=caption_feature_umap_clus_16)
 ```
 
-```{r}
+```{r, cluster_16_extra, eval= eval_16_extra}
 #| title: cluster 16 expr
 seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==16, "cluster 16", "other")) |> 
   join_features(clus_16_genes) |> mutate(.feature=factor(.feature, levels=clus_16_genes)) |> 
@@ -575,48 +655,36 @@ seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==16, "cluster 16",
 ```
 
 
-```{r}
+```{r, cluster_17_feature_umap, eval= eval_17}
 #| title: cluster 17
 
-clus_17_genes <- c( "Csf1", "Ms4a2", "Il6","Cd63")
-
-feature_umap(clus_17_genes) +labs(subtitle = "Csf1 producing, IgE-R+",  caption =   "Ms4a2= IgE-R, Fcer1a, ")+theme(plot.caption = element_text(size=12, face="bold"))
-
+feature_umap(clus_17_genes,title_feature_umap_clus_17, caption=caption_feature_umap_clus_17)
 ```
-```{r}
+```{r, cluster_18_feature_umap, eval= eval_18}
 #| title: cluster 18
 
-clus_18_genes <- c( "S100a9","Mmp9", "S100a8", "H2-Q10")
-
-feature_umap(clus_18_genes) +labs(subtitle = "Procalcitonin/Mmp9",  caption =   "")+theme(plot.caption = element_text(size=12, face="bold"))
+feature_umap(clus_18_genes,title_feature_umap_clus_18, caption=caption_feature_umap_clus_18)
 
 ```
 
-```{r}
+```{r, cluster_19_feature_umap, eval= eval_19}
 #| title: cluster 19
 
-clus_18_genes <- c( "Cidec", "Kcnn3","F7", "Mertk", "Cd24a")
-
-feature_umap(clus_18_genes) +labs(subtitle = "?? ",  caption =   "Cidec: Lipid transferase, ")+theme(plot.caption = element_text(size=12, face="bold"))
-
+feature_umap(clus_19_genes,title_feature_umap_clus_19, caption=caption_feature_umap_clus_19)
 ```
 
-```{r}
+```{r, cluster_20_feature_umap, eval= eval_20}
+
 #| title: cluster 20
 
-clus_18_genes <- c( "F5", "Acod1", "Cd24a", "Ccr3")
-
-feature_umap(clus_18_genes) +labs(subtitle = "?? ",  caption =   "Cidec: Lipid transferase, ")+theme(plot.caption = element_text(size=12, face="bold"))
+feature_umap(clus_20_genes,title_feature_umap_clus_20, caption=caption_feature_umap_clus_20)
 
 ```
 
-```{r}
+```{r, cluster_21_feature_umap, eval= eval_21}
 #| title: cluster 21
 
-clus_18_genes <- c( "F13a1", "Mafb", "Csf3r", "Ccr2", "Gzmb", "S100a4")
-
-feature_umap(clus_18_genes) +labs(subtitle = "?? ",  caption =   "")+theme(plot.caption = element_text(size=12, face="bold"))
-
+feature_umap(clus_21_genes,title_feature_umap_clus_21, caption=caption_feature_umap_clus_21)
 ```
 ### Row {.tabset}
 ```{r}
