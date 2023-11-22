@@ -1,0 +1,216 @@
+---
+title: "bootstrap_2"
+format: html
+editor: visual
+---
+
+## Bootstrapping Confindence Intervals for "Difference in Differnece" of scRNA-Seq Data
+
+```{r}
+easypackages::libraries("modelr", "tidyverse","Seurat", "tidyseurat", "ggridges", "ggpointdensity", "magrittr")
+bal_alv_mac <- read_rds( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_macs_with_merged_groups.rds")
+bal_alv_mac$virus <- tibble(sampletag_name=bal_alv_mac |> pull(sampletag_name)) |> separate(sampletag_name,into = c("virus")) |> pull("virus")
+
+
+```
+
+```{r}
+
+choose_values_virus_Ms4a3 <- function(seurat_obj, gene, virus_cond_1,virus_cond_2, slot="data") {
+        dat_A_x <- seurat_obj |>  filter(virus==virus_cond_1 & sampletag_Ms4a3=="Ms4a3_pos")
+        dat_A_y <- seurat_obj |>  filter(virus==virus_cond_1 & sampletag_Ms4a3=="Ms4a3_neg")
+        
+        dat_B_x <- seurat_obj |>  filter(virus==virus_cond_2 & sampletag_Ms4a3=="Ms4a3_pos")
+        dat_B_y <- seurat_obj |>  filter(virus==virus_cond_2 & sampletag_Ms4a3=="Ms4a3_neg")
+        
+        if (slot=="data") {
+                        gene_index_A <- which(gene == rownames(dat_A_x))[[1]]
+        values_A_x <- dat_A_x@assays$RNA@layers$data[gene_index_A,]
+        # values_A_x <- tibble(values=dat_A_x@assays$RNA@layers$data[gene_index_A,],
+        # name=paste0(virus_cond_1,"_", "Ms4a3_pos"))
+        
+        
+        gene_index_A <- which(gene == rownames(dat_A_y))[[1]]
+        values_A_y <- dat_A_y@assays$RNA@layers$data[gene_index_A,]
+        # values_A_y <- tibble(values=dat_A_x@assays$RNA@layers$data[gene_index_A,],
+        # name=paste0(virus_cond_1,"_", "Ms4a3_neg"))
+        
+        
+        
+        gene_index_B <- which(gene == rownames(dat_B_x))[[1]]
+        values_B_x <- dat_B_x@assays$RNA@layers$data[gene_index_B,]
+        
+        
+        gene_index_B <- which(gene == rownames(dat_B_y))[[1]]
+        values_B_y <- dat_B_y@assays$RNA@layers$data[gene_index_B,]
+        output_lst <- list(values_A_x,values_A_y,values_B_x,values_B_y)
+                
+        }
+
+        
+                if (slot=="counts") {
+                        gene_index_A <- which(gene == rownames(dat_A_x))[[1]]
+        values_A_x <- dat_A_x@assays$RNA@layers$counts[gene_index_A,]
+        # values_A_x <- tibble(values=dat_A_x@assays$RNA@layers$counts[gene_index_A,],
+        # name=paste0(virus_cond_1,"_", "Ms4a3_pos"))
+        
+        
+        gene_index_A <- which(gene == rownames(dat_A_y))[[1]]
+        values_A_y <- dat_A_y@assays$RNA@layers$counts[gene_index_A,]
+        # values_A_y <- tibble(values=dat_A_x@assays$RNA@layers$counts[gene_index_A,],
+        # name=paste0(virus_cond_1,"_", "Ms4a3_neg"))
+        
+        
+        
+        gene_index_B <- which(gene == rownames(dat_B_x))[[1]]
+        values_B_x <- dat_B_x@assays$RNA@layers$counts[gene_index_B,]
+        
+        
+        gene_index_B <- which(gene == rownames(dat_B_y))[[1]]
+        values_B_y <- dat_B_y@assays$RNA@layers$counts[gene_index_B,]
+        output_lst <- list(values_A_x,values_A_y,values_B_x,values_B_y)
+                
+        }
+        
+        
+        
+        
+        return(output_lst)
+        
+        
+}
+
+fc_plot <-function(dat, x,y,contrast)
+        
+{         ggplot(data = dat,aes({{x}},{{y}},color={{contrast}}))+
+        geom_density2d() +  
+                geom_abline(intercept = 0, slope = 1, color="black", linetype="dashed",linewidth=1)+
+                geom_vline(xintercept =  0,  color="black")+
+                geom_hline(yintercept =  0,  color="black")+
+                xlim(c(-2,2))+ylim(c(-2,2))+
+                theme_bw()
+        }
+
+bootstrap_mean <- function(value_vec){
+        sample(value_vec , size = length(value_vec),replace = T) |> mean()
+}
+
+```
+```{r}
+spp1 <- choose_values_virus_Ms4a3(bal_alv_mac,gene = "Spp1",virus_cond_1 = "PR8",virus_cond_2 = "Mock")
+
+spp1_counts <- choose_values_virus_Ms4a3(bal_alv_mac,gene = "Spp1",virus_cond_1 = "PR8",virus_cond_2 = "Mock", slot = "counts")
+
+a_x <- replicate(10000,
+          bootstrap_mean(spp1[[1]])
+       )
+a_y <-  replicate(10000,
+          bootstrap_mean(spp1[[2]])
+       )
+
+b_x <- replicate(10000,
+          bootstrap_mean(spp1[[3]])
+       )
+
+b_y <-  replicate(10000,
+          bootstrap_mean(spp1[[4]])
+       )
+tbl <- tibble(a_x,a_y,b_x,b_y) 
+
+
+
+tibble(x=a_x,y=a_y,contrast="a") |> bind_rows(tibble(x=b_x,y=b_y,contrast="b")) |> fc_plot(x,y,contrast)
+
+tbl |> transmute(mean_diff_a=a_x-a_y,mean_diff_b=b_x-b_y ) |> mutate(contrast="none") |> fc_plot(mean_diff_a,mean_diff_b,contrast)
+
+```
+```{r}
+
+Epcam <- choose_values_virus_Ms4a3(bal_alv_mac,gene = "Epcam",virus_cond_1 = "PR8",virus_cond_2 = "Mock")
+
+
+
+a_x <- replicate(10000,
+          bootstrap_mean(Epcam[[1]])
+       )
+a_y <-  replicate(10000,
+          bootstrap_mean(Epcam[[2]])
+       )
+
+b_x <- replicate(10000,
+          bootstrap_mean(Epcam[[3]])
+       )
+
+b_y <-  replicate(10000,
+          bootstrap_mean(Epcam[[4]])
+       )
+tbl <- tibble(a_x,a_y,b_x,b_y) 
+
+
+
+tibble(x=a_x,y=a_y,contrast="a") |> bind_rows(tibble(x=b_x,y=b_y,contrast="b")) |> fc_plot(x,y,contrast)
+
+tbl |> transmute(mean_diff_a=a_x-a_y,mean_diff_b=b_x-b_y ) |> mutate(contrast="none") |> fc_plot(mean_diff_a,mean_diff_b,contrast)
+
+```
+
+```{r Gabbr2}
+
+Gabrr2_counts <- choose_values_virus_Ms4a3(bal_alv_mac,gene = "Gabrr2",virus_cond_1 = "PR8",virus_cond_2 = "Mock", slot = "counts")
+
+Gabrr2 <- choose_values_virus_Ms4a3(bal_alv_mac,gene = "Gabrr2",virus_cond_1 = "PR8",virus_cond_2 = "Mock", slot = "data")
+
+
+a_x <- replicate(10000,
+          bootstrap_mean(Gabrr2[[1]])
+       )
+a_y <-  replicate(10000,
+          bootstrap_mean(Gabrr2[[2]])
+       )
+
+b_x <- replicate(10000,
+          bootstrap_mean(Gabrr2[[3]])
+       )
+
+b_y <-  replicate(10000,
+          bootstrap_mean(Gabrr2[[4]])
+       )
+tbl <- tibble(a_x,a_y,b_x,b_y) 
+
+
+
+tibble(x=a_x,y=a_y,contrast="a") |> bind_rows(tibble(x=b_x,y=b_y,contrast="b")) |> fc_plot(x,y,contrast)
+
+tbl |> transmute(mean_diff_a=a_x-a_y,mean_diff_b=b_x-b_y ) |> mutate(contrast="none") |> fc_plot(mean_diff_a,mean_diff_b,contrast)
+
+```
+
+```{r Adamts9}
+
+Adamts9 <- choose_values_virus_Ms4a3(bal_alv_mac,gene = "Adamts9",virus_cond_1 = "PR8",virus_cond_2 = "Mock")
+
+
+
+a_x <- replicate(10000,
+          bootstrap_mean(Adamts9[[1]])
+       )
+a_y <-  replicate(10000,
+          bootstrap_mean(Adamts9[[2]])
+       )
+
+b_x <- replicate(10000,
+          bootstrap_mean(Adamts9[[3]])
+       )
+
+b_y <-  replicate(10000,
+          bootstrap_mean(Adamts9[[4]])
+       )
+tbl <- tibble(a_x,a_y,b_x,b_y) 
+
+
+
+tibble(x=a_x,y=a_y,contrast="a") |> bind_rows(tibble(x=b_x,y=b_y,contrast="b")) |> fc_plot(x,y,contrast)
+
+tbl |> transmute(mean_diff_a=a_x-a_y,mean_diff_b=b_x-b_y ) |> mutate(contrast="none") |> fc_plot(mean_diff_a,mean_diff_b,contrast)
+
+```
