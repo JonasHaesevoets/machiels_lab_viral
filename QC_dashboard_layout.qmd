@@ -16,7 +16,7 @@ libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","
 )
 
  #source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_lung.R")
- source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_bal.R")
+source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_bal.R")
 
 ```
 
@@ -68,7 +68,7 @@ filtered_seurat_obj <- seurat_obj |>
 filtered_seurat_obj |> DimPlot(label = T)
 
 
-write_rds(filtered_seurat_obj, file = paste0(file_path$intermediate_data,file_name_obj,"_filtered"))
+write_rds(filtered_seurat_obj, file = paste0(file_path$intermediate_data,file_name_obj,"_filtered","rds" ))
 
 ```
 
@@ -255,15 +255,15 @@ DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
 ```
 ```{r}
 #| title: PC  4/5
-DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
+DimPlot(seurat_obj, reduction = "pca", dims = c(4,5))
 ```
 ```{r}
 #| title: PC  6/7
-DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
+DimPlot(seurat_obj, reduction = "pca", dims = c(6,7))
 ```
 ```{r}
 #| title: PC  8/9
-DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
+DimPlot(seurat_obj, reduction = "pca", dims = c(8,9))
 ```
 
 ## Column {.tabset}

@@ -1,0 +1,332 @@
+---
+title: "Experiment 1 - differentially expressed genes dashboard"
+format: dashboard
+---
+
+```{r include=FALSE}
+#if (!require(devtools)) install.packages("devtools")
+#devtools::install_github("gaospecial/ggVennDiagram")
+library("patchwork")
+easypackages::libraries("tidyverse", "tidyr", "tidygate", "ggVennDiagram", "VennDiagram", "purr")
+
+
+markers_roc <- read_csv( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_mac_markers_roc.csv")
+
+```
+# BAL
+```{r include=FALSE}
+ploter_ <- function(plot_i=1,
+                    color_highlight="red",
+                    fc_thresh_upper = 0.66,
+                    log2_FC_tresh_x=1,
+                    AUC_tresh=0.5) {
+        plot_ <- lst[[plot_i]] |> full_join(lst[[2]], by="gene")|>  
+                mutate(avg_log2FC.x=ifelse(avg_log2FC.x>4,4,avg_log2FC.x),
+                       avg_log2FC.y=ifelse(avg_log2FC.x>4,4,avg_log2FC.y)) |> 
+                #replace_na(list(avg_log2FC.x=0,avg_log2FC.y=0)) |>
+                mutate(dist_from_0.5 =abs(myAUC.x-0.5)) |> 
+                arrange(dist_from_0.5) |> 
+        mutate(fc_ratio=avg_log2FC.y/avg_log2FC.x) |> 
+        mutate(highlight_genes=case_when(
+                (fc_ratio<fc_thresh_upper  & avg_log2FC.x>log2_FC_tresh_x & myAUC.x>AUC_tresh)  ~"highlight",
+                TRUE~NA
+                
+        )) |> 
+                ggplot(aes(avg_log2FC.x,avg_log2FC.y, color=highlight_genes),alpha=0.5)+
+                geom_point() +
+        geom_abline(intercept = 0, slope = 1, color="black", 
+                 linetype="dashed", linewidth=1)+
+                scale_color_manual(values=c(color_highlight))+
+        theme_minimal()+
+        #coord_fixed()+
+                theme(legend.position = "none")+xlim(c(-4.2,+4.2))+ylim(c(-4.2,+4.2))+ggtitle(lst[[plot_i]][1,"comparison"])
+        return(plot_)
+        
+}
+
+
+ploter_ <- function(plot_i=1,
+                    color_highlight="red",
+                    fc_thresh_upper = 0.66,
+                    log2_FC_tresh_x=1,
+                    AUC_tresh=0.5) {
+        plot_ <- lst[[plot_i]] |> full_join(lst[[2]], by="gene")|>  
+                mutate(avg_log2FC.x=ifelse(avg_log2FC.x>4,4,avg_log2FC.x),
+                       avg_log2FC.y=ifelse(avg_log2FC.x>4,4,avg_log2FC.y)) |> 
+                #replace_na(list(avg_log2FC.x=0,avg_log2FC.y=0)) |>
+                mutate(dist_from_0.5 =abs(myAUC.x-0.5)) |> 
+                arrange(dist_from_0.5) |> 
+        mutate(fc_ratio=avg_log2FC.y/avg_log2FC.x) |> 
+        mutate(highlight_genes=case_when(
+                (fc_ratio<fc_thresh_upper  & avg_log2FC.x>log2_FC_tresh_x & myAUC.x>AUC_tresh)  ~"highlight",
+                TRUE~NA
+                
+        )) |> 
+                ggplot(aes(avg_log2FC.x,avg_log2FC.y, color=highlight_genes),alpha=0.5)+
+                geom_point() +
+        geom_abline(intercept = 0, slope = 1, color="black", 
+                 linetype="dashed", linewidth=1)+
+                scale_color_manual(values=c(color_highlight))+
+        theme_minimal()+
+        #coord_fixed()+
+                theme(legend.position = "none")+xlim(c(-4.2,+4.2))+ylim(c(-4.2,+4.2))+ggtitle(lst[[plot_i]][1,"comparison"])
+        return(plot_)
+        
+}
+
+
+fc_thresh_upper <- 0.66
+plot_i=1
+                   color_highlight="red"
+                    fc_thresh_upper = 0.66
+                    log2_FC_tresh_x=1
+
+                    AUC_tresh=0.
+
+
+
+library(ggpointdensity)
+
+ lst[[1]] |> full_join(lst[[2]], by="gene")|>  
+                mutate(avg_log2FC.x=ifelse(avg_log2FC.x>4,4,avg_log2FC.x),
+                       avg_log2FC.y=ifelse(avg_log2FC.x>4,4,avg_log2FC.y))|> 
+                arrange(power.x) |> 
+        mutate(highlight_genes=case_when(
+                ( avg_log2FC.x>log2_FC_tresh_x & myAUC.x>AUC_tresh)  ~"highlight",
+                TRUE~NA
+                
+        )) |> 
+                ggplot(aes(avg_log2FC.x,myAUC.x#,# color=highlight_genes, 
+                           #color=power.x
+                           ),alpha=0.5)+
+                geom_pointdensity()
+
+
+
+
+
+lst <- markers_roc |> group_by(comparison) |> group_split()
+
+
+
+vulcano_x <- lst[[1]] |> 
+                mutate(avg_log2FC=ifelse(avg_log2FC>4,4,avg_log2FC),
+                       avg_log2FC=ifelse(avg_log2FC>4,4,avg_log2FC))|> 
+                arrange(power) |> 
+        mutate(highlight_genes=case_when(
+                ( avg_log2FC>log2_FC_tresh_x & myAUC>AUC_tresh)  ~"highlight",
+                TRUE~NA
+                
+        )) |> 
+                ggplot(aes(avg_log2FC,power, color=highlight_genes
+                           ),alpha=0.5)+
+                geom_point()+xlim(c(-4.2,+4.2))+ylim(c(-0,1)) +theme_minimal()+theme(axis.title.x = element_blank(),
+                                                                                     axis.ticks.x = element_blank(),
+                                                                                     axis.text.x = element_blank())
+
+
+vulcano_y <- lst[[2]] |> 
+                mutate(avg_log2FC=ifelse(avg_log2FC>4,4,avg_log2FC),
+                       avg_log2FC=ifelse(avg_log2FC>4,4,avg_log2FC))|> 
+                arrange(power) |> 
+        mutate(highlight_genes=case_when(
+                ( avg_log2FC>log2_FC_tresh_x & myAUC>AUC_tresh)  ~"highlight",
+                TRUE~NA
+                
+        )) |> 
+                ggplot(aes(-power,avg_log2FC, color=highlight_genes
+                           ),alpha=0.5)+
+                geom_point()+#xlim(c(-4.2,+4.2))+ylim(c(-0,1)) +
+        theme_minimal()+theme(axis.title.x = element_blank(),
+                                                                                     axis.ticks.x = element_blank(),
+                                                                                     axis.text.x = element_blank(),
+                              legend.position = "none")
+
+
+
+```
+
+```{r}
+lst[[1]] |> full_join(lst[[2]], by="gene")
+```
+
+
+
+## Row {heigt=10%}
+```{r controls}
+
+```
+
+## Row 
+```{r}
+#| echo: false
+p1<- ploter_(plot_i = 1, color_highlight="red" ) 
+p2 <- ploter_(plot_i = 3, color_highlight="green" )
+p3 <- ploter_(plot_i = 4, color_highlight="blue")
+p4 <- ploter_(plot_i = 5, color_highlight="purple")
+
+vulcano_1 <- 
+```
+
+### Column 
+```{r}
+(plot_spacer+ vulcano_1)/(vulcano_y+(p1 +ggtitle(NULL)))
+
+```
+
+### Column 
+```{r}
+p2
+```
+
+### Column 
+```{r}
+p3
+```
+
+### Column 
+```{r}
+p4
+```
+## Row 
+### Column
+```{r}
+venn_dat <- list(
+  A = (p1[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)), 
+  B = (p2[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)), 
+  C = (p3[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)),
+  D = (p4[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)))
+  
+venn1 <- ggVennDiagram(venn_dat, label_alpha = 0)
+venn1
+
+
+```
+
+### Column
+```{r}
+overlap <- calculate.overlap(venn_dat)
+
+genes_highlighted_tbl <- p1[[1]] |> filter(highlight_genes=="highlight") |> 
+        bind_rows(p2[[1]] |> filter(highlight_genes=="highlight")
+                  ) |> 
+        bind_rows(p3[[1]] |> filter(highlight_genes=="highlight")
+                  ) |> 
+        bind_rows(p4[[1]] |> filter(highlight_genes=="highlight")
+                  ) 
+
+
+
+genes_highlighted <- genes_highlighted_tbl|> pull(gene)
+
+colnames(genes_highlighted_tbl) <- str_remove_all(colnames(genes_highlighted_tbl),".x")
+
+dat <- markers_roc |> 
+        full_join(genes_highlighted_tbl) |> 
+        filter(gene %in% genes_highlighted) |> 
+         arrange(factor(gene, levels = (list_c(overlap))))
+
+
+dat|> ggplot(aes(gene,comparison, size=power, fill=avg_log2FC, color=as.character(highlight_genes))) +
+        geom_point(shape=21, stroke=2)+
+        theme_minimal()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+scale_fill_viridis_b()
+
+#+ scale_colour_manual(c("#E69F00", "#56B4E9"))
+        
+
+```
+# Lung
+
+
+
+```{r include=FALSE}
+markers_roc <- read_csv( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_lung_alv_mac_markers_roc.csv")
+
+lst <- markers_roc |> group_by(comparison) |> group_split()
+
+
+
+```
+
+
+## Row {heigt=10%}
+```{r controls}
+
+```
+
+## Row 
+```{r}
+#| echo: false
+p1<- ploter_(plot_i = 1, color_highlight="red" ) 
+p2 <- ploter_(plot_i = 3, color_highlight="green" )
+p3 <- ploter_(plot_i = 4, color_highlight="blue")
+p4 <- ploter_(plot_i = 5, color_highlight="purple")
+```
+
+### Column 
+```{r}
+p1
+
+```
+
+### Column 
+```{r}
+p2
+```
+
+### Column 
+```{r}
+p3
+```
+
+### Column 
+```{r}
+p4
+```
+## Row 
+### Column
+```{r}
+venn_dat <- list(
+  A = (p1[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)), 
+  B = (p2[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)), 
+  C = (p3[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)),
+  D = (p4[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)))
+  
+venn1 <- ggVennDiagram(venn_dat, label_alpha = 0)
+venn1
+
+
+```
+
+### Column
+```{r}
+overlap <- calculate.overlap(venn_dat)
+
+genes_highlighted_tbl <- p1[[1]] |> filter(highlight_genes=="highlight") |> 
+        bind_rows(p2[[1]] |> filter(highlight_genes=="highlight")
+                  ) |> 
+        bind_rows(p3[[1]] |> filter(highlight_genes=="highlight")
+                  ) |> 
+        bind_rows(p4[[1]] |> filter(highlight_genes=="highlight")
+                  ) 
+
+
+
+genes_highlighted <- genes_highlighted_tbl|> pull(gene)
+
+colnames(genes_highlighted_tbl) <- str_remove_all(colnames(genes_highlighted_tbl),".x")
+
+dat <- markers_roc |> 
+        full_join(genes_highlighted_tbl) |> 
+        filter(gene %in% genes_highlighted) |> 
+         arrange(factor(gene, levels = (list_c(overlap))))
+
+
+dat|> ggplot(aes(gene,comparison, size=power, fill=avg_log2FC, color=as.character(highlight_genes))) +
+        geom_point(shape=21, stroke=2)+
+        theme_minimal()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+scale_fill_viridis_b()
+
+#+ scale_colour_manual(c("#E69F00", "#56B4E9"))
+        
+
+```
