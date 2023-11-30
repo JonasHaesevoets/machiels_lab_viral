@@ -8,27 +8,15 @@ format: dashboard
 #devtools::install_github("gaospecial/ggVennDiagram")
 library("patchwork")
 easypackages::libraries("tidyverse", "tidyr", "tidygate", "ggVennDiagram", "VennDiagram", "purr", "ggpointdensity")
-
-markers_roc <- read_csv( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_mac_markers_roc.csv")
 ```
-# BAL
 
-
-```{r include=FALSE}
-fc_thresh_upper <- 0.66
-plot_i=1
-color_highlight="red"
-fc_thresh_upper = 0.66
-log2_FC_tresh_x=1
-
-power_tresh_standard <- 0.3
-
-
-fc_by_fc_ploter <- function(plot_i=1,
+```{r, functions, include=FALSE}
+fc_by_fc_ploter <- function(lst,
+                            plot_i=1,
                     color_highlight="red",
                     fc_thresh_upper = 0.66,
-                    log2_FC_tresh_x=1,
-                    power_tresh=power_tresh_standard) {
+                    log2_FC_tresh_x,
+                    power_tresh) {
   
   plot_ <- lst[[plot_i]] |> full_join(lst[[2]], by="gene")|>  
     mutate(avg_log2FC.x=ifelse(avg_log2FC.x>4,4,avg_log2FC.x),
@@ -45,7 +33,18 @@ fc_by_fc_ploter <- function(plot_i=1,
         power.x>power_tresh)  ~"highlight",
       TRUE~"no"
       
-    )) |> 
+    ))
+  
+  if (log2_FC_tresh_x<0) {plot_ <- plot_ |>mutate(highlight_genes=case_when(
+      (#fc_ratio<fc_thresh_upper  &
+         avg_log2FC.x<(log2_FC_tresh_x)&
+        power.x>power_tresh)  ~"highlight",
+      TRUE~"no"
+      
+    ))
+    
+  }
+plot_ <- plot_|> 
     mutate(highlight_genes=factor(highlight_genes,levels=c("no", "highlight"))) |> 
     ggplot(aes(avg_log2FC.x,avg_log2FC.y, color=highlight_genes),alpha=0.5)+
         geom_abline(intercept = 0, slope = 1, color="black", 
@@ -62,20 +61,10 @@ fc_by_fc_ploter <- function(plot_i=1,
   
 }
 
-
-
-
-
-
-
-
-
-
-lst <- markers_roc |> group_by(comparison) |> group_split()
-
-vulcano_x <- function(i, power_tresh=power_tresh_standard) {
+vulcano_x <- function(lst,i, power_tresh=power_tresh_standard,log2_FC_tresh_x=log2_FC_tresh_x_standard) {
+  tbl <- lst[[i]]
   
-  lst[[i]] |> 
+   tbl <- tbl |> 
                   mutate(avg_log2FC=ifelse(avg_log2FC>4,4,avg_log2FC),
                          avg_log2FC=ifelse(avg_log2FC<(-4),(-4),avg_log2FC),avg_log2FC#,
                          #power=if_else(power>0.55,(0.55+runif(1,0.1,0.2)),power)
@@ -85,8 +74,23 @@ vulcano_x <- function(i, power_tresh=power_tresh_standard) {
                   ( avg_log2FC>log2_FC_tresh_x & power>power_tresh)  ~"highlight",
                   TRUE~"no"
                   
-          )) |> 
-    mutate(highlight_genes=factor(highlight_genes,levels=c("no", "highlight"))) |> 
+          )) 
+  
+  
+    if (log2_FC_tresh_x<0) {
+      #print("negative")
+      tbl <- tbl |> mutate(highlight_genes=case_when(
+      (#fc_ratio<fc_thresh_upper  &
+avg_log2FC<(log2_FC_tresh_x) & power>power_tresh)  ~"highlight",
+                  TRUE~"no"
+      
+    ))
+    
+    }
+  tbl <- tbl |> 
+    mutate(highlight_genes=factor(highlight_genes,levels=c("no", "highlight")))
+  
+  plot_ <- tbl|> 
                   ggplot(aes(avg_log2FC,power, color=highlight_genes
                              ),alpha=0.5)+
                   geom_point()+
@@ -98,40 +102,56 @@ vulcano_x <- function(i, power_tresh=power_tresh_standard) {
           #axis.text.x = element_blank(),
           legend.position = "none")+
   scale_color_manual(values=c("grey", "blue"))
-
   
+  return(plot_)
   }
 
+```
+```{r, load_data, include=FALSE }
+markers_roc <- read_csv( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_mac_markers_roc.csv")
 
+lst <- markers_roc |> group_by(comparison) |> group_split()
+```
 
+```{r, set_power_0.3, include=FALSE }
+color_highlight="red"
 
+log2_FC_tresh_x_standard <- 1
 
-
-
-
-
+power_tresh_standard <- 0.3
+fc_thresh_upper <- 0.66
 ```
 
 
+# Power 0.3
 
 
-## Row {height=20%}
 
 
 ## Row 
-```{r}
+```{r, set_fc_fc_plots}
 #| echo: false
-fc_by_fc_1 <- fc_by_fc_ploter(1)
-fc_by_fc_3 <- fc_by_fc_ploter(3)
-fc_by_fc_4 <- fc_by_fc_ploter(4)
-fc_by_fc_5 <- fc_by_fc_ploter(5)
+
+fc_by_fc_1 <- fc_by_fc_ploter(lst = lst,plot_i = 1,
+                              log2_FC_tresh_x =log2_FC_tresh_x_standard,
+                              power_tresh = power_tresh_standard)
+fc_by_fc_3 <- fc_by_fc_ploter(lst = lst,plot_i = 3,
+                              log2_FC_tresh_x =log2_FC_tresh_x_standard,
+                              power_tresh = power_tresh_standard)
+fc_by_fc_4 <- fc_by_fc_ploter(lst = lst,plot_i = 4,
+                              log2_FC_tresh_x =log2_FC_tresh_x_standard,
+                              power_tresh = power_tresh_standard)
+fc_by_fc_5 <- fc_by_fc_ploter(lst = lst,plot_i = 5,
+                              log2_FC_tresh_x =log2_FC_tresh_x_standard,
+                              power_tresh = power_tresh_standard)
 ```
 
 #### Column {width=12%}
-```{r}
+```{r, vulcano_y_here}
 #| fig-width: 3
 #| fig-height: 6
-(plot_spacer())/(vulcano_x(2)+coord_flip()+scale_y_reverse()+ggtitle("Mock Ms4a3 pos vs. neg."))+ 
+vulc <- vulcano_x(lst = lst,i = 2,power_tresh = power_tresh_standard,log2_FC_tresh_x = log2_FC_tresh_x_standard)
+(plot_spacer())/(vulc+coord_flip()+scale_y_reverse()+ggtitle("Mock Ms4a3 pos vs. neg."))+ 
   plot_layout(heights =  c(1, 3))
 ```
 #### Column {width=22%}
@@ -139,7 +159,10 @@ fc_by_fc_5 <- fc_by_fc_ploter(5)
 #| title: A
 #| fig-width: 5.5
 #| fig-height: 6
-vulcano_x(1)/ fc_by_fc_1+ 
+
+vulc <- vulcano_x(lst = lst,i = 1,power_tresh = power_tresh_standard,log2_FC_tresh_x = log2_FC_tresh_x_standard)
+
+vulc/ fc_by_fc_1+ 
   plot_layout(heights =  c(1, 3))
 ```
 
@@ -148,7 +171,8 @@ vulcano_x(1)/ fc_by_fc_1+
 #| title: B
 #| fig-width: 5.5
 #| fig-height: 6
-vulcano_x(3)/ fc_by_fc_3+ 
+vulc <- vulcano_x(lst = lst,i = 3,power_tresh = power_tresh_standard,log2_FC_tresh_x = log2_FC_tresh_x_standard)
+vulc/ fc_by_fc_3+ 
   plot_layout(heights =  c(1, 3))
 ```
 
@@ -157,7 +181,9 @@ vulcano_x(3)/ fc_by_fc_3+
 #| title: C
 #| fig-width: 5.5
 #| fig-height: 6
-vulcano_x(4)/ fc_by_fc_4+ 
+
+vulc <- vulcano_x(lst = lst,i = 4,power_tresh = power_tresh_standard,log2_FC_tresh_x = log2_FC_tresh_x_standard)
+vulc/ fc_by_fc_4+ 
   plot_layout(heights =  c(1, 3))
 ```
 
@@ -166,12 +192,14 @@ vulcano_x(4)/ fc_by_fc_4+
 #| title: D
 #| fig-width: 5.5
 #| fig-height: 6
-vulcano_x(5)/ fc_by_fc_5+ 
+vulc <- vulcano_x(lst = lst,i = 5,power_tresh = power_tresh_standard,log2_FC_tresh_x = log2_FC_tresh_x_standard)
+vulc/ fc_by_fc_5+ 
   plot_layout(heights =  c(1, 3))
 ```
 ## Row 
 ### Column
 ```{r}
+#| title: shared DEG Ms4a3 pos. vs neg.
 venn_dat <- list(
   A = (fc_by_fc_1[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)), 
   B = (fc_by_fc_3[[1]] |> filter(highlight_genes=="highlight") |> pull(gene)), 
@@ -186,6 +214,7 @@ venn1
 
 ### Column
 ```{r}
+#| title: Fold changes intragroup - Ms4a3 pos. vs neg.
 overlap <- calculate.overlap(venn_dat)
 
 genes_highlighted_tbl <- fc_by_fc_1[[1]] |> filter(highlight_genes=="highlight") |> 
@@ -217,3 +246,77 @@ dat|> ggplot(aes(gene,comparison, size=power, fill=avg_log2FC, color=highlight_g
 
 ```
 
+
+
+# Power 0.2
+
+```{r read_chuncks}
+knitr::read_chunk('test_code_cunck.R')
+```
+
+```{r, include=FALSE }
+color_highlight="red"
+log2_FC_tresh_x_standard <- 1
+power_tresh_standard <- 0.2
+fc_thresh_upper <- 0.66
+```
+
+```{r, child='child_deg_dashboard.qmd'}
+```
+
+# Power 0.15
+```{r, include=FALSE }
+color_highlight="red"
+log2_FC_tresh_x_standard <- 1
+power_tresh_standard <- 0.15
+fc_thresh_upper <- 0.66
+```
+
+```{r, child='child_deg_dashboard.qmd'}
+```
+
+# Power 0.3, negative FC
+
+```{r }
+knitr::read_chunk('test_code_cunck.R')
+```
+
+```{r, , include=FALSE }
+color_highlight="red"
+log2_FC_tresh_x_standard <- -1
+power_tresh_standard <- 0.3
+fc_thresh_upper <- 0.66
+```
+
+```{r, child='child_deg_dashboard.qmd'}
+```
+# Power 0.2, negative FC
+
+```{r }
+knitr::read_chunk('test_code_cunck.R')
+```
+
+```{r, set_power_0.2, include=FALSE }
+color_highlight="red"
+log2_FC_tresh_x_standard <- -1
+power_tresh_standard <- 0.2
+fc_thresh_upper <- 0.66
+```
+
+```{r, child='child_deg_dashboard.qmd'}
+```
+# Power 0.15, negative FC
+
+```{r }
+knitr::read_chunk('test_code_cunck.R')
+```
+
+```{r, include=FALSE }
+color_highlight="red"
+log2_FC_tresh_x_standard <- -1
+power_tresh_standard <- 0.15
+fc_thresh_upper <- 0.66
+```
+
+```{r, child='child_deg_dashboard.qmd'}
+```
