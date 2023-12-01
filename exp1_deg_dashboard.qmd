@@ -1,5 +1,5 @@
 ---
-title: "Experiment 1 - differentially expressed genes dashboard"
+title: "Experiment 1 - AUROC differentially expressed genes dashboard"
 format: dashboard
 ---
 
@@ -81,7 +81,7 @@ vulcano_x <- function(lst,i, power_tresh=power_tresh_standard,log2_FC_tresh_x=lo
       #print("negative")
       tbl <- tbl |> mutate(highlight_genes=case_when(
       (#fc_ratio<fc_thresh_upper  &
-avg_log2FC<(log2_FC_tresh_x) & power>power_tresh)  ~"highlight",
+avg_log2FC<(log2_FC_tresh_x) & (power>power_tresh))  ~"highlight",
                   TRUE~"no"
       
     ))
@@ -191,7 +191,7 @@ fc_thresh_upper <- 0.66
 
 ```{r, child='child_deg_dashboard.qmd'}
 ```
-# Power 0.15, negative FC
+# Power 0.1, negative FC
 
 ```{r }
 knitr::read_chunk('test_code_cunck.R')
@@ -200,7 +200,7 @@ knitr::read_chunk('test_code_cunck.R')
 ```{r, include=FALSE }
 color_highlight="red"
 log2_FC_tresh_x_standard <- -1
-power_tresh_standard <- 0.15
+power_tresh_standard <- 0.1
 fc_thresh_upper <- 0.66
 ```
 

@@ -96,7 +96,7 @@ venn1
 
 ### Column
 ```{r}
-#| fig-width: 10
+#| fig-width: 14
 #| fig-height: 6
 #| title: Fold changes intragroup - Ms4a3 pos. vs neg.
 overlap <- calculate.overlap(venn_dat)
@@ -104,11 +104,11 @@ overlap <- calculate.overlap(venn_dat)
 genes_highlighted_tbl <- fc_by_fc_1[[1]] |> filter(highlight_genes=="highlight") |> 
         bind_rows(fc_by_fc_3[[1]] |> filter(highlight_genes=="highlight")
                   ) |> 
-        bind_rows(fc_by_fc_mock[[1]] |> filter(highlight_genes=="highlight")
-                  )
         bind_rows(fc_by_fc_4[[1]] |> filter(highlight_genes=="highlight")
                   ) |> 
-        bind_rows(fc_by_fc_5[[1]] |> filter(highlight_genes=="highlight")
+        bind_rows(fc_by_fc_5[[1]] |> filter(highlight_genes=="highlight")|> 
+        bind_rows(fc_by_fc_mock[[1]] |> filter(highlight_genes=="highlight")
+                  ) 
                   ) 
 
 
