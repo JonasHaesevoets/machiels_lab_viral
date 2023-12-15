@@ -6,7 +6,7 @@ file_path$output <- ".\\output\\"
 file_path$intermediate_data<- ".\\intermediate_data\\" 
 #file_path$raw_data <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_Expression_Data_Unfiltered.st.gz"
 
-file_name_obj <- "seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed.rds"
+file_name_obj <- "seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed"
 
 seurat_obj <- read_rds(file = paste0(file_path$intermediate_data,file_name_obj)) |> mutate(sampletag_multiplets=factor(sampletag_multiplets, levels=c("undeterminded" , "multiplet"  ,   "single_hashtag"))) #level change can be ommited later when intermediate data has been asjusted
 

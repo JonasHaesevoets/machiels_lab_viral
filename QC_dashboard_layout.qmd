@@ -1,5 +1,5 @@
 ---
-title: "QC Experiment 1, day 60, BAL"
+title: "QC Experiment 2, day 8, bal"
 format: 
   dashboard:
     orientation: columns
@@ -15,8 +15,11 @@ library("easypackages")
 libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","patchwork","Matrix", "ggpp","ggpubr","ggmosaic", "DT", "lemon"#, "gridExtra"
 )
 
- #source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_lung.R")
-source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_bal.R")
+#source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_lung.R")
+#source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_bal.R")
+
+source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp2_bal.R")
+#source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp2_lung.R")
 
 ```
 
@@ -402,75 +405,79 @@ de_genes_tbl |> mutate(cluster=as_factor(cluster)) |>
 #load packages
 
 feature_umap <- function(genes, title_="", caption_=""){
-        seurat_obj |> join_features(genes) |> mutate(.feature=factor(.feature,levels=genes)) |> ggplot(aes(UMAP_1,UMAP_2,color=.abundance_RNA))+geom_point() +
+        seurat_obj |> join_features(genes) |> mutate(.feature=factor(.feature,levels=genes)) |> ggplot(aes(umap_1,umap_2,color=.abundance_RNA))+geom_point() +
   scale_color_viridis_c()+ theme_void()+coord_fixed()+
-  facet_wrap(~.feature, ncol = 7) +
+  facet_wrap(~.feature, ncol = 4) +
     labs(title =title_,
          caption =caption_ )+
     theme(plot.caption = element_text(size=6, face="bold"))
 }
 
+clus_0_genes <-  c(de_genes_tbl |> filter(cluster==0) |> slice_max(avg_log2FC,n = 5) |> pull(gene), c("H2-Ab1"))
+title_feature_umap_clus_0 <- "Macrophage, MHC complex"
+caption_feature_umap_clus_0 <-"" 
 ```
 
 
-```{r, cluster_0_feature_umap, eval= eval_0}
+```{r, cluster_0_feature_umap, eval= eval_0, include=eval_0}
 #| title: cluster 0
+#| fig-height: 10
 feature_umap(clus_0_genes, title_= title_feature_umap_clus_1, caption_ = caption_feature_umap_clus_1) 
 ```
 
-```{r, cluster_1_feature_umap, eval= eval_1}
+```{r, cluster_1_feature_umap, eval= eval_1, include=eval_1}
 #| title: cluster 1
-feature_umap(clus_1_genes,title_feature_umap_clus_1, caption=caption_feature_umap_clus_1)
+feature_umap(genes=clus_1_genes,title_feature_umap_clus_1, caption=caption_feature_umap_clus_1)
 ```
 
-```{r, cluster_2_feature_umap, eval= eval_2}
+```{r, cluster_2_feature_umap, eval= eval_2, include=eval_2}
 #| title: cluster 2
 feature_umap(clus_2_genes,title_feature_umap_clus_2, caption=caption_feature_umap_clus_2)
 ```
 
-```{r, cluster_3_feature_umap, eval= eval_3}
+```{r, cluster_3_feature_umap, eval= eval_3, include=eval_3}
 #| title: cluster 3
 feature_umap(clus_3_genes,title_feature_umap_clus_3, caption=caption_feature_umap_clus_3)
 ```
 
-```{r, cluster_4_feature_umap, eval= eval_4}
+```{r, cluster_4_feature_umap, eval= eval_4, include=eval_4}
 #| title: cluster 4
 feature_umap(clus_4_genes,title_feature_umap_clus_4, caption=caption_feature_umap_clus_4)
 ```
 
-```{r, cluster_5_feature_umap, eval= eval_5}
+```{r, cluster_5_feature_umap, eval= eval_5, include=eval_5}
 #| title: cluster 5
 
 feature_umap(clus_5_genes,title_feature_umap_clus_5, caption=caption_feature_umap_clus_5)
 ```
 
-```{r, cluster_6_feature_umap, eval= eval_6}
+```{r, cluster_6_feature_umap, eval= eval_6, include=eval_6}
 #| title: cluster 6
 feature_umap(clus_6_genes,title_feature_umap_clus_6, caption=caption_feature_umap_clus_6)
 ```
 
-```{r, cluster_7_feature_umap, eval= eval_7}
+```{r, cluster_7_feature_umap, eval= eval_7, include=eval_7}
 #| title: cluster 7
 
 feature_umap(clus_7_genes,title_feature_umap_clus_7, caption=caption_feature_umap_clus_7)
 ```
-```{r, cluster_8_feature_umap, eval= eval_8}
+```{r, cluster_8_feature_umap, eval= eval_8, include=eval_8}
 #| title: cluster 8
 feature_umap(clus_8_genes,title_feature_umap_clus_8, caption=caption_feature_umap_clus_8)
 
 ```
-```{r, cluster_9_feature_umap, eval= eval_9}
+```{r, cluster_9_feature_umap, eval= eval_9, include=eval_9}
 #| title: cluster 9
 
 feature_umap(clus_9_genes,title_feature_umap_clus_9, caption=caption_feature_umap_clus_9)
 ```
-```{r, cluster_10_feature_umap, eval= eval_10}
+```{r, cluster_10_feature_umap, eval= eval_10, include=eval_10}
 #| title: cluster 10
 
 feature_umap(clus_10_genes,title_feature_umap_clus_10, caption=caption_feature_umap_clus_10)
 ```
 
-```{r, cluster_10_extra, eval= eval_10_extra}
+```{r, cluster_10_extra, eval= eval_10_extra, include= eval_10_extra}
 #| title: cluster 10 mt graph
 
 clus=10
@@ -480,33 +487,33 @@ seurat_obj |> mutate(cluster_10=ifelse(RNA_snn_res.0.5==clus, paste("cluster", a
 ```
 
 
-```{r, cluster_11_feature_umap, eval= eval_11}
+```{r, cluster_11_feature_umap, eval= eval_11, include=eval_11}
 #| title: cluster 11
 
 feature_umap(clus_11_genes,title_feature_umap_clus_11, caption=caption_feature_umap_clus_11)
 
 ```
 
-```{r, cluster_12_feature_umap, eval= eval_12}
+```{r, cluster_12_feature_umap, eval= eval_12, include=eval_12}
 #| title: cluster 12
 #| 
 feature_umap(clus_12_genes,title_feature_umap_clus_12, caption=caption_feature_umap_clus_12)
 
 ```
-```{r, cluster_13_feature_umap, eval= eval_13}
+```{r, cluster_13_feature_umap, eval= eval_13, include=eval_13}
 #| title: cluster 13
 
 feature_umap(clus_13_genes,title_feature_umap_clus_13, caption=caption_feature_umap_clus_13)
 
 ```
 
-```{r, cluster_14_feature_umap, eval= eval_14}
+```{r, cluster_14_feature_umap, eval= eval_14, include=eval_14}
 #| title: cluster 14
 
 feature_umap(clus_14_genes,title_feature_umap_clus_14, caption=caption_feature_umap_clus_14)
 ```
 
-```{r, cluster_15_feature_umap, eval= eval_15}
+```{r, cluster_15_feature_umap, eval= eval_15, include=eval_15}
 #| title: cluster 15
 
 feature_umap(clus_15_genes,title_feature_umap_clus_15, caption=caption_feature_umap_clus_15)
@@ -514,7 +521,8 @@ feature_umap(clus_15_genes,title_feature_umap_clus_15, caption=caption_feature_u
 
 
 
-```{r, cluster_16_feature_umap, eval= eval_16}
+
+```{r, cluster_16_feature_umap, eval= eval_16, include=eval_16}
 #| title: cluster 16
 
 feature_umap(clus_16_genes,title_feature_umap_clus_16, caption=caption_feature_umap_clus_16)
@@ -533,31 +541,31 @@ seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==16, "cluster 16",
 ```
 
 
-```{r, cluster_17_feature_umap, eval= eval_17}
+```{r, cluster_17_feature_umap, eval= eval_17, include=eval_17}
 #| title: cluster 17
 
 feature_umap(clus_17_genes,title_feature_umap_clus_17, caption=caption_feature_umap_clus_17)
 ```
-```{r, cluster_18_feature_umap, eval= eval_18}
+```{r, cluster_18_feature_umap, eval= eval_18, include=eval_18}
 #| title: cluster 18
 
 feature_umap(clus_18_genes,title_feature_umap_clus_18, caption=caption_feature_umap_clus_18)
 
 ```
 
-```{r, cluster_19_feature_umap, eval= eval_19}
+```{r, cluster_19_feature_umap, eval= eval_19, include=eval_19}
 #| title: cluster 19
 
 feature_umap(clus_19_genes,title_feature_umap_clus_19, caption=caption_feature_umap_clus_19)
 ```
 
-```{r, cluster_20_feature_umap, eval= eval_20}
+```{r, cluster_20_feature_umap, eval= eval_20, include=eval_20}
 #| title: cluster 20
 
 feature_umap(clus_20_genes,title_feature_umap_clus_20, caption=caption_feature_umap_clus_20)
 ```
 
-```{r, cluster_21_feature_umap, eval= eval_21}
+```{r, cluster_21_feature_umap, eval= eval_21, include=eval_21}
 #| title: cluster 21
 
 feature_umap(clus_21_genes,title_feature_umap_clus_21, caption=caption_feature_umap_clus_21)
@@ -568,7 +576,7 @@ feature_umap(clus_21_genes,title_feature_umap_clus_21, caption=caption_feature_u
 
 clus_highlight <- function(clus){
   seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==clus, paste("cluster", as.character(clus)), "other")) |>
-  ggplot(aes(UMAP_1,UMAP_2,color=cluster_highlight ))+geom_point() +theme_minimal()+ theme(legend.position = "none")
+  ggplot(aes(umap_1,umap_2,color=cluster_highlight ))+geom_point() +theme_minimal()+ theme(legend.position = "none")
   
 }
 
