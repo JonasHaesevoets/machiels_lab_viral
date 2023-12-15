@@ -25,6 +25,18 @@ file_names_tbl <- tribble(
         ~sample_tag_reads_per_cell_A,
         ~sample_tag_reads_per_cell_B,
         
+        #experiment 2
+        "viral.experiment.2", #name_for_merged_seurat_file
+        "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\",#absolute path raw_data_root
+        "lung", #cell_id_A
+        "bal",#cell_id_B
+        "output_lung_d8\\Combined_BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
+        "seurat_obj_experiment_2_combined_lung_raw_dbec", #~name_for_seurat_file_A; file path for the intermediate data output of the script
+        "output_bal_d8\\Combined_BD-Analysis-BMachiels-Bal_DBEC_MolsPerCell.csv",#~dbec_file_path_B,
+        "seurat_obj_experiment_2_combined_bal_raw_dbec",#name_for_seurat_file_B
+        "output_lung_d8\\BD-Analysis-BMachiels-Lung_Sample_Tag_ReadsPerCell.csv",#~sample_tag_reads_per_cell_A,
+        "output_bal_d8\\BD-Analysis-BMachiels-Bal_Sample_Tag_ReadsPerCell.csv",#sample_tag_reads_per_cell_B,
+        
         #experiment 1
         "viral.experiment.1", #name_for_merged_seurat_file
         "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\",#absolute path raw_data_root
