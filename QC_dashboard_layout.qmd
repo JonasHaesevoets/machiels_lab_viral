@@ -1,5 +1,5 @@
 ---
-title: "QC Experiment 2, day 8, bal"
+title: "QC Experiment 1, day 60, lung"
 format: 
   dashboard:
     orientation: columns
@@ -15,10 +15,10 @@ library("easypackages")
 libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","patchwork","Matrix", "ggpp","ggpubr","ggmosaic", "DT", "lemon"#, "gridExtra"
 )
 
-#source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_lung.R")
+source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_lung.R")
 #source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_bal.R")
 
-source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp2_bal.R")
+#source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp2_bal.R")
 #source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp2_lung.R")
 
 ```
@@ -71,7 +71,10 @@ filtered_seurat_obj <- seurat_obj |>
 filtered_seurat_obj |> DimPlot(label = T)
 
 
-write_rds(filtered_seurat_obj, file = paste0(file_path$intermediate_data,file_name_obj,"_filtered","rds" ))
+write_rds(filtered_seurat_obj, file = file_path_output
+          )
+
+
 
 ```
 
@@ -142,10 +145,10 @@ ggMarginal(multiplet_n_count_RNA_n_Feature +
 ```
 
 
-```{r}
-#| title: nCount marginal filtered
+```{r message=FALSE}
+#| title: nCount marginal filtered clusters 1-7
 
-multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=seurat_clusters)) + 
+multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj |>mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |>  filter(seurat_clusters_num %in% c(0:7))  |> ggplot(aes(nCount_RNA, nFeature_RNA, color=seurat_clusters)) +  
   geom_point(size=0.5) +
   theme_bw() +
   xlim(c(-100,70000)) +
@@ -154,9 +157,86 @@ multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj |>  ggplot(aes(nC
   geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+ guides(colour = guide_legend(override.aes = list(size=7)))
 
 ggMarginal(multiplet_n_count_RNA_n_Feature_filtered +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3) 
+max_num_cluster <-  filtered_seurat_obj|> mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |> pull(seurat_clusters_num) |> max()
+eval_filtered_15 <-  max_num_cluster>=15
+
+```
+
+
+```{r include=eval_filtered_15, message=FALSE}
+#| title: nCount marginal filtered clusters 8-15
+
+multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj|> mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |>  filter(seurat_clusters_num %in% c(8:15)) |>   ggplot(aes(nCount_RNA, nFeature_RNA, color=seurat_clusters)) + 
+  geom_point(size=0.5) +
+  theme_bw() +
+  xlim(c(-100,70000)) +
+  ylim(c(-1000,8000)) +
+  #scale_color_manual(values = c( "grey","red","green"))  +  
+  geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+ guides(colour = guide_legend(override.aes = list(size=7)))
+
+ggMarginal(multiplet_n_count_RNA_n_Feature_filtered +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3) 
+
+
+
+max_num_cluster <-  filtered_seurat_obj|> mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |> pull(seurat_clusters_num) |> max()
+eval_filtered_15 <-  max_num_cluster>=15
+
+```
+
+
+
+```{r include=eval_filtered_15, message=FALSE, eval=eval_filtered_15}
+#| title: nCount marginal filtered clusters >15
+if (eval_filtered_15) {
+  multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj|> mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |>  filter(seurat_clusters_num >15) |>   ggplot(aes(nCount_RNA, nFeature_RNA, color=seurat_clusters)) + 
+  geom_point(size=0.5) +
+  theme_bw() +
+  xlim(c(-100,70000)) +
+  ylim(c(-1000,8000)) +
+  #scale_color_manual(values = c( "grey","red","green"))  +  
+  geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+ guides(colour = guide_legend(override.aes = list(size=7)))
+
+ggMarginal(multiplet_n_count_RNA_n_Feature_filtered +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3)
+  
+  
+}
+
+
+
+```
+
+```{r}
+#| title: nCount boxplot unflitered
+
+seurat_obj |> ggplot(aes(nCount_RNA, seurat_clusters, fill=seurat_clusters)) + geom_boxplot()+ theme_bw()
+
+```
+
+```{r}
+#| title: nCount RNA boxplot filtered
+
+filtered_seurat_obj |> ggplot(aes(nCount_RNA, seurat_clusters, fill=seurat_clusters)) + geom_boxplot()+ theme_bw()
+
 ```
 ```{r}
-#| title: fraction multiplets, by quantile
+#| title: nCount RNA per condition unfiltered
+
+seurat_obj |> ggplot(aes(nCount_RNA, sampletag_name, fill=sampletag_name)) + geom_boxplot()+ theme_bw()
+
+```
+```{r}
+#| title: nCount RNA per condition filtered
+
+sorted <- seurat_obj$sampletag_name |> unique() |> as.character()|> sort()
+
+filtered_seurat_obj |> mutate(sampletag_name=factor(sampletag_name, levels=sorted  )) |> 
+  ggplot(aes(nCount_RNA, sampletag_name, fill=sampletag_name)) +
+  geom_boxplot()+ theme_bw()
+
+```
+
+```{r}
+#| title: fraction multiplets, by nCOunt RNA quantile
  seurat_obj |>  
   mutate(ncount_bin=cut_number(nCount_RNA,50)) |> 
   separate(ncount_bin,sep = ",",into=c("throw","ncount_bin")) |>
@@ -172,7 +252,7 @@ ggMarginal(multiplet_n_count_RNA_n_Feature_filtered +theme(legend.position = "bo
 ```
 
 ```{r}
-#| title: fraction multiplets, by  nCount
+#| title: fraction multiplets, by nCount RNA absolut
  seurat_obj |>  
   mutate(ncount_bin=cut_width(x=nCount_RNA,width=1000, boundary = 0)) |> 
   separate(ncount_bin,sep = ",",into=c("throw","ncount_bin")) |>
@@ -343,6 +423,9 @@ cluster_cell_cycle_mosaic_plot_all
 
 ```{r}
 #| title: cell cycle
+#| fig-width: 7
+#| fig-height: 15
+#| warning: false
 cluster_cell_cycle_mosaic_plot <- seurat_obj  |> 
         ggplot()+
         geom_mosaic(aes(x=product(Phase,sampletag_multiplets),
@@ -405,6 +488,7 @@ de_genes_tbl |> mutate(cluster=as_factor(cluster)) |>
 #load packages
 
 feature_umap <- function(genes, title_="", caption_=""){
+  
         seurat_obj |> join_features(genes) |> mutate(.feature=factor(.feature,levels=genes)) |> ggplot(aes(umap_1,umap_2,color=.abundance_RNA))+geom_point() +
   scale_color_viridis_c()+ theme_void()+coord_fixed()+
   facet_wrap(~.feature, ncol = 4) +
@@ -422,7 +506,7 @@ caption_feature_umap_clus_0 <-""
 ```{r, cluster_0_feature_umap, eval= eval_0, include=eval_0}
 #| title: cluster 0
 #| fig-height: 10
-feature_umap(clus_0_genes, title_= title_feature_umap_clus_1, caption_ = caption_feature_umap_clus_1) 
+feature_umap(clus_0_genes, title_= title_feature_umap_clus_0, caption_ = caption_feature_umap_clus_1) 
 ```
 
 ```{r, cluster_1_feature_umap, eval= eval_1, include=eval_1}
