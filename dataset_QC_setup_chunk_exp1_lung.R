@@ -1,4 +1,3 @@
-
 set.seed(2023)
 #set up file paths
 file_path <- vector("list") 
@@ -6,19 +5,22 @@ file_path$output <- ".\\output\\"
 file_path$intermediate_data<- ".\\intermediate_data\\" 
 #file_path$raw_data <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_Expression_Data_Unfiltered.st.gz"
 
-file_name_obj <- "seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed"
+obj_identifier <- "experiment_1_lung"
+file_name_obj <- paste0("seurat_obj_", obj_identifier, "_workflowed.rds")
+
 
 seurat_obj <- read_rds(file = paste0(file_path$intermediate_data,file_name_obj)) |> mutate(sampletag_multiplets=factor(sampletag_multiplets, levels=c("undeterminded" , "multiplet"  ,   "single_hashtag"))) #level change can be ommited later when intermediate data has been asjusted
 
 #seurat_obj <-   read_rds(file = paste0(file_path$intermediate_data,"SAMPLED_2000cells_seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed.rds") )
 
-de_genes_tbl <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\experiment_1._lung__QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds" |> read_rds() #|> select(cluster:gene)
+#de_genes_tbl <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\experiment_1._lung__QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds" |> read_rds() #|> select(cluster:gene)
 
 
-de_genes_tbl <- read_csv("intermediate_data/experiment_1.Lung_QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.csv")|>
+de_genes_tbl <- read_csv(
+        "C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/experiment_1_workflowed.Lung_QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.csv")|>
         relocate(gene) 
 
-file_path_output <- paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_lung_raw_dbec_cleaned.rds")
+file_path_output <- paste0(file_path$intermediate_data,"seurat_obj_experiment_1_lung_afterQCdashboard.rds")
 
 
 #visualisation parameters
@@ -45,68 +47,92 @@ upper_nCount_RNA_thresh <- seurat_obj$nCount_RNA |>
 upper_nCount_RNA_thresh_non_scientific <- format(round(upper_nCount_RNA_thresh,digits = 4), scientific = FALSE)
 
 # clusters
-deleted_clusters=c(0,5,7,10,15,16)
+deleted_clusters=c(0,6,8,11,15,16, 17,18)
 
-del_clusters_string <- paste0(as.character(deleted_clusters))
+ cluster_determination <- c("low_RNA_5"=5,
+                            "low_RNA_mt_high_10"=10,
+                            "contamination_B_NK"=13)
 
+ seurat_obj <- seurat_obj |> mutate(orig_cluster_specification=case_when(
+                                    
+         seurat_clusters==0 ~ "0_NK_cells",
+         seurat_clusters==6 ~ "6_B_cell",
+         seurat_clusters==8 ~ "8_CD8_T_cells",
+         seurat_clusters==11 ~ "5_mt_high",
+         seurat_clusters==15 ~ "15_Proliferating_NK-like",
+         seurat_clusters==16 ~ "16_epithelial_cell",
+         seurat_clusters==17 ~ "17_granulocyte",
+         seurat_clusters==18 ~ "18_mast_cell",
+
+         TRUE~seurat_clusters
+
+ ))
+
+ del_clusters_string <- paste0(as.character(deleted_clusters))
 
 
 
 #genes to gighlight in feature umaps
-clus_0_genes <- c("Prf1","Il2rb","Gzmb","Gzma","Eomes","Ms4a4b","Il12rb2","H2-Q7", "Cd3g", "Cd8a", "Cd4", "Ifng","Il2ra", "Foxp3","Ncr1", "Rorc", "Ncam1", "Tbx21", "Il7r", "Klrc1", "Klrk1", "Ncr3")
-title_feature_umap_clus_0 <- ""
-caption_feature_umap_clus_0 <- "likely MHC2 expressing NK cells" # 
+clus_0_genes <- c("Prf1","Il2rb","Gzmb","Gzma","Eomes","Ms4a4b","Il12rb2","H2-Q7", "Cd3g",
+                  "Cd8a", "Cd4", "Ifng","Il2ra", "Foxp3","Ncr1", "Rorc", "Ncam1", "Tbx21", "Il7r", "Klrc1", "Klrk1", "Ncr3")
+title_feature_umap_clus_0 <- "likely NK cells"
+caption_feature_umap_clus_0 <- "" # 
 
 clus_1_genes <- c("Ccr2","Ifitm3","Thbs1", "Ms4a4c")
 title_feature_umap_clus_1 <- ""
-caption_feature_umap_clus_1 <- "likely MHC2 expressing NK cells" # 
+caption_feature_umap_clus_1 <- "" # 
 
-clus_2_genes <- c("Ace", "Csf1r")
+clus_2_genes <- c("Siglecf", "Lpl")
 title_feature_umap_clus_2 <- ""
 caption_feature_umap_clus_2 <- "" # 
 
-clus_3_genes <- c("Fpr", "Chil3","Lpl", "Cd9", "Ctsd", "Mertk")
-title_feature_umap_clus_3 <- ""
-caption_feature_umap_clus_3 <- "scavanger Macrophages" 
 
 
-clus_4_genes <- c("Pld3", "Ftl1")
+clus_3_genes <- c("Ace", "B2m")#c("Fpr", "Chil3","Lpl", "Cd9", "Ctsd", "Mertk")
+title_feature_umap_clus_3 <- ""#"scavanger Macrophages"
+caption_feature_umap_clus_3 <- "" 
+
+
+clus_4_genes <- c("Mertk")#c("Pld3", "Ftl1")
 title_feature_umap_clus_4 <- ""
 caption_feature_umap_clus_4 <- ""
 
-
-clus_5_genes <- c("Cd79a", "Cd19", "Ms4a1")
-title_feature_umap_clus_5 <- ""
-caption_feature_umap_clus_5 <- "B lineage"
-
-
-clus_6_genes <- c("Cd209a", "Flt3", "H2-Ab1", "H2-Aa")
+clus_5_genes <- c("C1qb", "Apoe", "")
 title_feature_umap_clus_6 <- ""
-caption_feature_umap_clus_6 <- "MHC-2 high"
+caption_feature_umap_clus_6 <- ""
 
-clus_7_genes <- c("Cd3e", "Cd8a")
-title_feature_umap_clus_7 <- ""
-caption_feature_umap_clus_7 <- "CD8 T cells"
+clus_6_genes <- c("Cd79a", "Cd19", "Ms4a1")
+title_feature_umap_clus_6 <- "B lineage"
+caption_feature_umap_clus_6 <- ""
 
-clus_8_genes <- c("C1qb", "CD81", "Apoe", "H2-Aa")
-title_feature_umap_clus_8 <- ""
-caption_feature_umap_clus_8 <- "Apoe alveolar macrophages"
+
+clus_7_genes <- c("Cd209a", "Flt3", "H2-Ab1", "H2-Aa")
+title_feature_umap_clus_6 <- "MHC-2 high"
+caption_feature_umap_clus_6 <- ""
+
+clus_8_genes <- c("Cd3e", "Cd8a")
+title_feature_umap_clus_7 <- "CD8 T cells"
+caption_feature_umap_clus_7 <- ""
+
+# clus_8_genes <- c("C1qb", "Cd81", "Apoe", "H2-Aa")
+# title_feature_umap_clus_8 <- "Apoe alveolar macrophages"
+# caption_feature_umap_clus_8 <- ""
 
 clus_9_genes <- c("H2-Eb1", "Mgl2", "Tnfsf9", "H2-Aa")
-title_feature_umap_clus_9 <- ""
-caption_feature_umap_clus_9 <-  "CD137L?, Apoe alveolar macrophages"
-
-clus_10_genes <- c("mt-Nd3", "mt-Co3" ,"Lpp")
-title_feature_umap_clus_10 <- ""
-caption_feature_umap_clus_10 <-"mt high"
+title_feature_umap_clus_9 <- "CD137L?, Apoe alveolar macrophages"
+caption_feature_umap_clus_9 <-  ""
 
 
-clus_11_genes <- c("Clec9a", "Cst3", "Cd24a", "H2-Ab1")
+clus_10_genes <- c("Clec9a", "Cst3", "Cd24a", "H2-Ab1")
+title_feature_umap_clus_10 <- "Clec9a, MHC2"
+caption_feature_umap_clus_10 <- ""
+
+clus_11_genes <- c("mt-Nd3", "mt-Co3" ,"Lpp")
 title_feature_umap_clus_11 <- ""
-caption_feature_umap_clus_11 <- "Clec9a, MHC2"
+caption_feature_umap_clus_11 <-"mt high"
 
 
-clus_12_genes <- c("Mki67", "Cks1b", "Ctsk" , "Tpx2", "Spp1", "H2-Aa")
+clus_12_genes <- c("Spp1", "Chil3","Mki67", "Cks1b", "Ctsk" , "Tpx2", "Spp1", "H2-Aa")
 title_feature_umap_clus_12 <- "Proliferating/Spp1+" 
 caption_feature_umap_clus_12 <- "Ki-67, Tpx: Spindle assembly factor required for normal assembly of mitotic spindles"
 
@@ -120,33 +146,34 @@ title_feature_umap_clus_14 <- "Proliferating"
 caption_feature_umap_clus_14 <- ""
 
 
-clus_15_genes <- c("Stmn1", "Mcm5", "Top2a")
-title_feature_umap_clus_15 <- "Proliferating"
+clus_15_genes <- c("Stmn1", "Mcm5", "Top2a", "Gzma")
+title_feature_umap_clus_15 <- "Proliferating, NK-like Gzma"
 caption_feature_umap_clus_15 <- ""
 
-clus_16_genes <- c( "Cldn5", "Col4a1","Ly6c1", "H2-Aa")
-title_feature_umap_clus_16 <- "Macrophage - Epithelial cell doublet/phagocytosed" 
-caption_feature_umap_clus_16 <- "Caudin5, collagen 4, tight junction, Col4 producing, MHC2 positive, Epidermal Growth Factor Receptor 5 expressing"
+clus_16_genes <- c( "Cldn5", "Col4a1","Ly6c1", "H2-Aa", "Cd36")
+title_feature_umap_clus_16 <- "Macrophage - Epithelial cell doublet/phagocytosed:: cd36 is platelet protein" 
+caption_feature_umap_clus_16 <- "Claudin5, collagen 4, tight junction, Col4 producing, MHC2 positive, Epidermal Growth Factor Receptor 5 expressing"
 
-clus_17_genes <- c( "Csf1", "Ms4a2", "Il6","Cd63")
-title_feature_umap_clus_17 <- "Csf1 producing, IgE-R+"
-caption_feature_umap_clus_17 <- "Ms4a2= IgE-R, Fcer1a, "
+#17 keep
 
-clus_18_genes <- c( "S100a9","Mmp9", "S100a8", "H2-Q10")
-title_feature_umap_clus_18 <- "Procalcitonin/Mmp9"
-caption_feature_umap_clus_18 <- ""
+clus_17_genes <- c("Cd24a", "S100a9") #)c( "Csf1", "Ms4a2", "Il6","Cd63", "Cd7")
+title_feature_umap_clus_17 <- "granulocyte"#"neutrophil?"#"Basophil/eosinophil,  Csf1 producing, IgE-R+"
+caption_feature_umap_clus_17 <-""# "Ms4a2= IgE-R, Fcer1a, "
 
-clus_19_genes <- c( "Cidec", "Kcnn3","F7", "Mertk", "Cd24a")
-title_feature_umap_clus_19 <- "??"
-caption_feature_umap_clus_19 <- "Cidec: Lipid transferase, "
 
-clus_20_genes <- c( "F5", "Acod1", "Cd24a", "Ccr3")
-title_feature_umap_clus_20 <- "??"
-caption_feature_umap_clus_20 <- ""
 
-clus_21_genes <- c( "F13a1", "Mafb", "Csf3r", "Ccr2", "Gzmb", "S100a4")
-title_feature_umap_clus_21 <- ""
-caption_feature_umap_clus_21 <- ""
+clus_18_genes <- c("Fcer1a", "CD200r3") #c( "S100a9","Mmp9", "S100a8", "H2-Q10")
+title_feature_umap_clus_18 <- c(" mastcell??")#"Neutrophil/basophil - like ; Calgranulin / Mmp9"
+caption_feature_umap_clus_18 <-  "Ms4a2= IgE-R, Fcer1a" # "H2-q10 -Unlike other class I genes, this gene is expressed only in liver cells and its product is secreted into the serum."
+
+clus_19_genes <- c( "Siglecf", "Spp1","Krt19", "Mertk")
+title_feature_umap_clus_19 <- "fib mac?"#"Keratin 19 positive (??), macrophage"
+caption_feature_umap_clus_19 <- " "
+
+clus_20_genes <- c("Mafb" )
+title_feature_umap_clus_20 <- "keep"#"Neutrophil??"
+caption_feature_umap_clus_20 <- #"Ncf2, Neutrophil cytosolic factor 2"
+
 
 
 ###---evaluation helpers for chunks
