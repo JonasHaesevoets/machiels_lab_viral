@@ -1,0 +1,1266 @@
+---
+title: "case_study_dsb_adt_normalization"
+format: 
+  html:
+    default-image-extension: png
+    fig-width: 12
+    fig-height: 8
+editor: visual
+---
+```{r fig.height=7, fig.width=12, message=FALSE, warning=FALSE, include=FALSE}
+
+```
+
+```{r fig.height=7, fig.width=12, message=FALSE, warning=FALSE, include=FALSE}
+library("easypackages")
+libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","patchwork", "ggpubr","dsb","Matrix", "ggnewscale"
+)
+```
+
+
+```{r fread, eval=FALSE, include=FALSE}
+library(data.table)
+unfiltered_csv_paths <- c("C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\output_lung_d8\\BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\output_bal_d8\\BD-Analysis-BMachiels-BAL_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_bal\\Output_BAL\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz")
+
+exp_name <- c("lung_d8","bal_d8",
+              "lung_d60", "bal_d60")
+
+for (i in seq_along(unfiltered_csv_paths)) {
+  counts_fread = fread(unfiltered_csv_paths[i], select = c("Cell_Index",
+                                                    "Siglec-F|Siglecf|AMM2013|pAbO",
+                                                    "I-A_I-E|H2-Ab_Ad_Aq_Ed_Ek|AMM2019|pAbO",
+                                                    "CD274|Cd274|AMM2038|pAbO",
+                                                    "CD11c:HL3|Itgax|AMM2008|pAbO",
+                                                    "Ly-6G|Ly6g|AMM2009|pAbO",
+                                                    "Ly-6A_Ly-6E|Ly6a_Ly6e|AMM2026|pAbO"), 
+                       showProgress = T)
+  
+  colnames(counts_fread) <- c("cell_index","Siglecf_AbSeq","H2_ia_ie_AbSeq","Cd274_AbSeq","Cd11c","Ly_6g_AbSeq","Ly_6a_AbSeq")
+  write_csv(counts_fread,paste0(".\\intermediate_data\\",exp_name[i],"unfiltered_prot_counts_fread.csv") )
+
+}
+
+
+
+```
+
+
+```{r vroom, eval=FALSE, include=FALSE}
+library(vroom)
+Sys.setenv(VROOM_CONNECTION_SIZE = 500072)
+
+unfiltered_csv_paths <- c("C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\output_lung_d8\\BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\output_bal_d8\\BD-Analysis-BMachiels-BAL_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_bal\\Output_BAL\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz")
+
+exp_name <- c("lung_d8","bal_d8",
+              "lung_d60", "bal_d60")
+
+for (i in seq_along(unfiltered_csv_paths)) {
+  counts_fread = vroom(unfiltered_csv_paths[i], select = c("Cell_Index",
+                                                    "Siglec-F|Siglecf|AMM2013|pAbO",
+                                                    "I-A_I-E|H2-Ab_Ad_Aq_Ed_Ek|AMM2019|pAbO",
+                                                    "CD274|Cd274|AMM2038|pAbO",
+                                                    "CD11c:HL3|Itgax|AMM2008|pAbO",
+                                                    "Ly-6G|Ly6g|AMM2009|pAbO",
+                                                    "Ly-6A_Ly-6E|Ly6a_Ly6e|AMM2026|pAbO"), 
+                       showProgress = T)
+  
+  colnames(counts_fread) <- c("cell_index","Siglecf_AbSeq","H2_ia_ie_AbSeq","Cd274_AbSeq","Cd11c","Ly_6g_AbSeq","Ly_6a_AbSeq")
+  write_csv(counts_fread,paste0(".\\intermediate_data\\",exp_name[i],"unfiltered_prot_counts_fread.csv") )
+
+}
+
+
+
+```
+
+
+
+```{r  include=FALSE, eval=FALSE, echo=FALSE}
+
+setup_chunks <- c(
+  "dataset_QC_setup_chunk_exp1_bal.R",
+  "dataset_QC_setup_chunk_exp2_bal.R",
+  "dataset_QC_setup_chunk_exp1_lung.R",
+  "dataset_QC_setup_chunk_exp2_lung.R")
+
+# unfiltered_prot_counts <- c(
+#   "bal_d60_unfiltered_prot_counts.csv",
+#   "bal_d8_unfiltered_prot_counts.csv",
+#   "lung_d60_unfiltered_prot_counts.csv",
+#   "lung_d8_unfiltered_prot_counts.csv")
+
+unfiltered_prot_counts <- c(
+  "bal_d60unfiltered_prot_counts_fread.csv",
+  "bal_d8unfiltered_prot_counts_fread.csv",
+  "lung_d60unfiltered_prot_counts_fread.csv",
+  "lung_d8unfiltered_prot_counts_fread.csv")
+
+dataset_name <- c(
+  "bal_d60",
+  "bal_d8",
+  "lung_d60",
+  "lung_d8")
+
+unfiltered_prot_counts <- unfiltered_prot_counts |> map_vec(\(x) paste0(".\\intermediate_data\\", x))
+
+plot_list <- list()
+for (i in seq_along(unfiltered_prot_counts)) {
+  print(unfiltered_prot_counts[i])
+  all_BD_protein_counts <- read_csv(unfiltered_prot_counts[i])
+  
+  protein_counts_cell_is_col <- all_BD_protein_counts |>  tidyfst::t_dt() 
+  colnames(protein_counts_cell_is_col) <- protein_counts_cell_is_col[1,] 
+  protein_counts_cell_is_col <- protein_counts_cell_is_col[-1,]
+  protein_sum_tbl <- tibble(cell_sum=protein_counts_cell_is_col |>
+                              colSums(), cell=colnames(protein_counts_cell_is_col))
+  
+  cutoff <- 6000
+  protein_sum_tbl <- protein_sum_tbl |>
+    mutate(rank=rank(desc(cell_sum))) |>
+    arrange(rank) |>
+    mutate(cuml_sum=cumsum(cell_sum))|>
+    mutate(cell_or_empty_by_cutoff=if_else(rank>cutoff, "empty", "cell"))
+  
+  source(file=setup_chunks[i]) 
+  print("in memory: seurat")
+  seurat_obj <- seurat_obj |>
+    mutate( kept_cell= case_when(
+    (seurat_clusters %in% deleted_clusters) ~ "deleted_clusters",
+    nCount_RNA>upper_nCount_RNA_thresh~ "too_much_RNA",
+    nCount_RNA<lower_nCount_RNA_thresh~"too_little_RNA",
+    percent_mito>upper_mito_thresh~"too_much_mito",
+    sampletag_multiplets!="single_hashtag"~ "no_singlet",
+    TRUE ~"keep"))
+  
+  meta_data_protein_sum_tbl <- seurat_obj |>
+    as_tibble() |>
+    rename(cell=".cell") |>
+    full_join(protein_sum_tbl ) |>
+    mutate(kept_cell=if_else(
+      is.na(kept_cell),"empty_by_BD",kept_cell)
+      )
+  #make plots
+  
+  
+  p1 <- meta_data_protein_sum_tbl |> slice_sample(n=2000) |> 
+    ggplot(aes(log10(rank),
+               log10(cuml_sum),
+               color= kept_cell))+
+    geom_point()+ggtitle(label=unfiltered_prot_counts[i], subtitle =setup_chunks[i] )
+  
+  p2 <- meta_data_protein_sum_tbl |> #slice_sample(n=2000)|> 
+    ggplot(aes(x=log10(rank), color= kept_cell) )+
+    geom_density()
+  
+  plot_output_1 <- p1/p2
+  
+  p3 <- meta_data_protein_sum_tbl  |> 
+    ggplot(aes(log(nCount_protein+1),log(nCount_RNA+1) ))+geom_point()+ geom_bin2d(bins = 150) + 
+    scale_fill_viridis_c(option = "C") +theme_bw() +
+    ggtitle(label=unfiltered_prot_counts[i], subtitle =setup_chunks[i])
+  
+  p4 <- meta_data_protein_sum_tbl  |>
+    ggplot(aes(log(nCount_protein+1),log(nCount_RNA+1), color=kept_cell ))+geom_point()+theme_bw()
+  
+  p5 <- meta_data_protein_sum_tbl |>
+    ggplot(aes(log(cell_sum+1)))+
+    geom_histogram()+ggtitle("all_wells")+theme_bw()
+  
+  p6 <- meta_data_protein_sum_tbl |>
+    filter(kept_cell=="empty_by_BD") |>
+    ggplot(aes(log(cell_sum+1)))+
+    geom_histogram()+ggtitle("empty_by_BD")+theme_bw()
+  
+  p7 <- meta_data_protein_sum_tbl |>
+    filter(kept_cell=="keep") |> ggplot(aes(log(cell_sum+1)))+
+    geom_histogram()+
+    ggtitle("cells")+theme_bw()
+  
+  plot_output_2 <-  p3/p4/p5/p6/p7
+  seurat_obj <- NULL
+
+  ggsave(plot=plot_output_1, filename = paste0("C:/Users/danne/R_projects/machiels_lab_viral/output/plots/","fread_protein_BD_empty_cell_comparison_" ,dataset_name[i],".png") )
+  
+  ggsave(plot=plot_output_2, filename =paste0("C:/Users/danne/R_projects/machiels_lab_viral/output/plots/","fread_RNA_comparison_BD_empty_cell_" ,dataset_name[i],".png") )
+  
+  ######
+  #perform dsb normalization
+  
+  plot_list[[dataset_name[i]]] <- list(plot_output_1, plot_output_2)
+  
+  
+  cells <- meta_data_protein_sum_tbl |> filter(kept_cell=="keep")|> pull(cell)
+  cells_tbl <- all_BD_protein_counts |> filter(cell_index %in% cells) 
+  cells_matrix <- t(as.matrix(cells_tbl|> select(-cell_index)))
+  colnames(cells_matrix) <- cells_tbl |> pull(cell_index)
+  
+  empty_droplets <- meta_data_protein_sum_tbl |> filter(kept_cell=="empty_by_BD")|> pull(cell)
+  empty_droplets_tbl <- all_BD_protein_counts |> filter(cell_index %in% empty_droplets) 
+  empty_droplets_matrix <- t(as.matrix(empty_droplets_tbl|> select(-cell_index)))
+  colnames(empty_droplets_matrix) <- empty_droplets_tbl |> pull(cell_index)
+  
+  cells.dsb.norm = DSBNormalizeProtein(
+    cell_protein_matrix = cells_matrix, #
+    empty_drop_matrix = empty_droplets_matrix, 
+    denoise.counts = F, 
+    use.isotype.control = F
+  )
+  
+  write_rds(cells.dsb.norm,paste0(".\\intermediate_data\\dsb_matrix_",dataset_name[i],".rds"))
+  
+  
+
+  
+}
+
+write_rds(plot_list,paste0(".\\intermediate_data\\protein_reads_QC_plot_list.rds"))
+
+
+```
+
+ScRNA-Seq  typically is normalized so that read values are respresented as a (log-) fractions of the sum of all counts of all expressed genes per cell. This method is not aplicable to antibody deriverd DNA-tags (adt). This can easily be seen in that for a given marker a cell postive for two marker would have lower normalized values then a single-positive cell with these kinds of normalizations. 
+
+Due to technical factors such as unbound molecules adt have a varying background signal. The dsb method corrects for such background variation. This method was developed for droplet based methods. Exploratory analysis of rhapsody data showed that empty wells also contain significant background signal in some libraries as judged by signal in wells that do not contain cells.
+
+For FACS stainings it is nowadays commonplace to include staining controls such as isotype controls. This procedure is not yet common practice for adt staining. Nonetheless, unspecific binding affects adt experiments in a similar manner as FACS eperiments. Library amplification effects are more common and stronger in adt. To make adt signals comparable across libraries these have to be scaled for this reason. Here, quantile scaling effets are analyzed for possible effects of outliers which is a danger of maximum value scaling.
+
+
+
+# Evaluation of counts in cell wells and empty wells
+
+## d8 bal
+```{r fig.height=7, fig.width=12, message=FALSE, warning=FALSE,echo=FALSE}
+plot_list <- read_rds(paste0(".\\intermediate_data\\protein_reads_QC_plot_list.rds"))
+ggpubr::ggarrange(plotlist = plot_list[[2]])
+```
+
+This data set has significant background as can be seen in the relativly steep slope after the bend in the top left plot. And the overall high counts.
+
+## d8 lung
+```{r fig.height=7, fig.width=12, message=FALSE, warning=FALSE,echo=FALSE}
+ggpubr::ggarrange(plotlist = plot_list[[4]])
+```
+This data set has significant background as can be seen in the relativly steep slope after the bend in the top left plot. And the overall high counts.
+
+## d60 bal
+
+```{r fig.height=7, fig.width=12, message=FALSE, warning=FALSE,echo=FALSE}
+plot_list <- read_rds(paste0(".\\intermediate_data\\protein_reads_QC_plot_list.rds"))
+
+ggpubr::ggarrange(plotlist = plot_list[[1]])
+```
+
+
+## d60 lung
+```{r fig.height=7, fig.width=12, message=FALSE, warning=FALSE,echo=FALSE}
+
+ggpubr::ggarrange(plotlist = plot_list[[3]])
+```
+##load dsb normalized data
+
+```{r  message=FALSE, warning=FALSE,echo=FALSE}
+
+path_1 <- "D:\\danne\\intermediate_data\\seurat_obj.v5_experiment_1_2_merged.rds"
+path_1 <-"C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj.v5_experiment_1_2_merged.rds"
+path_1 <- "C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_experiment_1_2_merged_v5_split_integrated.rds"
+obj.v5 <- read_rds(path_1)
+
+#add filtering Data
+# obj.v5@misc <- list(misc_list_1,misc_list_2)
+# write_rds(obj.v5,path_1)
+
+exp_1_lung <- "intermediate_data/dsb_matrix_lung_d60.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_1_lung_",cell))
+exp_2_lung <- "intermediate_data/dsb_matrix_lung_d8.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_2_lung_",cell))
+exp_1_bal <-  "intermediate_data/dsb_matrix_bal_d60.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_1_bal_",cell))
+exp_2_bal <-"intermediate_data/dsb_matrix_bal_d8.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_2_bal_",cell))
+
+dsb_all <- bind_rows(exp_1_lung,
+               exp_2_lung,
+               exp_1_bal,
+               exp_2_bal)
+
+dsb_features <- colnames(dsb_all)[-1]
+
+print("number of cells in final RNA Seurat that are not in protein object:  ")
+setdiff(obj.v5 |> colnames(),dsb_all$cell)# cells that are in  seurat object that aren't in protein object ->why?
+print("number of cells in protein object that are not in final RNA Seurat object:  ")
+setdiff(dsb_all$cell,obj.v5 |> colnames()) |> length()# cells that are in protein object that arnt in seurat object ->why?
+
+
+dsb_all <- dsb_all |> filter(cell %in% (obj.v5 |> colnames()))# reduce protein count matrix to cells that are present in seurat object
+#append protein object bei "empty" cells with missing cell name
+missing_cellnames <- setdiff(colnames(obj.v5), pull(dsb_all, cell))
+dsb_all <- dsb_all |> filter(!is.na(cell)) |> bind_rows(tibble(cell=missing_cellnames))
+
+dsb_all <- dsb_all[match(obj.v5 |> colnames(), dsb_all$cell),] 
+
+
+dsb_all_t <- dsb_all |> select(-cell)|> t() |> as.sparse()
+colnames(dsb_all_t) <- pull(dsb_all, cell)
+
+dsb_all_seur <- CreateAssay5Object(counts=dsb_all_t)
+obj.v5[["RNA"]] <- JoinLayers(obj.v5[["RNA"]])#????????
+options(Seurat.object.assay.version = "v5")
+
+# 
+obj.v5[["dsb"]] <- dsb_all_seur
+dsb_features <- rownames(obj.v5[["dsb"]])
+
+proteins <- c("siglec-f-siglecf-amm2013-p-ab-o",
+"i-a-i-e-h2-ab-ad-aq-ed-ek-amm2019-p-ab-o",
+"cd274-cd274-amm2038-p-ab-o",
+"cd11c-hl3-itgax-amm2008-p-ab-o",
+"ly-6g-ly6g-amm2009-p-ab-o",
+"ly-6a-ly-6e-ly6a-ly6e-amm2026-p-ab-o")
+#change protein assay to v5 assay
+protein_counts <- obj.v5[["protein"]]$counts[proteins,]
+rownames(protein_counts) <- dsb_features
+
+protein_Assay <- CreateAssay5Object(counts = protein_counts)
+
+obj.v5[["protein"]] <- protein_Assay
+obj.v5 <- NormalizeData(obj.v5, normalization.method = "CLR", margin = 2, assay = "protein")
+
+
+DefaultAssay(obj.v5) <- "protein"
+obj.v5 <- JoinLayers(obj.v5)
+
+
+prot_counts <- obj.v5@assays$protein$counts |> t() |> as_tibble(rownames=".cell") |> pivot_longer(cols = "Siglecf-AbSeq":"Ly-6a-AbSeq", names_to = "marker") |> mutate(method="prot_counts")
+prot_data <- obj.v5@assays$protein$data |> t() |> as_tibble(rownames=".cell") |> pivot_longer(cols = "Siglecf-AbSeq":"Ly-6a-AbSeq", names_to = "marker") |> mutate(method="prot_CLR")
+dsb<- obj.v5@assays$dsb$counts |> t() |> as_tibble(rownames=".cell")|> pivot_longer(cols = "Siglecf-AbSeq":"Ly-6a-AbSeq", names_to = "marker") |> mutate(method="dsb")
+
+# colnames(dsb) <-colnames(dsb) |> map_vec( \(x) paste0(x, "_dsb"))
+# colnames(prot_counts) <-colnames(prot_counts) |> map_vec( \(x) paste0(x, "_prot_counts"))
+# colnames(prot_data) <-colnames(prot_data) |> map_vec( \(x) paste0(x, "_prot_data"))
+# 
+# colnames(dsb)[1] <- "cell"
+# colnames(prot_counts)[1] <- "cell"
+# colnames(prot_data)[1] <- "cell"
+
+library(tidyseurat)
+protein_dsb <-dsb  |> bind_rows(prot_counts) |> bind_rows(prot_data) 
+harmony_8dim_embedings <- obj.v5@reductions$umap.harmony_8dims@cell.embeddings |> as_tibble(rownames=".cell")
+protein_dsb <- protein_dsb|> left_join(harmony_8dim_embedings) |> left_join(obj.v5 |> as_tibble() |> select(.cell, harmony_cluster_8dims_rough, orig.ident)  )
+
+protein_dsb <- protein_dsb |> mutate(orig.ident=as.factor(orig.ident)) |> separate(.cell, into= c("exp","no","sample_type"), remove = F) |> mutate(exp_no=paste(exp,no,sep="_")) |> select(-exp,-no) |> relocate(exp_no, .before=sample_type)
+
+
+```
+
+## Comparison of dsb and centered log ratio. 
+counts are not scaled by library effects
+```{r, message=FALSE, warning=FALSE,echo=FALSE}
+protein_dsb |> filter(method=="dsb" ) |> ggplot(aes(value,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+theme_bw() +
+  facet_wrap(~harmony_cluster_8dims_rough )+ggtitle("dsb correted antibody derived tags")+theme(legend.position = "none",axis.title   = element_blank())
+
+
+protein_dsb |> filter(method=="prot_CLR" ) |> ggplot(aes(value,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+theme_bw() +
+  facet_wrap(~harmony_cluster_8dims_rough )+ggtitle("centered log ratio antibody derived tags")+theme(legend.position = "none",axis.title   = element_blank())
+```
+
+
+```{r fig.width=20, fig.height=12 , message=FALSE, warning=FALSE,echo=FALSE}
+library(ggpubr)
+
+#facet grid option
+cluster_plot_list_dsb <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+
+
+for (clus in clusters) {
+  cluster_plot_list_dsb[[as.character(clus)]] <- protein_dsb |> filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |> ggplot(aes(value,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+theme_bw() +
+  facet_grid(exp_no~sample_type)+ggtitle(paste("cluster", as.character(clus)))+theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) + xlim(0,40)
+}
+
+cluster_plot_list_clr <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_clr[[as.character(clus)]] <- protein_dsb |> filter(method=="prot_CLR",harmony_cluster_8dims_rough==clus ) |> ggplot(aes(value,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+theme_bw() +
+  facet_grid(exp_no~sample_type)+ggtitle(paste("cluster", as.character(clus)))+theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) + xlim(0,5)
+  
+}
+```
+
+
+```{r  fig.width=20, fig.height=12, message=FALSE, warning=FALSE,echo=FALSE}
+ggarrange(plotlist = cluster_plot_list_dsb, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("dsb corrected not scaled by library",face = "bold", size = 14))
+
+ggarrange(plotlist = cluster_plot_list_clr, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("centered log ratio",face = "bold", size = 14))
+```
+
+
+```{r fig.width=15, fig.height=8, message=FALSE, warning=FALSE,echo=FALSE}
+protein_dsb |>filter(method=="dsb") |>  ggplot(aes(orig.ident, value)) +geom_boxplot()+ facet_wrap(~ marker) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +ggtitle(" corrected not scaled by library")
+
+protein_dsb |>filter(method=="dsb") |>  ggplot(aes(value,orig.ident, fill=orig.ident )) +ggridges::geom_density_ridges()+ facet_wrap(~marker) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +ggtitle("dsb  corrected not scaled by library")
+```
+testing of quantile scaling for effect of outliers 
+```{r fig.width=20, fig.height=12, message=FALSE, warning=FALSE,echo=FALSE}
+probs=c(0.8, 0.9, 0.95, 0.99, 0.998, 1)
+plot_list_quantile_scale <- list()
+for (i in probs) {
+    plot_list_quantile_scale[[as.character(i)]] <- 
+    protein_dsb |>
+    filter(method=="dsb") |>
+    group_by(method,marker,orig.ident) |>
+    mutate(method_marker_quantile=quantile(value,probs = i,na.rm = T)) |>
+    mutate(quantile_scaled=value/method_marker_quantile)|>
+    ggplot(aes(quantile_scaled,orig.ident, fill=orig.ident )) +
+    ggridges::geom_density_ridges()+
+    facet_wrap(~marker) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    xlim(0,2.5)+
+      ggtitle(as.character(i)) 
+  
+}
+
+ggarrange(plotlist = plot_list_quantile_scale,common.legend = T)
+
+
+```
+Max-scaling performs reasonably well. However Siglecf in experiment 2-lung only has a very small proportion of cells that would count as postive.
+ With 95th quantile scaling Siglecf in the same sample is present in a continuous distribution. This has to be checked for biological soundness.
+ Ly6g and Ly6C do not possess a resonably sized positve fraction in max-scaling. 90th quantile scaling results in a gradual distribution.
+
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+protein_dsb <- 
+    protein_dsb |>
+    group_by(method,marker,orig.ident) |>
+    mutate(method_marker_0.99_quantile=quantile(value,probs = 0.99,na.rm = T)) |>
+  mutate(method_marker_0.998_quantile=quantile(value,probs = 0.998,na.rm = T)) |>
+  mutate(method_marker_0.9_quantile=quantile(value,probs = 0.9,na.rm = T)) |>
+  mutate(method_marker_max=quantile(value,probs = 1,na.rm = T)) |>
+    mutate(quantile_0.99_scaled=value/method_marker_0.99_quantile) |> 
+      mutate(quantile_0.998_scaled=value/method_marker_0.998_quantile) |> 
+  mutate(quantile_0.9_scaled=value/method_marker_0.9_quantile) |> 
+  mutate(quantile_max_scaled=value/method_marker_max) |> ungroup()
+```
+
+
+```{r fig.width=20, fig.height=12, message=FALSE, warning=FALSE,echo=FALSE}
+cluster_plot_list_0.9_quantile_scaled <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_0.9_quantile_scaled[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_0.9_scaled,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim(0,2.5)
+}
+ggarrange(plotlist = cluster_plot_list_0.9_quantile_scaled, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("Scaled to 90th quantile",face = "bold", size = 14))
+
+cluster_plot_list_0.9_quantile_scaled <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_0.9_quantile_scaled[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_0.9_scaled,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim(0,2.5)
+}
+
+ggarrange(plotlist = cluster_plot_list_0.9_quantile_scaled, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("Scaled to 90th quantile",face = "bold", size = 14))
+
+
+
+
+
+
+cluster_plot_list_0.99_quantile_scaled <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_0.99_quantile_scaled[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_0.99_scaled,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim(0,2.5)
+}
+
+
+ggarrange(plotlist = cluster_plot_list_0.99_quantile_scaled, common.legend = T, legend = "right" )  |> 
+annotate_figure( top = text_grob("Scaled to 99th quantile",face = "bold", size = 14))
+
+
+cluster_plot_list_0.998_quantile_scaled <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_0.998_quantile_scaled[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_0.998_scaled,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim(0,2.5)
+}
+
+
+ggarrange(plotlist = cluster_plot_list_0.998_quantile_scaled, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("Scaled to 998th quantile",face = "bold", size = 14))
+
+
+cluster_plot_list_max_scaled <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_max_scaled[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_max_scaled,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim((-1),2.5)
+}
+
+
+ggarrange(plotlist = cluster_plot_list_max_scaled, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("Scaled to max",face = "bold", size = 14))
+```
+
+90th quantile scaling results in a bimodal ditribution of Ly6G in cluster 10, which is unlikly to be biologically sound.
+All clusters, including cluster 1, appear to be Ly6A-negative in max. scaling. 
+A positive shoulder appears for Ly6a in 90th quantile scaling. Therefore Ly6a-90th-quantile scaled will be kept in the meta data for later analysis.
+
+
+
+## Check for behavior of Ly6a
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+protein_dsb |>
+  filter(method == "dsb") |>
+  #filter(marker==marker_choose) |>
+  filter(marker == "Ly-6a-AbSeq") |>
+  ggplot(aes(harmony_cluster_8dims_rough,
+             quantile_max_scaled)) +
+  geom_jitter(alpha = 0.4, stroke = NA) +
+  theme_bw() + ggtitle("Ly-6a-AbSeq dsb max scaled")
+
+
+protein_dsb |>
+  filter(method == "dsb") |>
+  #filter(marker==marker_choose) |>
+  filter(marker == "Ly-6a-AbSeq") |>
+  ggplot(aes(harmony_cluster_8dims_rough,
+             value)) +
+  geom_violin(alpha = 0.4, stroke = NA) +
+  theme_bw() +
+  ggtitle("Ly-6a-AbSeq dsb raw values")
+
+
+protein_dsb |>
+  filter(method == "dsb") |>
+  #filter(marker==marker_choose) |>
+  filter(marker == "Siglecf-AbSeq") |>
+  ggplot(aes(harmony_cluster_8dims_rough,
+             value)) +
+  geom_violin(alpha = 0.4, stroke = NA) +
+  theme_bw() +
+  ggtitle("Siglecf-AbSeq dsb raw values")
+```
+There are negative values. This doesn't make biological sense.
+
+"Dsb values are interpretable as the number of standard deviations of each protein from the expected noise (if using the default settings) with additional correction for cell to cell technical variations." [https://cran.r-project.org/web/packages/dsb/vignettes/end_to_end_workflow.html]
+
+Hence, negative values  represent statistical variation of values close to zero. These are though just zero. Max scaling will amplify this noise signal, possibly resulting in spurious signal. Therfore negative values will be adjusted to zero.
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+protein_dsb <- protein_dsb |>
+  mutate(dsb_zero=if_else(method=="dsb"&value<0,0,value))
+
+protein_dsb |>
+    filter(method=="dsb") |> 
+#filter(marker==marker_choose) |> 
+  filter(marker=="Ly-6a-AbSeq") |> 
+  ggplot(aes(harmony_cluster_8dims_rough,
+             dsb_zero))+
+  geom_violin(alpha=0.4,stroke=NA )+
+  theme_bw()+ ggtitle("Ly-6a-AbSeq")
+
+    
+
+```
+# no-negative dsb corrected max scaled adt counts
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+protein_dsb <-
+  protein_dsb |>
+  group_by(method, marker, orig.ident) |>
+  mutate(method_marker_0.99_quantile_dsb_zero = quantile(dsb_zero, probs = 0.99, na.rm = T)) |>
+  mutate(method_marker_0.998_quantile_dsb_zero = quantile(dsb_zero, probs = 0.998, na.rm = T)) |>
+  mutate(method_marker_0.9_quantile_dsb_zero = quantile(dsb_zero, probs = 0.9, na.rm = T)) |>
+  mutate(method_marker_max_dsb_zero = quantile(dsb_zero, probs = 1, na.rm = T)) |>
+  mutate(quantile_0.99_scaled_dsb_zero = dsb_zero / method_marker_0.99_quantile_dsb_zero) |>
+  mutate(quantile_0.998_scaled_dsb_zero = dsb_zero / method_marker_0.998_quantile_dsb_zero) |>
+  mutate(quantile_0.9_scaled_dsb_zero = dsb_zero / method_marker_0.9_quantile_dsb_zero) |>
+  mutate(quantile_max_scaled_dsb_zero = dsb_zero / method_marker_max_dsb_zero) |> ungroup()
+
+
+```
+
+
+
+```{r fig.width=20, fig.height=12, message=FALSE, warning=FALSE,echo=FALSE}
+
+
+cluster_plot_list_0.9_quantile_scaled_dsb_zero <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_0.9_quantile_scaled_dsb_zero[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_0.9_scaled_dsb_zero,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim((-0.2),2.5)
+}
+
+ggarrange(plotlist = cluster_plot_list_0.9_quantile_scaled_dsb_zero, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("Scaled to 90th quantile",face = "bold", size = 14))
+
+
+
+
+
+
+cluster_plot_list_0.99_quantile_scaled_dsb_zero <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_0.99_quantile_scaled_dsb_zero[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_0.99_scaled_dsb_zero,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim((-0.2),2.5)
+}
+
+
+ggarrange(plotlist = cluster_plot_list_0.99_quantile_scaled_dsb_zero, common.legend = T, legend = "right" )  |> 
+annotate_figure( top = text_grob("Scaled to 99th quantile",face = "bold", size = 14))
+
+
+cluster_plot_list_0.998_quantile_scaled_dsb_zero <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_0.998_quantile_scaled_dsb_zero[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_0.998_scaled_dsb_zero,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim((-0.2),2.5)
+}
+
+
+ggarrange(plotlist = cluster_plot_list_0.998_quantile_scaled_dsb_zero, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("Scaled to 998th quantile",face = "bold", size = 14))
+
+
+cluster_plot_list_max_scaled_dsb_zero <- list()
+clusters <- obj.v5$harmony_cluster_8dims_rough |> unique() |> as.character() |> as.numeric() |> sort()
+for (clus in clusters) {
+  cluster_plot_list_max_scaled_dsb_zero[[as.character(clus)]] <- protein_dsb |>
+    filter(method=="dsb",harmony_cluster_8dims_rough==clus ) |>
+    ggplot(aes(quantile_max_scaled_dsb_zero,marker, fill=marker)) +
+  ggridges::geom_density_ridges()+
+    theme_bw() +
+  facet_grid(exp_no~sample_type)+
+    ggtitle(paste("cluster", as.character(clus)))+
+    theme(legend.position = "none", axis.text.y = element_blank(),axis.title   = element_blank()) +
+    xlim((-0.2),1)
+}
+
+
+ggarrange(plotlist = cluster_plot_list_max_scaled_dsb_zero, common.legend = T, legend = "right")|> 
+annotate_figure( top = text_grob("Scaled to max",face = "bold", size = 14))
+```
+
+
+
+# no-negative dsb corrected max scaled adt counts
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+protein_dim_map_plotter_max_zero <- function(marker_choose,quantile_treshhold ){
+  plot <- protein_dsb |> filter(method=="dsb") |> 
+filter(marker==marker_choose) |> 
+group_by(marker) |>drop_na() |>
+  ggplot(aes(umapharmony8dims_1,
+             umapharmony8dims_2,
+             color=quantile_max_scaled_dsb_zero))+
+  geom_point(alpha=0.6,stroke=NA )+
+   scale_color_viridis_c(option = "D") +
+  # geoms below will use another color scale
+  ggnewscale::new_scale_color() +
+  stat_ellipse(aes( color=harmony_cluster_8dims_rough),
+               linetype = 2,
+               lwd = 2, size=20, lty=5) + theme_bw()+ ggtitle(label =marker_choose, subtitle =  paste("quantile maximum: ",quantile_treshhold ))
+
+return(plot)
+}
+```
+
+```{r fig.width=20, fig.height=12, message=FALSE, warning=FALSE,echo=FALSE}
+siglecf_plot <- protein_dim_map_plotter_max_zero(marker_choose = "Siglecf-AbSeq", quantile_treshhold = 0.90)
+H2_ia_ie_plot <- protein_dim_map_plotter_max_zero(marker_choose = "H2-ia-ie-AbSeq", quantile_treshhold = 0.70)
+C11c_plot <- protein_dim_map_plotter_max_zero(marker_choose = "Cd11c", quantile_treshhold = 0.90)
+Cd274_plot <- protein_dim_map_plotter_max_zero(marker_choose = "Cd274-AbSeq", quantile_treshhold = 0.90)
+Ly6g_plot <- protein_dim_map_plotter_max_zero(marker_choose = "Ly-6g-AbSeq", quantile_treshhold = 0.98)
+Ly_6a_plot <- protein_dim_map_plotter_max_zero(marker_choose = "Ly-6a-AbSeq", quantile_treshhold = 0.98)
+
+ggarrange(siglecf_plot, H2_ia_ie_plot, C11c_plot, Cd274_plot,Ly6g_plot, Ly_6a_plot, legend = "bottom", common.legend = T)
+```
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+protein_dsb |>
+  ggplot(aes(quantile_max_scaled_dsb_zero,harmony_cluster_8dims_rough, fill=harmony_cluster_8dims_rough)) +
+  geom_density_ridges()+facet_wrap(~marker)
+```
+
+
+# no-zero dsb corrected max scaled adt counts
+
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+protein_dim_map_plotter <- function(marker_choose,quantile_treshhold ){
+  plot <- protein_dsb |> filter(method=="dsb") |> 
+filter(marker==marker_choose) |> 
+group_by(marker) |>drop_na()  |>mutate(quantile_max=quantile(value,probs =quantile_treshhold )) |>
+  mutate(marker_quantile_max_clip=if_else(value>quantile_max,quantile_max,value))|> ungroup() |> 
+  mutate(percent_max_quantile=marker_quantile_max_clip/quantile_max) |>
+  ggplot(aes(umapharmony8dims_1,
+             umapharmony8dims_2,
+             color=percent_max_quantile))+
+  geom_point(alpha=0.6,stroke=NA )+
+   scale_color_viridis_c(option = "D") +
+  # geoms below will use another color scale
+  ggnewscale::new_scale_color() +
+  stat_ellipse(aes( color=harmony_cluster_8dims_rough),
+               linetype = 2,
+               lwd = 2, size=20, lty=5) + theme_bw()+ ggtitle(label =marker_choose, subtitle =  paste("quantile maximum: ",quantile_treshhold ))
+
+return(plot)
+}
+```
+
+```{r fig.width=20, fig.height=12, message=FALSE, warning=FALSE,echo=FALSE}
+siglecf_plot <- protein_dim_map_plotter(marker_choose = "Siglecf-AbSeq", quantile_treshhold = 0.90)
+H2_ia_ie_plot <- protein_dim_map_plotter(marker_choose = "H2-ia-ie-AbSeq", quantile_treshhold = 0.70)
+C11c_plot <- protein_dim_map_plotter(marker_choose = "Cd11c", quantile_treshhold = 0.90)
+Cd274_plot <- protein_dim_map_plotter(marker_choose = "Cd274-AbSeq", quantile_treshhold = 0.90)
+Ly6g_plot <- protein_dim_map_plotter(marker_choose = "Ly-6g-AbSeq", quantile_treshhold = 0.98)
+Ly_6a_plot <- protein_dim_map_plotter(marker_choose = "Ly-6a-AbSeq", quantile_treshhold = 0.98)
+
+ggarrange(siglecf_plot, H2_ia_ie_plot, C11c_plot, Cd274_plot,Ly6g_plot, Ly_6a_plot, legend = "bottom", common.legend = T)
+```
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+
+
+protein_dsb |> filter(method=="dsb" ) |> ggplot(aes(umapharmony8dims_1,umapharmony8dims_2, color=harmony_cluster_8dims_rough))+ geom_point()
+```
+
+
+```{r fig.width=20, fig.height=12, message=FALSE, warning=FALSE,echo=FALSE, include=FALSE}
+library(ggalt)
+library(ggnewscale)
+library(ggforce)
+library(tidyquant)
+
+protein_dsb |> filter(method=="dsb") |> 
+#filter(marker==marker_choose) |> 
+  ggplot(aes(umapharmony8dims_1,
+             umapharmony8dims_2,
+             color=value))+
+  geom_point(alpha=0.4,stroke=NA )+
+   scale_color_viridis_c(option = "D") +
+  # geoms below will use another color scale
+  new_scale_color() +
+  stat_ellipse(aes( color=harmony_cluster_8dims_rough),
+               linetype = 2,
+               lwd = 0.8, size=20, lty=3) +
+  theme_bw()+
+  ggtitle(label ="dsb values, no scalaing",
+          #subtitle =  paste("quantile maximum: ",quantile_treshhold)
+          ) +
+  facet_wrap(~marker)
+
+
+
+quantile_treshhold <- 0.95
+
+protein_dsb |> filter(method=="dsb") |> 
+#filter(marker==marker_choose) |> 
+group_by(marker) |>drop_na()  |>mutate(quantile_max=quantile(value,probs =quantile_treshhold )) |>
+  mutate(marker_quantile_max_clip=if_else(value>quantile_max,quantile_max,value))|> ungroup() |> 
+  mutate(percent_max_quantile=marker_quantile_max_clip/quantile_max) |>
+  ggplot(aes(umapharmony8dims_1,
+             umapharmony8dims_2,
+             color=percent_max_quantile))+
+  geom_point(alpha=0.4,stroke=NA 
+             )+ 
+  facet_wrap(~marker)+
+   scale_color_viridis_c(option = "D") +
+  # geoms below will use another color scale
+  ggnewscale::new_scale_color() +
+  stat_ellipse(aes( color=harmony_cluster_8dims_rough),
+               linetype = 2,
+               lwd = 0.8, size=20, lty=3) + theme_bw()+
+  ggtitle(label ="quantile clip at 95th quantile of all cells, no additional scaling"#,
+          #subtitle =  paste("quantile maximum: ",quantile_treshhold)
+          )
+  
+
+
+
+
+protein_dsb |>
+  filter(method=="dsb") |> 
+#filter(marker==marker_choose) |> 
+  ggplot(aes(umapharmony8dims_1,
+             umapharmony8dims_2,
+             color=quantile_max_scaled))+
+  geom_point(alpha=0.4,stroke=NA )+
+   scale_color_viridis_c(option = "D") +
+  # geoms below will use another color scale
+  new_scale_color() +
+  stat_ellipse(aes( color=harmony_cluster_8dims_rough),
+               linetype = 2,
+               lwd = 0.8, size=20, lty=3) +
+  theme_bw()+
+  ggtitle(label ="max scaled per library",
+          #subtitle =paste("quantile maximum: ",quantile_treshhold )
+          ) +
+  facet_wrap(~marker)
+```
+
+
+```{r message=FALSE, warning=FALSE,echo=FALSE, include=FALSE}
+protein_dsb |>
+  filter(method=="dsb") |> 
+#filter(marker==marker_choose) |> 
+  filter(marker=="Ly-6a-AbSeq") |> 
+  ggplot(aes(umapharmony8dims_1,
+             umapharmony8dims_2,
+             color=quantile_max_scaled))+
+  geom_point(alpha=0.4,
+             stroke=NA )+
+   scale_color_viridis_c(option = "D") +
+  # geoms below will use another color scale
+  new_scale_color() +
+  stat_ellipse(aes( color=harmony_cluster_8dims_rough),
+               linetype = 2,
+               lwd = 0.8, size=20, lty=3) +
+  theme_bw()+
+  ggtitle(label ="90th quantile scaled per library",
+          subtitle =paste("quantile maximum: ",quantile_treshhold )
+          ) +
+  facet_wrap(~marker)
+```
+
+#add scaled counts to seurat object
+
+```{r}
+scaled_data_tbl <- protein_dsb |> filter(method=="dsb") |> select(.cell,marker,quantile_max_scaled_dsb_zero) |> pivot_wider(names_from = marker, values_from = quantile_max_scaled_dsb_zero)
+
+#make matrix with row names 
+
+scaled_data_mtx <- scaled_data_tbl |> select(-.cell) |> as.matrix()
+rownames(scaled_data_mtx) <- pull(scaled_data_tbl, .cell)
+#arrange according to 
+scaled_data_mtx <- scaled_data_mtx[match(obj.v5 |> colnames(), scaled_data_tbl$.cell),] 
+scaled_data_mtx_t <- scaled_data_mtx |> t()
+scaled_data_mtx_t[1:2,1:2]
+
+scaled_data_seur_assay <- CreateAssay5Object(counts=dsb_all_t, data=scaled_data_mtx_t)
+
+obj.v5[["dsb"]] <- scaled_data_seur_assay
+
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="dsb", slot="data")  |> 
+group_by(.feature,orig.ident,condition,sampletag_Ms4a3) |>
+  summarise(mean_scaled_dsb=mean(.abundance_dsb)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  mutate(experiment=str_replace_all(orig.ident,c("viral.experiment.1_"="d60",
+                                                 "viral.experiment.2_"="d8") )) |> 
+  mutate(sample= paste(experiment,condition, sep = "_")) |> 
+  ggplot(aes(.feature,sample, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="dsb", slot="data")  |> 
+group_by(.feature,orig.ident,condition,sampletag_Ms4a3) |>
+  summarise(mean_scaled_dsb=mean(.abundance_dsb)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  mutate(experiment=str_replace_all(orig.ident,c("viral.experiment.1_"="d60",
+                                                 "viral.experiment.2_"="d8") )) |> 
+  mutate(sample= paste(experiment,condition, sep = "_")) |> 
+  ggplot(aes(.feature,sample, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  facet_wrap(~sampletag_Ms4a3)
+
+
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="dsb", slot="data")  |> 
+group_by(.feature,orig.ident,condition,sampletag_Ms4a3) |>
+  summarise(mean_scaled_dsb=mean(.abundance_dsb)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  mutate(experiment=str_replace_all(orig.ident,c("viral.experiment.1_"="d60",
+                                                 "viral.experiment.2_"="d8") )) |> 
+  mutate(sample= paste(experiment,condition, sep = "_")) |> 
+  ggplot(aes(.feature,experiment, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  facet_grid(condition~sampletag_Ms4a3)
+
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="dsb", slot="data") |>  as_tibble() |> separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+  relocate(day) |>
+  group_by(.feature,day,sample_type, condition,sampletag_Ms4a3) |>
+  summarise(mean_scaled_dsb=mean(.abundance_dsb)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,condition, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggh4x::facet_nested(day~sample_type + sampletag_Ms4a3)
+```
+```{r}
+# obj.v5 |>  as_tibble() |>
+#   separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+#     mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+#                                                  "viral.experiment.2"="d8") )) |>
+#     mutate(day=as_factor(day),
+#          sample_type=as_factor(sample_type),
+#          condition=as_factor(condition),
+#          sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+#          harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+#          ) |> 
+#   group_by(day,sample_type, condition,sampletag_Ms4a3) |>
+#   summarize(n_total=n()#, .before=.cell
+#             ) |> 
+#   group_by(day,sample_type, condition,sampletag_Ms4a3, harmony_cluster_8dims_rough) |>
+#   summarize(freq_cluster=n()/n_total) |> unique() |> 
+#   ggplot(aes(harmony_cluster_8dims_rough,condition, fill=freq_cluster)) +
+#   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+#   ggh4x::facet_nested(day~sample_type + sampletag_Ms4a3)
+  
+
+
+
+
+
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+    mutate(day=as_factor(day),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,) |>
+  mutate(freq_cluster=n/sum(n)) |> 
+  ggplot(aes(harmony_cluster_8dims_rough,condition, fill=freq_cluster)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggh4x::facet_nested(day~sample_type + sampletag_Ms4a3)
+  
+
+# obj.v5 |>  as_tibble() |>
+#   separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+#     mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+#                                                  "viral.experiment.2"="d8") )) |>
+#     mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+#          sample_type=as_factor(sample_type),
+#          condition=as_factor(condition),
+#          sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+#          harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+#          ) |> 
+#   group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+#   count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+#   group_by(day,sample_type, condition,sampletag_Ms4a3,) |>
+#   mutate(freq_cluster=n/sum(n)) |> 
+#   ggplot(aes(harmony_cluster_8dims_rough,condition, fill=freq_cluster)) +
+#   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+#   ggh4x::facet_nested(day~sample_type + sampletag_Ms4a3)
+
+
+
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+    mutate(day=as_factor(day),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  group_by(harmony_cluster_8dims_rough) |>
+  mutate(freq_cluster=n/sum(n)) |> 
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=freq_cluster)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggh4x::facet_nested(day~sample_type + sampletag_Ms4a3)
+
+
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+    mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  group_by(harmony_cluster_8dims_rough) |>
+  mutate(freq_cluster=n/sum(n)) |> 
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=freq_cluster)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggh4x::facet_nested(~sampletag_Ms4a3+sample_type +day)
+
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+    mutate(day=as_factor(day),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  group_by(harmony_cluster_8dims_rough) |>
+  mutate(freq_cluster=n/sum(n)) |> 
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=freq_cluster)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  ggh4x::facet_nested(~sampletag_Ms4a3+sample_type +day)
+
+
+#row scaled
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+    mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  group_by(harmony_cluster_8dims_rough) |>
+  mutate(freq_cluster=n/sum(n)) |> 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+  mutate(condition=as.character(condition)) |> na.omit() |> 
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=freq_cluster)) +
+  geom_tile()+ scale_fill_viridis()+theme_bw() + 
+  ggh4x::facet_nested(~sampletag_Ms4a3+sample_type +day) +theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+
+#column scaled
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+    mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |>
+  mutate(freq_cluster=n/sum(n)) |> 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+  mutate(condition=as.character(condition)) |> na.omit() |> 
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=freq_cluster)) +
+  geom_tile()+ scale_fill_viridis()+theme_bw() +
+  ggh4x::facet_nested(~sampletag_Ms4a3+sample_type +day,) +theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+# column differnce to mean
+
+#column scaled
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+    mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |>
+ 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+    mutate(freq_cluster=n/sum(n)) |>
+  mutate(condition=as.character(condition)) |> na.omit() |> 
+  group_by(harmony_cluster_8dims_rough) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  ungroup() |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
+  geom_tile()+ scale_fill_viridis()+theme_bw() +
+  ggh4x::facet_nested(~sampletag_Ms4a3+sample_type +day) +theme_dark()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+    scale_fill_gradient2(  low = "blue",
+  mid = "white",
+  high = "red")
+
+
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+    mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |>
+ 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+    mutate(freq_cluster=n/sum(n)) |>
+  mutate(condition=as.character(condition)) |> na.omit() |> 
+  group_by(harmony_cluster_8dims_rough) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  ungroup() |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
+  geom_tile()+ 
+  #scale_fill_viridis()+theme_bw() +
+  ggh4x::facet_nested_wrap(
+    vars(sampletag_Ms4a3,sample_type ,day), nrow = 1,drop = TRUE,scales = "free_x"
+  )+theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))   + scale_fill_gradient2(  low = "blue",
+  mid = "white",
+  high = "red")
+
+
+##cluster 8
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+    mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |>
+ 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+    mutate(freq_cluster=n/sum(n)) |>
+  mutate(condition=as.character(condition)) |> na.omit() |> 
+  group_by(harmony_cluster_8dims_rough) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  
+ # filter(harmony_cluster_8dims_rough %in% c(7,8,9,10)) |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
+  geom_tile()+ 
+  #scale_fill_viridis()+theme_bw() +
+  ggh4x::facet_nested_wrap(
+    vars(sampletag_Ms4a3,sample_type ,day), nrow = 1,drop = TRUE,scales = "free_x"
+  )+theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))   + scale_fill_gradient2(  low = "blue",
+  mid = "white",
+  high = "red")
+```
+
+```{r}
+obj.v5 |> mutate(experiment=str_replace_all(orig.ident,
+                                            c("viral.experiment.1_"="d60",
+                                              "viral.experiment.2_"="d8"))) |>
+  group_by(experiment,sampletag_Ms4a3, condition) |> 
+  mutate(n_experiment=n()) |>
+  relocate(n_experiment, experiment)
+  
+```
+```{r}
+obj.v5@reductions
+```
+
+```{r}
+obj.v5|> DimPlot(label=T, reduction = "umap.harmony_8dims")
+```
+
