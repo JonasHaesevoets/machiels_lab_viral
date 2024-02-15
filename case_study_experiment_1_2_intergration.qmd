@@ -1,0 +1,529 @@
+---
+title: "intergration of experiments 1 and 2 "
+format: html
+editor: visual
+---
+
+```{r}
+
+batch_highlight_2_by_2 <- function(reduc="umap.harmony"){
+        px_1 <- DimPlot(
+                obj.v5,
+                reduction = reduc,
+                #group.by = c("harmony_cluster_8dims"),
+                cells.highlight = Cells(obj.v5)[obj.v5$orig.ident== (obj.v5$orig.ident |> unique())[1]],
+                label.size = 2,
+                alpha = 0.5
+        )+ggtitle((obj.v5$orig.ident |> unique())[1])+theme(legend.position = "none")
+        
+        px_2 <- DimPlot(
+                obj.v5,
+                reduction = reduc,
+                #group.by = c("harmony_cluster_8dims"),
+                cells.highlight = Cells(obj.v5)[obj.v5$orig.ident== (obj.v5$orig.ident |> unique())[2]],
+                label.size = 2,
+                alpha = 0.5
+        )+ggtitle((obj.v5$orig.ident |> unique())[2])+theme(legend.position = "none")
+        
+        px_3 <- DimPlot(
+                obj.v5,
+                reduction = reduc,
+                #group.by = c("harmony_cluster_8dims"),
+                cells.highlight = Cells(obj.v5)[obj.v5$orig.ident== (obj.v5$orig.ident |> unique())[3]],
+                label.size = 2,
+                alpha = 0.5
+        )+ggtitle((obj.v5$orig.ident |> unique())[3])+theme(legend.position = "none")
+        
+        px_4 <- DimPlot(
+                obj.v5,
+                reduction = reduc,
+                #group.by = c("harmony_cluster_8dims"),
+                cells.highlight = Cells(obj.v5)[obj.v5$orig.ident== (obj.v5$orig.ident |> unique())[4]],
+                label.size = 2,
+                alpha = 0.5
+        )+ggtitle((obj.v5$orig.ident |> unique())[4])+theme(legend.position = "none")
+        return((px_1+px_2)/(px_3+px_4))}
+```
+
+```{r}
+set.seed(2023)
+easypackages::libraries("Seurat","tidyverse", "SeuratWrappers"#,"tidyseurat"
+                        , "ggExtra", "xlsx"
+)
+
+library(Seurat)
+#library(BPCells)
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(patchwork)
+# set this option when analyzing large datasets
+options(future.globals.maxSize = 3e+09)
+```
+
+```{r eval=FALSE, include=FALSE}
+
+exp_2_lung <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_2_lung_afterQCdashboard.rds" |> read_rds()
+exp_2_bal <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_2_bal_afterQCdashboard.rds" |> read_rds()
+
+exp_2 <- merge(exp_2_lung, exp_2_bal,add.cell.ids = c("lung", "bal")) 
+misc_list_2 <- list(exp_2_lung@misc,exp_2_bal@misc)
+exp_2_bal <- NULL
+exp_2_lung <- NULL
+gc()
+
+exp_1_lung <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_lung_afterQCdashboard.rds" |> read_rds()
+exp_1_bal <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_afterQCdashboard.rds" |> read_rds()
+
+exp_1 <- merge(exp_1_lung, exp_1_bal,add.cell.ids = c("lung", "bal")) 
+misc_list_1 <- list(exp_1_lung@misc, exp_1_bal@misc)
+exp_1_bal <- NULL
+exp_1_lung <- NULL
+gc()
+
+obj <- merge(exp_1, exp_2,add.cell.ids = c("exp_1", "exp_2"))
+exp_2 <- NULL
+exp_1<- NULL
+gc()
+obj@misc <- list(misc_list_1,misc_list_2)
+obj <- JoinLayers(obj)
+write_rds(obj,"C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged.rds")
+#obj <- NULL
+```
+
+## without filtering
+
+###unintegrated
+
+```{r include=FALSE, eval=FALSE}
+# library(future)
+# # check the current active plan
+# plan("multicore", workers = 4)
+```
+
+# v5 conversion
+
+```{r include=FALSE, eval=FALSE}
+
+obj <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged.rds")
+
+meta_data <- obj[[]]
+options(Seurat.object.assay.version = "v5")
+
+obj.v5 <- CreateSeuratObject(counts = obj[["RNA"]]$counts, meta.data = meta_data)
+#obj.v5[[]] <- meta_data
+#obj.v5$orig.ident <- meta_data$orig.ident
+protein <- CreateAssay5Object(counts = obj[["protein"]]$counts)
+sampletags <- CreateAssay5Object(counts = obj[["sampletags"]]$counts)
+obj.v5[["protein"]] <- protein
+obj.v5[["sampletags"]] <- sampletags
+
+obj <- NULL
+gc()
+
+
+obj.v5[["RNA"]] <- split(obj.v5[["RNA"]], f = obj.v5$orig.ident)
+
+
+obj.v5 <- NormalizeData(obj.v5)
+obj.v5 <- FindVariableFeatures(obj.v5)
+obj.v5 <- ScaleData(obj.v5)
+obj.v5 <- RunPCA(obj.v5)
+obj.v5 <- FindNeighbors(obj.v5, dims = 1:20)
+obj.v5 <- FindClusters(obj.v5)
+obj.v5 <- RunUMAP(obj.v5, dims = 1:20, return.model = T,reduction = "pca", reduction.name = "umap.unintegrated")
+obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_unintegrated.rds")
+```
+
+```{r fig.height=12}
+#obj.v5 <-   read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_unintegrated.rds")
+obj.v5 <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+
+p1 <- DimPlot(obj.v5, label = T, label.size = 3, reduction = "umap.unintegrated", group.by = "orig.ident") + NoLegend()
+p2 <- DimPlot(obj.v5, label = T, label.size = 3, reduction = "umap.unintegrated", split.by = "orig.ident") 
+p1/p2
+#plan("sequential")
+```
+
+## rcpa
+
+```{r eval=FALSE, include=FALSE}
+obj.v5 <- IntegrateLayers(
+  object = obj.v5, method = RPCAIntegration,
+  orig.reduction = "pca", new.reduction = "integrated.rpca",
+  verbose = FALSE
+)
+
+obj.v5 <- FindNeighbors(obj.v5, reduction = "integrated.rpca", dims = 1:15)
+obj.v5 <- FindClusters(obj.v5, cluster.name = "rpca_cluster")
+obj.v5 <- RunUMAP(obj.v5, reduction = "integrated.rpca", dims = 1:15, reduction.name = "umap.rpca")
+obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+```
+
+```{r fig.height=12}
+#obj.v5 <-   read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+
+p3 <- DimPlot(
+  obj.v5,
+  reduction = "umap.rpca",
+  group.by = c("orig.ident"),
+   label.size = 2
+)
+
+p4 <- DimPlot(
+  obj.v5,
+  reduction = "umap.rpca",
+  group.by = c("orig.ident"),
+  split.by = c("orig.ident"),
+  label.size = 2
+)
+
+p3/p4
+```
+
+# Harmony
+
+```{r eval=FALSE}
+#obj.v5 <-   read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+obj.v5 <- IntegrateLayers(
+  object = obj.v5, method = HarmonyIntegration,
+  orig.reduction = "pca", new.reduction = "integrated.harmony",
+  verbose = FALSE
+)
+
+obj.v5 <- FindNeighbors(obj.v5, reduction = "integrated.harmony", dims = 1:15 )
+obj.v5 <- FindClusters(obj.v5, cluster.name = "harmony_cluster_15dims")
+obj.v5 <- RunUMAP(obj.v5, reduction = "integrated.harmony", dims = 1:15, reduction.name = "umap.harmony_15dims")
+obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+
+obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+```
+
+```{r}
+x <- obj.v5@reductions$integrated.harmony@cell.embeddings |> as_tibble() |>  summarise(across(everything(), sd)) |> pivot_longer(cols = everything()) 
+x |> mutate(dim=1:nrow(x)) |> ggplot(aes(dim,value))+geom_col()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ggtitle(" Harmany dimension standard deviations")+theme_bw()
+
+```
+
+# Harmony 15 dimensions
+
+```{r}
+p5 <- DimPlot(
+  obj.v5,
+  reduction = "umap.harmony_15dims",
+  group.by = c("orig.ident"),
+   label.size = 2
+)
+
+p6 <- DimPlot(
+  obj.v5,
+  reduction = "umap.harmony_15dims",
+  group.by = c("harmony_cluster_15dims"),
+  label.size = 2
+)
+
+p7 <- batch_highlight_2_by_2("umap.harmony_15dims")
+p7
+p5
+p6
+```
+
+# Harmony 10 dimensions
+
+```{r eval=FALSE, include=FALSE}
+obj.v5 <- FindNeighbors(obj.v5, reduction = "integrated.harmony", dims = 1:10 )
+obj.v5 <- FindClusters(obj.v5, cluster.name = "harmony_cluster_10dims")
+obj.v5 <- RunUMAP(obj.v5, reduction = "integrated.harmony", dims = 1:10, reduction.name = "umap.harmony_10dims")
+obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+```
+
+```{r}
+p5 <- DimPlot(
+  obj.v5,
+  reduction = "umap.harmony_10dims",
+  group.by = c("orig.ident"),
+   label.size = 2
+)
+
+p6 <- DimPlot(
+  obj.v5,
+  reduction = "umap.harmony_10dims",
+  group.by = c("harmony_cluster_10dims"),
+  label.size = 2
+)
+
+p7 <- batch_highlight_2_by_2("umap.harmony_10dims")
+p7
+p5
+p6
+```
+
+# Harmony 8 dimensions
+
+```{r eval=FALSE, include=FALSE}
+#library(tidyseurat)
+obj.v5 <- FindNeighbors(obj.v5, reduction = "integrated.harmony", dims = 1:8 )
+obj.v5 <- FindClusters(obj.v5, cluster.name = "harmony_cluster_8dims")
+obj.v5 <- FindClusters(obj.v5, cluster.name = "harmony_cluster_8dims_rough", resolution = 0.3)
+obj.v5 <- RunUMAP(obj.v5, reduction = "integrated.harmony", dims = 1:8, reduction.name = "umap.harmony_8dims")
+obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+```
+
+```{r}
+#obj.v5 <-   read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+
+p5 <- DimPlot(
+  obj.v5,
+  reduction = "umap.harmony_8dims",
+  group.by = c("orig.ident"),
+   label.size = 2
+)
+
+p6 <- DimPlot(
+  obj.v5,
+  reduction = "umap.harmony_8dims",
+  group.by = c("harmony_cluster_8dims"),
+  label.size = 2
+)
+
+p8 <- DimPlot(
+  obj.v5,
+  reduction = "umap.harmony_8dims",
+  group.by = c("harmony_cluster_8dims_rough"),
+  label.size = 5,
+  label = T,
+  
+)
+
+p7 <- batch_highlight_2_by_2("umap.harmony_8dims")
+      
+
+p7
+p5
+p6
+p8
+```
+
+### cluster 1
+
+```{r}
+DimPlot(obj.v5, cells.highlight = Cells(obj.v5)[(obj.v5$harmony_cluster_8dims_rough %in% c(1))], reduction = "umap.harmony_8dims" )
+```
+
+```{r eval=FALSE}
+obj.v5 <- JoinLayers(obj.v5)
+Idents(obj.v5) <- "harmony_cluster_8dims_rough"
+clus_1 <- FindConservedMarkers(obj.v5,ident.1=c(1),  logfc.threshold=0.5, min.pct = 0.1,max.cells.per.ident = 500, grouping.var = "orig.ident")
+
+###
+#clus_0_1_protein <- FindConservedMarkers(obj.v5,ident.1=c(0,1,2),  logfc.threshold=0.5, min.pct = 0.1,max.cells.per.ident = 500, grouping.var = "orig.ident",assay = "protein")
+
+ xlsx::write.xlsx(clus_1,"C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/clus_0_1.xlsx")
+ clus_1
+```
+
+```{r}
+clus_1 <- read.xlsx(file="C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/clus_0_1.xlsx", sheetIndex = 1) |> as_tibble() |> rename(gene=NA.)
+ 
+ 
+top_clus_1_neg_pos <- clus_1 |> 
+  mutate(
+    FCmean=(viral.experiment.2__bal_avg_log2FC+
+      viral.experiment.2__bal_avg_log2FC+
+      viral.experiment.2__lung_avg_log2FC+
+      viral.experiment.1__lung_avg_log2FC)/4)|>
+  mutate(neg_pos=if_else(FCmean>0,"pos","neg")) |> 
+  group_by(neg_pos) |>
+  slice_min(minimump_p_val,n = 20) |>
+  mutate(gene=as.factor(gene)) |> 
+  pull(gene) |>
+  unique() 
+DotPlot(obj.v5, features = top_clus_1_neg_pos) + theme(axis.text.x = element_text(face = "bold", color = "black",
+size = 12, angle = 45, hjust = 1, vjust = 1))
+```
+
+```{r}
+tibble(cluster=obj.v5$harmony_cluster_8dims_rough, orig_ident=obj.v5$orig.ident) |>
+  separate(orig_ident,into = c("viral","bla","exp", "type")) |>
+  mutate(dpi=ifelse(exp==1,"d60","d8")) |> select(cluster,exp,type,dpi) |>
+  mutate(dataset=paste(type,dpi,sep ="_" )) |>
+  mutate(clus_1=if_else(cluster%in%c(1),"1","other")) |> 
+  count(dataset, clus_1) %>%       
+  group_by(dataset) %>%
+  mutate(pct= round(prop.table(n) * 100, 1)) |> 
+  ggplot(aes(dataset,pct, fill=clus_1)) +
+  geom_bar(stat="identity") +
+  ylab("percentage") +
+  geom_text(aes(label=paste0(sprintf("%1.1f", pct),"%")),
+            position=position_stack(vjust=0.5)) +
+  ggtitle("cluster 1") +
+  theme_bw()
+```
+
+### cluster 0 and 2
+
+```{r}
+DimPlot(obj.v5, cells.highlight = Cells(obj.v5)[(obj.v5$harmony_cluster_8dims_rough %in% c(0,2))], reduction = "umap.harmony_8dims" )
+```
+
+```{r eval=FALSE}
+clus_0_2 <- FindConservedMarkers(obj.v5,ident.1=c(0,2),  logfc.threshold=0.5, min.pct = 0.1,max.cells.per.ident = 500, grouping.var = "orig.ident")
+
+ xlsx::write.xlsx(clus_0_2,"C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/clus_0_2.xlsx")
+clus_0_2
+```
+
+```{r}
+clus_0_2 <- read.xlsx(file="C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/clus_0_2.xlsx", sheetIndex = 1) |> as_tibble() |> rename(gene=NA.)
+
+top_clus_0_2_neg_pos <- clus_0_2 |>
+  #as_tibble(rownames = "gene") |> 
+  mutate(
+    FCmean=(viral.experiment.2__bal_avg_log2FC+
+      viral.experiment.2__bal_avg_log2FC+
+      viral.experiment.2__lung_avg_log2FC+
+      viral.experiment.1__lung_avg_log2FC)/4)|>
+  mutate(neg_pos=if_else(FCmean>0,"pos","neg")) |> 
+  group_by(neg_pos) |>
+  slice_min(minimump_p_val,n = 20) |>
+  mutate(gene=as.factor(gene)) |> 
+  pull(gene) |>
+  unique() 
+DotPlot(obj.v5, features = top_clus_0_2_neg_pos) + theme(axis.text.x = element_text(face = "bold", color = "black",
+size = 12, angle = 45, hjust = 1, vjust = 1))
+```
+
+```{r}
+tibble(cluster=obj.v5$harmony_cluster_8dims_rough, orig_ident=obj.v5$orig.ident) |>
+  separate(orig_ident,into = c("viral","bla","exp", "type")) |>
+  mutate(dpi=ifelse(exp==1,"d60","d8")) |> select(cluster,exp,type,dpi) |>
+  mutate(dataset=paste(type,dpi,sep ="_" )) |>
+  mutate(clus_0_2=if_else(cluster%in%c(0,2),"0_or_2","other")) |> 
+  count(dataset, clus_0_2) %>%       
+  group_by(dataset) %>%
+  mutate(pct= round(prop.table(n) * 100, 1)) |> 
+  ggplot(aes(dataset,pct, fill=clus_0_2)) +
+  geom_bar(stat="identity") +
+  ylab("percentage") +
+  geom_text(aes(label=paste0(sprintf("%1.1f", pct),"%")),
+            position=position_stack(vjust=0.5)) +
+  ggtitle("clusters 0 and 2") +
+  theme_bw()
+```
+
+```{r}
+DimPlot(obj.v5, cells.highlight = Cells(obj.v5)[(obj.v5$harmony_cluster_8dims_rough %in% c(3,4))], reduction = "umap.harmony_8dims" ,alpha = 0.3)
+```
+
+### cluster 3 and 4
+
+```{r eval=FALSE}
+clus_3_4<- FindConservedMarkers(obj.v5,ident.1=c(3,4),  logfc.threshold=0.5, min.pct = 0.1,max.cells.per.ident = 500, grouping.var = "orig.ident")
+
+xlsx::write.xlsx(clus_3_4,"C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/clus_3_4.xlsx")
+```
+
+```{r}
+clus_3_4 <- read.xlsx(file="C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/clus_3_4.xlsx", sheetIndex = 1) |> as_tibble() |> rename(gene=NA.)
+
+top_5_clus_3_4_neg_pos <- clus_3_4 |>
+ # as_tibble(rownames = "gene") |> 
+  mutate(
+    FCmean=(viral.experiment.2__bal_avg_log2FC+
+      viral.experiment.2__bal_avg_log2FC+
+      viral.experiment.2__lung_avg_log2FC+
+      viral.experiment.1__lung_avg_log2FC)/4)|>
+  mutate(neg_pos=if_else(FCmean>0,"pos","neg")) |> 
+  group_by(neg_pos) |>
+  slice_min(minimump_p_val,n = 20) |>
+  mutate(gene=as.factor(gene)) |> 
+  pull(gene) |>
+  unique() 
+
+DotPlot(obj.v5, features = top_5_clus_3_4_neg_pos) + theme(axis.text.x = element_text(face = "bold", color = "black",
+size = 12, angle = 45, hjust = 1, vjust = 1))
+```
+
+```{r}
+tibble(cluster=obj.v5$harmony_cluster_8dims_rough, orig_ident=obj.v5$orig.ident) |>
+  separate(orig_ident,into = c("viral","bla","exp", "type")) |>
+  mutate(dpi=ifelse(exp==1,"d60","d8")) |> select(cluster,exp,type,dpi) |>
+  mutate(dataset=paste(type,dpi,sep ="_" )) |>
+  mutate(clus_3_4=if_else(cluster%in%c(3,4),"3_or_4","other")) |> 
+  count(dataset, clus_3_4) %>%       
+  group_by(dataset) %>%
+  mutate(pct= round(prop.table(n) * 100, 1)) |> 
+  ggplot(aes(dataset,pct, fill=clus_3_4)) +
+  geom_bar(stat="identity") +
+  ylab("percentage") +
+  geom_text(aes(label=paste0(sprintf("%1.1f", pct),"%")),
+            position=position_stack(vjust=0.5)) +
+  ggtitle("clusters 3 and 4") +
+  theme_bw()
+```
+
+```{r}
+obj.v5 <- JoinLayers(obj.v5)
+Idents(obj.v5) <- "harmony_cluster_8dims_rough"
+all_harmony_clusters_rough <- FindAllMarkers(obj.v5,min.pct = 0.3,max.cells.per.ident = 500, logfc.threshold = 0.5, )
+all_harmony_clusters_rough |> group_by(cluster) |> slice_min(p_val_adj,n = 10)
+
+xlsx::write.xlsx(all_harmony_clusters_rough,"C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/all_harmony_clusters_rough.xlsx")
+
+write_rds(all_harmony_clusters_rough, "C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/all_harmony_clusters_rough.xlsx")
+```
+
+```{r}
+
+all_harmony_clusters_rough <- read_rds( "C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/all_harmony_clusters_rough.xlsx")
+options(java.parameters = "-Xmx8000m")
+
+
+
+# all_harmony_clusters_rough <- read.xlsx(
+#   file="C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/intergration_1_2/12_01_2024/all_harmony_clusters_rough.xlsx",
+#   sheetIndex = 1)
+
+top_5_clus_genes <- all_harmony_clusters_rough |> filter(avg_log2FC>0) |> group_by(cluster) |> slice_min(p_val_adj,n = 5) |> pull(gene) |> unique() |>  as.factor()
+
+DotPlot(obj.v5, features = top_5_clus_genes) + theme(axis.text.x = element_text(face = "bold", color = "black",
+size = 12, angle = 45, hjust = 1, vjust = 1))
+```
+
+```{r}
+tibble(cluster=obj.v5$harmony_cluster_8dims_rough, orig_ident=obj.v5$orig.ident) |>
+  separate(orig_ident,into = c("viral","bla","exp", "type")) |>
+  mutate(dpi=ifelse(exp==1,"d60","d8")) |> select(cluster,exp,type,dpi) |>
+  mutate(dataset=paste(type,dpi,sep ="_" )) |>
+  count(dataset, cluster) %>%       
+  group_by(dataset) %>%
+  mutate(pct= round(prop.table(n) * 100, 1)) |> 
+  ggplot(aes(dataset,pct, fill=cluster)) +
+  geom_bar(stat="identity") +
+  ylab("percentage") +
+  geom_text(aes(label=paste0(sprintf("%1.1f", pct),"%")),
+            position=position_stack(vjust=0.5)) +
+  ggtitle("clusters") +
+  theme_bw()
+```
+
+```{r}
+Layers(obj.v5)
+obj.v5 <- JoinLayers(obj.v5)
+
+
+obj.v5 <- SCTransform(obj.v5) %>%
+    RunPCA() %>%
+    FindNeighbors(dims = 1:30) %>%
+    FindClusters() %>%
+    RunUMAP(dims = 1:30)
+
+```
+## ScTransform
+
+```{r}
+obj.v5 <- readRDS("C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_experiment_1_2_merged_v5_split_integrated_sct_1.rds")
+DimPlot(obj.v5, group.by = "orig.ident")
+```
+
+
