@@ -1,7 +1,3 @@
-
-
-
-
 library(tidyseurat)
 library(readr)
 library(Seurat)
@@ -71,7 +67,7 @@ obj.v5 <- FindClusters(obj.v5, cluster.name = "harmony_cluster_8dims")
 obj.v5 <- FindClusters(obj.v5, cluster.name = "harmony_cluster_8dims_rough", resolution = 0.3)
 obj.v5 <- RunUMAP(obj.v5, reduction = "integrated.harmony", dims = 1:8, reduction.name = "umap.harmony_8dims")
 
-
-obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_integrated_test.rds")
+obj.v5 <- JoinLayers(obj.v5)
+obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_integrated.rds")
 
 
