@@ -69,7 +69,8 @@ read_rhapsody_multi_assay_tibble_based <- function(dbec_counts_path, project_nam
         #counts <- as(counts, "sparseMatrix")
         print("count table loaded")
 
-        protein <- counts[grep(names(counts),pattern = "pAbO")] |> clean_names() |>  #get rid of special characters that would interfere with downstream functions in feature names
+        protein <- counts[grep(names(counts),pattern = "pAbO")] |>
+                clean_names() |>  #get rid of special characters that would interfere with downstream functions in feature names
                 tidyfst::t_dt() #efficiently transposes dataframes 
         colnames(protein) <- barcodes # reapply cell index
         
@@ -82,7 +83,7 @@ read_rhapsody_multi_assay_tibble_based <- function(dbec_counts_path, project_nam
         gc() #freeing up memory
         
         print("creating seurat object")
-        seurat <- CreateSeuratObject(counts = transcriptome, project=project_name,)
+        seurat <- CreateSeuratObject(counts = transcriptome, project=project_name)
         
         print("adding assay objects")
         seurat[['protein']] <- CreateAssayObject(counts = protein)

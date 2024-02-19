@@ -27,8 +27,11 @@ exp_2 <- NULL
 exp_1<- NULL
 gc()
 obj@misc <- list(misc_list_1,misc_list_2)
-obj <- JoinLayers(obj)
+obj <- JoinLayers(obj, assay = "RNA")
+obj <- JoinLayers(obj, assay = "protein")
+obj <- JoinLayers(obj, assay = "sampletags")
 #write_rds(obj,"C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged.rds")
+#obj <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged.rds")
 
 ### convert object to v5 object
 
@@ -49,7 +52,7 @@ gc()
 
 #normalize by batch
 obj.v5[["RNA"]] <- split(obj.v5[["RNA"]], f = obj.v5$orig.ident)
-
+gc()
 
 obj.v5 <- NormalizeData(obj.v5) # individual size factors accoriding to Ahlmann-Eltze et al (2023) could be added here
 obj.v5 <- FindVariableFeatures(obj.v5)
@@ -67,7 +70,10 @@ obj.v5 <- FindClusters(obj.v5, cluster.name = "harmony_cluster_8dims")
 obj.v5 <- FindClusters(obj.v5, cluster.name = "harmony_cluster_8dims_rough", resolution = 0.3)
 obj.v5 <- RunUMAP(obj.v5, reduction = "integrated.harmony", dims = 1:8, reduction.name = "umap.harmony_8dims")
 
-obj.v5 <- JoinLayers(obj.v5)
+obj.v5 <- JoinLayers(obj.v5, assay= "RNA")
+#obj <- JoinLayers(obj, assay = "protein")
+#obj <- JoinLayers(obj, assay = "sampletags")
+
 obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_integrated.rds")
 
 

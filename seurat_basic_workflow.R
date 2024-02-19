@@ -1,5 +1,5 @@
 library(easypackages)
-libraries("tidyverse", "Seurat", "tidyseurat")
+libraries("tidyverse", "Seurat", "tidyseurat", "tibble")
 
 ####set up file paths
 file_path <- vector("list") 
@@ -20,21 +20,36 @@ file_names_tibble <- tribble(
     ~write_processed_seurat_obj_path,
     ~write_markers_path,#most parts of file name added by specificing parameters
     
+    
+    "Lung_d8",#library_name
+    paste0(file_path$intermediate_data,"seurat_obj_experiment_2_combined_lung_raw_dbec.rds"),#raw_seurat_obj_path
+    paste0(file_path$raw_data_root,"output_lung_d8\\","BD-Analysis-BMachiels-Lung_Sample_Tag_Calls.csv"),#path_sample_tag_calls
+    paste0(file_path$intermediate_data,"seurat_obj_experiment_2_lung_workflowed.rds"),#write_processed_seurat_obj_path
+    paste0(file_path$intermediate_data, "experiment_2_workflowed.Lung"),#write_markers_path
+
+    
+    "BAL_d8",#library_name
+    paste0(file_path$intermediate_data,"seurat_obj_experiment_2_combined_bal_raw_dbec.rds"),#raw_seurat_obj_path
+    paste0(file_path$raw_data_root,"output_bal_d8\\","BD-Analysis-BMachiels-Bal_Sample_Tag_Calls.csv"),#path_sample_tag_calls
+    paste0(file_path$intermediate_data,"seurat_obj_experiment_2_bal_workflowed.rds"),#write_processed_seurat_obj_path
+    paste0(file_path$intermediate_data, "experiment_2_workflowed.BAL"),#write_markers_path
+    
+    
     "Lung",#library_name
     paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_lung_raw_dbec.rds"),#raw_seurat_obj_path
     paste0(file_path$raw_data_root,"2023-10-02_output_lung\\Output_Lung\\","BD-Analysis-BMachiels_Sample_Tag_Calls.csv"),#path_sample_tag_calls
-    paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_lung_raw_dbec_workflowed.rds"),#write_processed_seurat_obj_path
-    paste0(file_path$intermediate_data, "experiment_1.Lung"),#write_markers_path
-    
-    
+    paste0(file_path$intermediate_data,"seurat_obj_experiment_1_lung_workflowed.rds"),#write_processed_seurat_obj_path
+    paste0(file_path$intermediate_data, "experiment_1_workflowed.Lung"),#write_markers_path
+
+
     "BAL",#library_name
     paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_bal_raw_dbec.rds"),#raw_seurat_obj_path
     paste0(file_path$raw_data_root,"2023-10-02_output_bal\\Output_BAL\\","BD-Analysis-BMachiels_Sample_Tag_Calls.csv"),#path_sample_tag_calls
-    paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_bal_raw_dbec_workflowed.rds"),#write_processed_seurat_obj_path
-    paste0(file_path$intermediate_data, "experiment_1.BAL")#write_markers_path
-    
+    paste0(file_path$intermediate_data,"seurat_obj_experiment_1_bal_workflowed.rds"),#write_processed_seurat_obj_path
+    paste0(file_path$intermediate_data, "experiment_1_workflowed.BAL")#write_markers_path
 
-    
+
+
     
 )
 
@@ -81,6 +96,7 @@ seurat_basic_workflow <- function(seurat_obj, sample_tag_calls){
         mutate(sampletag_Ms4a3=as_factor(sampletag_Ms4a3))
     
     seurat_obj$condition <- seurat_obj |> pull(sampletag_name) |> str_split_i(i=1, pattern = "_") |> as_factor()
+    seurat_obj$virus <- tibble(sampletag_name=seurat_obj |> pull(sampletag_name)) |> separate(sampletag_name,into = c("virus")) |> pull("virus")
     
     return(seurat_obj)
 }

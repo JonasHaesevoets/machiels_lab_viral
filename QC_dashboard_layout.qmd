@@ -1,5 +1,5 @@
 ---
-title: "QC Experiment 1, day 60, lung"
+title: "QC Experiment 1, day 60, bal"
 format: 
   dashboard:
     orientation: columns
@@ -15,11 +15,42 @@ library("easypackages")
 libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","patchwork","Matrix", "ggpp","ggpubr","ggmosaic", "DT", "lemon"#, "gridExtra"
 )
 
-source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_lung.R")
-#source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp1_bal.R")
+# EXPERIMENT 2
+#source(file="dataset_QC_setup_chunk_exp1_bal.R")
+source(file="dataset_QC_setup_chunk_exp1_lung.R")
 
-#source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp2_bal.R")
-#source(file="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\dataset_QC_setup_chunk_exp2_lung.R")
+
+# EXPERIMENT 2
+##source(file="dataset_QC_setup_chunk_exp2_bal.R")
+##source(file="dataset_QC_setup_chunk_exp2_lung.R")
+
+
+# seurat_obj[["RNA"]] <- JoinLayers(seurat_obj[["RNA"]])
+# options(Seurat.seurat_object.assay.version = "v5")
+# meta_data <- seurat_obj[[]]
+# 
+# seurat_obj.v5 <- CreateSeuratObject(counts = seurat_obj[["RNA"]]$counts, meta.data = meta_data)
+# #seurat_obj.v5[[]] <- meta_data
+# #seurat_obj.v5$orig.ident <- meta_data$orig.ident
+# protein <- CreateAssay5Object(counts = seurat_obj[["protein"]]$counts[c("siglec-f-siglecf-amm2013-p-ab-o","i-a-i-e-h2-ab-ad-aq-ed-ek-amm2019-p-ab-o","cd274-cd274-amm2038-p-ab-o","cd11c-hl3-itgax-amm2008-p-ab-o","ly-6g-ly6g-amm2009-p-ab-o","ly-6a-ly-6e-ly6a-ly6e-amm2026-p-ab-o"),])
+# sampletags <- CreateAssay5Object(counts = seurat_obj[["sampletags"]]$counts)
+# seurat_obj.v5[["protein"]] <- protein
+# seurat_obj.v5[["sampletags"]] <- sampletags
+# 
+# 
+# seurat_obj <- seurat_obj.v5
+# seurat_obj.v5 <- NULL
+# gc()
+options(Seurat.object.assay.version = "v5")
+
+seurat_obj[["RNA"]] <- as(object = seurat_obj[["RNA"]], Class = "Assay5")
+
+counts_protein <- seurat_obj[["protein"]]$counts[c("siglec-f-siglecf-amm2013-p-ab-o","i-a-i-e-h2-ab-ad-aq-ed-ek-amm2019-p-ab-o","cd274-cd274-amm2038-p-ab-o","cd11c-hl3-itgax-amm2008-p-ab-o","ly-6g-ly6g-amm2009-p-ab-o","ly-6a-ly-6e-ly6a-ly6e-amm2026-p-ab-o"),]
+
+rownames(counts_protein) <- c("Siglecf-AbSeq","H2-ia-ie-AbSeq","Cd274-AbSeq","Cd11c","Ly-6g-AbSeq","Ly-6a-AbSeq")
+
+seurat_obj[["protein"]] <- CreateAssay5Object(counts = counts_protein)
+
 
 ```
 
@@ -61,21 +92,123 @@ DimPlot(seurat_obj,label = T)+ggtitle("UMAP of first 10 Principal Components")
         
 ```{r}
 #| title: UMAP filtered
-#| 
+
+
 filtered_seurat_obj <- seurat_obj |>
-  filter(!(seurat_clusters %in% deleted_clusters)& 
-           nCount_RNA<upper_nCount_RNA_thresh&
-           nCount_RNA>lower_nCount_RNA_thresh&
-           percent_mito<upper_mito_thresh&
-           sampletag_multiplets=="single_hashtag")
+  filter(
+    !(seurat_clusters %in% deleted_clusters) &
+      nCount_RNA < upper_nCount_RNA_thresh &
+      nCount_RNA > lower_nCount_RNA_thresh &
+      percent_mito < upper_mito_thresh &
+      sampletag_multiplets == "single_hashtag"
+  )
+
 filtered_seurat_obj |> DimPlot(label = T)
 
-
-write_rds(filtered_seurat_obj, file = file_path_output
-          )
+```
 
 
+```{r include=FALSE}
+#| title: filtering_info_and_save_seurat_obj
+grouping_table <-
+  seurat_obj |> select(.cell,
+                       nCount_RNA,
+                       sampletag_multiplets,
+                       percent_mito,
+                       orig_cluster_specification) |> as_tibble()
 
+
+grouping_table <- grouping_table |>
+  mutate(
+    is_cell = ifelse(
+      nCount_RNA < upper_nCount_RNA_thresh &
+        nCount_RNA > lower_nCount_RNA_thresh,
+      "is_cell",
+      "not_cell"
+    )
+  ) 
+
+
+  
+grouping_table <- grouping_table |> 
+  mutate(
+    is_cell_and_RNAcorrect =
+      ifelse(
+        is_cell=="is_cell" &
+          sampletag_multiplets == "single_hashtag",
+        "is_cell_and_RNAcorrect",
+        "not_cell_or_RNA_correct"
+      )
+) |>
+  mutate(filter_step=ifelse(is_cell_and_RNAcorrect=="is_cell_and_RNAcorrect",2,NA) )
+
+
+grouping_table <- grouping_table |> 
+  mutate(
+    is_cell_and_RNAcorrect_lowMito = ifelse(
+      is_cell_and_RNAcorrect == "is_cell_and_RNAcorrect" &
+        percent_mito < upper_mito_thresh,
+      "is_cell_and_RNAcorrect_lowMito",
+      "not_cell_and_RNAcorrect_lowMito"
+    )
+  ) #|> mutate(filter_step=3)
+
+grouping_table <- grouping_table |> 
+  mutate(primary_filtered_clusters=ifelse(is_cell_and_RNAcorrect_lowMito == "is_cell_and_RNAcorrect_lowMito",
+                as.numeric(orig_cluster_specification),
+                "not_cell_and_RNAcorrect_lowMito"
+                )
+    )
+
+
+filtered_1 <- grouping_table |>group_by(is_cell) |>  summarise(n=n()) |> mutate(filter_step=1)
+filtered_2 <-grouping_table |> filter(is_cell=="is_cell") |> group_by(is_cell_and_RNAcorrect) |>  summarise(n=n()) |> mutate(filter_step=2)
+gc()
+filtered_3 <-grouping_table|> filter(is_cell_and_RNAcorrect=="is_cell_and_RNAcorrect") |>group_by(is_cell_and_RNAcorrect_lowMito) |>  summarise(n=n()) |> mutate(filter_step=3)
+filtered_4 <-grouping_table|> filter(is_cell_and_RNAcorrect_lowMito=="is_cell_and_RNAcorrect_lowMito")  |>group_by(primary_filtered_clusters) |>  summarise(n=n()) |> mutate(filter_step=4)
+
+
+
+n_after_filtering <-
+  bind_rows(filtered_1,filtered_2,filtered_3,filtered_4) |> relocate(n,filter_step) |>   pivot_longer(is_cell:primary_filtered_clusters) 
+
+
+
+filtered_seurat_obj@misc[[paste0(obj_identifier, "_n_after_filtering")]] <- n_after_filtering
+filtered_seurat_obj@misc[[paste0(obj_identifier, "_grouping_table")]] <- grouping_table
+
+
+write_rds(filtered_seurat_obj, file = file_path_output)
+```
+
+
+```{r}
+#| title: n after filtering
+
+
+geom_col_cust <- function(x) x + geom_col()+theme_bw()+ theme(axis.text.x = element_text(angle = 45, hjust = 1))+ylim(0,20000)
+
+p1 <- filtered_1 |> ggplot(aes(x = filter_step, y = n, fill = is_cell)) |> geom_col_cust()
+
+
+p2 <- filtered_2 |> ggplot(aes(x = filter_step, y = n, fill = is_cell_and_RNAcorrect)) |> geom_col_cust()
+
+p3 <- filtered_3|> ggplot(aes(x = filter_step , y = n, fill = is_cell_and_RNAcorrect_lowMito)) |> geom_col_cust()
+
+
+p4 <- filtered_4 |> ggplot(aes(x = filter_step, y = n, fill = primary_filtered_clusters)) |> geom_col_cust()
+
+
+p1 + p2 + p3 + p4
+
+
+
+```
+
+```{r}
+#| title: n after filtering 2
+
+n_after_filtering |> filter(!is.na(value)) |> ggplot(aes(x = name, y = n, fill = value)) + geom_col()+theme_bw()+ theme(axis.text.x = element_text(angle = 45, hjust = 1))#+facet_wrap(~name)+ them
 ```
 
 ### Row {.tabset}
@@ -488,8 +621,10 @@ de_genes_tbl |> mutate(cluster=as_factor(cluster)) |>
 #load packages
 
 feature_umap <- function(genes, title_="", caption_=""){
+
   
-        seurat_obj |> join_features(genes) |> mutate(.feature=factor(.feature,levels=genes)) |> ggplot(aes(umap_1,umap_2,color=.abundance_RNA))+geom_point() +
+  
+        seurat_obj |> join_features(genes, assay="RNA") |> mutate(.feature=factor(.feature,levels=genes)) |> ggplot(aes(umap_1,umap_2,color=.abundance_RNA))+geom_point() +
   scale_color_viridis_c()+ theme_void()+coord_fixed()+
   facet_wrap(~.feature, ncol = 4) +
     labs(title =title_,
@@ -497,9 +632,9 @@ feature_umap <- function(genes, title_="", caption_=""){
     theme(plot.caption = element_text(size=6, face="bold"))
 }
 
-clus_0_genes <-  c(de_genes_tbl |> filter(cluster==0) |> slice_max(avg_log2FC,n = 5) |> pull(gene), c("H2-Ab1"))
-title_feature_umap_clus_0 <- "Macrophage, MHC complex"
-caption_feature_umap_clus_0 <-"" 
+# clus_0_genes <-  c(de_genes_tbl |> filter(cluster==0) |> slice_max(avg_log2FC,n = 5) |> pull(gene), c("H2-Ab1"))
+# title_feature_umap_clus_0 <- "Macrophage, MHC complex"
+# caption_feature_umap_clus_0 <-"" 
 ```
 
 
@@ -507,6 +642,8 @@ caption_feature_umap_clus_0 <-""
 #| title: cluster 0
 #| fig-height: 10
 feature_umap(clus_0_genes, title_= title_feature_umap_clus_0, caption_ = caption_feature_umap_clus_1) 
+
+genes=clus_0_genes
 ```
 
 ```{r, cluster_1_feature_umap, eval= eval_1, include=eval_1}
@@ -808,6 +945,24 @@ clus_highlight(21)
 
 
 
+# Protein
 
+```{r}
+library(ggridges)
+DefaultAssay(seurat_obj) <- "protein"
+seurat_obj <- NormalizeData(seurat_obj, method="CLR")
 
+seurat_obj |> join_features(assay="protein", all=T, slot="counts") |>
+  group_by(.feature) |> summarise(
+    mean_protein=mean(.abundance_protein),
+    var_protein=var(.abundance_protein)) |>
+  ggplot(aes(mean_protein,var_protein))+geom_point()
+
+seurat_obj |> join_features(assay="protein", all=T, slot="counts") |> group_by(seurat_clusters) |> ggplot(aes(log10(.abundance_protein+1),y=seurat_clusters))+geom_density_ridges()+facet_grid(~.feature)+theme_bw()
+
+seurat_obj |> join_features(assay="protein", all=T, slot="data") |> group_by(seurat_clusters) |> ggplot(aes(.abundance_protein,y=seurat_clusters))+geom_density_ridges()+facet_grid(~.feature)+theme_bw()
+```
+```{r}
+
+```
 
