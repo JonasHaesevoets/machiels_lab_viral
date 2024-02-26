@@ -1,0 +1,811 @@
+---
+title: "DeSeq2_exp1_all_conditions"
+format:
+    html:
+      code-fold: true
+      code-summary: "Show the code"
+editor: visual
+---
+
+## controlled for virus, no Mock
+
+```{r}
+all_conditions_set <- c("all", "only_viruses")
+cond_select <- "only_viruses"# change this to change the comparisons of the analysis
+```
+
+```{r message=FALSE, warning=FALSE}
+easypackages::libraries(
+"Seurat",
+"tidyseurat",
+"dplyr",
+"ggplot2",
+"readr",
+"forcats",
+"ragg",
+"ggpubr",
+"stringr",
+"Matrix",
+"textTinyR",
+"tidyverse",
+"ggrepel",
+"scran",
+"pheatmap",
+"DESeq2",
+"patchwork")
+```
+
+```{r functions}
+make_idents_counts <- function(
+    ds,
+    idents_choose="seurat_clusters",
+    assay_="RNA",
+    min_cell_num=200,
+    keep=NULL,
+    perc_expressed=1){
+        slot_ <- "counts"
+        Idents(ds) <- idents_choose
+        group_names <- unique(Idents(ds))
+        if (!is.null(keep)) {group_names <- keep
+          
+        }
+        reads <- LayerData(bal_alv_mac,"counts")
+        #get rid of false genes / . in there name
+        reads <- reads[rownames(reads) %>% str_subset(pattern = "[.]",negate = T),]
+        #cut out genes with less then perc_expressed percent of cells that eypress the gene
+        i_cells <- WhichCells(ds, idents = keep)
+        
+        reads_group <- reads[,i_cells]
+        
+        reads <- reads[(((reads_group > 1) %>% rowSums())> (length(i_cells)/100*perc_expressed)),]
+        print(paste0(as.character(nrow(reads))," genes kept"))
+        sum_counts_ds <- tibble(.rows =  nrow(reads))
+        #z=1
+        for (i in seq_along(group_names)) {
+          print(i)
+          #print(colnames(sum_counts_ds))
+          print(group_names[i])
+          i_cells <- WhichCells(object =ds,idents = group_names[i])
+          if (length(i_cells)<min_cell_num) {
+            sum_counts_ds <- sum_counts_ds %>%
+            add_column(dings=0)
+          colnames(sum_counts_ds)[i] <- paste0(as.character(group_names[i]),"_smaller" , as.character(min_cell_num))
+
+          next}
+          #i_cells <- WhichCells(object =ds,idents = "hla_d_rlo_s100a_monocytes_C19-CB-0003")
+          reads_group <- reads[,i_cells] %>%  sparse_Sums(rowSums=T)
+          
+          sum_counts_ds <- sum_counts_ds %>%
+            add_column(dings=reads_group)
+          colnames(sum_counts_ds)[i] <- as.character(group_names[i])
+          #print(as.character(colnames(sum_counts_ds)[i]))
+          
+        }
+        
+        sum_counts_ds <- sum_counts_ds %>%  mutate(gene=rownames(reads)) %>% relocate(gene)
+        return(sum_counts_ds)
+}
+```
+
+```{r}
+path <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_macs_with_merged_groups.rds"
+path <- "D:\\danne\\intermediate_data\\seurat_obj_experiment_1_bal_alv_macs_with_merged_groups.rds"
+path <- "C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_experiment_1_bal_afterQCdashboard.rds"
+bal_alv_mac <- read_rds(path)
+```
+
+```{r}
+y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
+#y_chromosome_genes<-   c( "Ddx3y")
+bal_alv_mac_wide_sex <- bal_alv_mac |>
+  join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+  rowwise() |> 
+  mutate(max_male_genes=max(c_across(Ddx3y:Kdm5d))
+         ) |> 
+  #mutate(avg_male_gens=avg_male_gns) |>
+  mutate(female_sex_ratio=Xist-max_male_genes) |>
+  mutate(sex_classifier=case_when(
+    female_sex_ratio==0~"no_expression_of_specific_genes",
+    female_sex_ratio>0~"classified_as_female",
+    female_sex_ratio<0~"classified_as_male",
+    TRUE~"something is wrong")) 
+
+
+
+bal_alv_mac_wide_sex |> 
+  ggplot(aes(sampletag_name, fill=sex_classifier))+
+  geom_bar()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + ggtitle("sex classification No 1", "by difference of log-normalized data (Xist- max(Ddx3y,Eif2s3y,Kdm5d)")
+```
+
+
+```{r}
+
+bal_alv_mac_wide_sex <- bal_alv_mac_wide_sex |> 
+  
+    mutate(sex_classifier_2=case_when(
+    (Xist==0)&(max_male_genes==0)~"no_expression_of_specific_genes",
+    (Xist>0)&(max_male_genes==0)~"female",
+    (Xist==0)&(max_male_genes>0)~"male",
+    (Xist>0)&(max_male_genes>0)~"detection_of_male_and_female_genes",
+    TRUE~"something is wrong")) 
+
+
+bal_alv_mac_wide_sex |> 
+  ggplot(aes(sampletag_name, fill=sex_classifier_2))+
+  geom_bar()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+ ggtitle("sex classification No 2", "female: (Xist>0)AND(max_male_genes==0);male= Xist== AND(max_male_genes>0)")
+```
+
+
+```{r fig.height=15}
+library(ggridges)
+theme_x1 <- theme_minimal()+
+  theme(strip.text.x = element_text(size = 15))
+
+
+p1 <- bal_alv_mac_wide_sex |> ggplot(aes(Ddx3y)) + geom_histogram(binwidth = 0.1)+facet_wrap( ~sampletag_name, ncol = 1 )+theme_x1
+p2 <- bal_alv_mac_wide_sex |> ggplot(aes(Eif2s3y))+ geom_histogram(binwidth = 0.1)+facet_wrap( ~sampletag_name, ncol = 1)+theme_x1
+p3 <- bal_alv_mac_wide_sex |> ggplot(aes(Kdm5d))+ geom_histogram(binwidth = 0.1)+facet_wrap( ~sampletag_name, ncol = 1)+theme_x1
+p4 <- bal_alv_mac_wide_sex |> ggplot(aes(max_male_genes))+ geom_histogram(binwidth = 0.1)+facet_wrap( ~sampletag_name, ncol = 1)+theme_x1
+
+bal_alv_mac_wide_sex |>
+  select(.cell,sampletag_name,sex_classifier_2 ) |>
+  mutate(paste0(sampletag_name,sex_classifier_2, sep="_"))
+
+p1+p2
+
+p3+p4
+```
+
+
+```{r}
+bal_alv_mac_wide_sex |>
+  ggplot(aes(max_male_genes+1, Xist+1)) + geom_point() +ylim(0,3)     +xlim(0,3) +facet_wrap( ~sampletag_name) + ggtitle("Xist vs. max. male gene")
+```
+
+
+
+
+
+```{r}
+bal_alv_mac_wide_sex |> ggplot(aes(Eif2s3y, sampletag_name, fill=sampletag_name)) + geom_density_ridges()+ggtitle("Eif2s3y per sample")
+```
+
+
+```{r}
+bal_alv_mac_wide_sex |> ggplot(aes(Kdm5d, sampletag_name, fill=sampletag_name)) + geom_density_ridges()+ggtitle("Kdm5d per sample")
+```
+
+
+```{r}
+bal_alv_mac_wide_sex |> ggplot(aes(max_male_genes, sampletag_name, fill=sampletag_name)) + geom_density_ridges() +ggtitle("max. male gene")
+```
+# filter by sex classifier 2
+```{r}
+keep <- bal_alv_mac_wide_sex |> filter(sex_classifier_2 %in% c("male","female")) |> select(.cell,sex_classifier_2 )
+
+bal_alv_mac <- bal_alv_mac |> filter(.cell %in% pull(keep,.cell)) |> left_join(keep) 
+bal_alv_mac <- bal_alv_mac |> mutate(virus_ms4a3_sex=paste(sampletag_name,sex_classifier_2, sep="-"))
+```
+
+```{r message=FALSE, include=FALSE}
+bal_alv_mac_sums <- make_idents_counts(ds=bal_alv_mac,idents_choose = "virus_ms4a3_sex",perc_expressed = 0.05)
+
+bal_alv_mac_sums <- bal_alv_mac_sums[,sort(names(bal_alv_mac_sums))]
+```
+
+```{r if (cond_select <- "all")}
+
+if (cond_select=="only_viruses") {
+  bal_alv_mac_sums <- bal_alv_mac_sums |> select(!contains("Mock"))
+}
+
+if (cond_select %in% all_conditions_set) {
+  
+}else errorCondition()
+
+```
+
+## design_matrix
+
+```{r}
+
+expression_matrix <- as.matrix(bal_alv_mac_sums %>% select(-gene)|> select(-contains("smaller"))) 
+rownames(expression_matrix) <- bal_alv_mac_sums %>% pull(gene)
+
+
+design_x <- tibble(sampletag=colnames(expression_matrix)) |> separate(col=sampletag, into =c("virus","x"),remove = F, extra="merge") |> 
+  separate(col=x, into=c("Ms4a3", "sex"),sep = "-")#|> 
+
+#design_x <-design_x |> separate(sex,into="sex", extra="drop")
+design_x
+```
+## DeSeq2 Experiment 1 formula: Ms4a3+virus+sex
+```{r}
+#| code-fold: true
+#| code-summary: "model specification"
+
+
+dds<- DESeqDataSetFromMatrix(expression_matrix,
+                            colData=design_x,
+                            design= ~ 
+                              Ms4a3+virus+sex)
+
+
+```
+
+```{r}
+rld <- rlog(dds, blind=TRUE)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+pcaplot <- plotPCA(object=rld, intgroup=c("sampletag"))
+
+p1 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+pcaplot <- plotPCA(object=rld, intgroup=c("Ms4a3"))
+
+p2 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+pcaplot <- plotPCA(object=rld, intgroup=c("virus"))
+
+p3 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+(p1+p2)/(p3+plot_spacer())
+
+```
+
+```{r}
+rld_mat <- assay(rld)
+rld_cor <- cor(rld_mat)
+conds <- (names(bal_alv_mac_sums)[-1])
+
+paste(design_x$virus,design_x$Ms4a3, sep="_")
+
+design_x <- design_x |> mutate(name=paste(virus,Ms4a3, sep="_"))
+# Plot heatmap
+pheatmap(rld_cor  )
+```
+
+```{r message=FALSE, include=FALSE}
+res <- DESeq(dds)
+```
+
+### size factors
+
+```{r}
+sizeFactors(res)
+```
+
+### available comparisons
+
+```{r}
+resultsNames(res)
+```
+
+## dispersion plot
+
+```{r}
+plotDispEsts(res)
+
+```
+# Ms4a3_Ms4a3_pos_vs_Ms4a3_neg
+```{r}
+res_tbl <- results(res, name = "Ms4a3_Ms4a3_pos_vs_Ms4a3_neg")%>% as_tibble(rownames = "gene")
+res_tbl%>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
+```
+
+```{r}
+genes_highlight <- res_tbl%>% filter(padj<0.01&abs(log2FoldChange)>0.8) |> pull(gene)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+
+ res_highlight <-  res_tbl |> 
+  mutate(neg_log_pvalue_limit=ifelse((-log(pvalue))>100,100,-log(pvalue))) |>  
+   mutate(highlight=ifelse(gene %in% genes_highlight, "sig", "not")) %>% 
+    # mutate(highlight=ifelse(gene %in% c("MAFB"), "sig", "not")) %>% 
+  arrange(desc(highlight))
+
+res_highlight %>%
+  ggplot(aes(log2FoldChange, -log(pvalue))) +
+  geom_point(aes(color=highlight), alpha=0.5)+
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, -log(pvalue),label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+
+  
+  
+  res_highlight |> 
+    mutate(outlier=ifelse(-log(pvalue)>100,"outlier","no_outlier")) |> 
+  ggplot(aes(log2FoldChange, neg_log_pvalue_limit)) + 
+  geom_point(aes(color=highlight, shape=outlier), alpha=0.5)+ 
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+
+feats <- c("Gabbr2","Adamts9", "Sod3", "Tmem163", "Csrnp3", "Hoxb7", "Apobec2", "Apobec2", "Xlr", "Hbb-bh1", "Amotl1")
+
+feats <- c("B2m", "Spp1", "Tmem163")
+
+p1 <-bal_alv_mac |> VlnPlot(feats, group.by = "sampletag_name")
+
+ #bal_alv_mac |> join_features(feats) 
+
+gene_sums <- bal_alv_mac |> rowSums()
+
+x <- tibble (gene=names(gene_sums), total_count =gene_sums) |> slice_max(total_count,n = 10000)
+x1 <- x |> filter(gene %in% feats)
+x2 <- x[sample(nrow(x),200),]
+x3 <- bind_rows(x1,x2) |> mutate(example_genes=gene %in% feats )
+p2 <- x3 |> mutate(gene=fct_reorder(.f=gene, .x=total_count, .desc = T)) |> ggplot(aes(gene, total_count, fill=example_genes))+geom_col()+theme_void()
+library(patchwork)
+p1 /
+(p2+ggtitle("sum of gene counts over all cells, random 200 genes from top 10000 including B2m, Spp1, Tmem163"))
+  
+```
+
+```{r}
+bal_alv_mac |> VlnPlot("Gt(ROSA)26Sor", group.by = "sampletag_name", pt.size = 0)
+```
+
+```{r}
+res_tbl%>% ggplot(aes(pvalue)) + geom_histogram(bins = 200)
+```
+```{r}
+res |> colnames()
+
+```
+
+```{r}
+# res_tbl <- results(res, name = "virus_Mock_vs_MAV1")%>% as_tibble(rownames = "gene")
+# res_tbl%>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
+```
+
+```{r}
+genes_highlight <- res_tbl%>% filter(padj<0.01&abs(log2FoldChange)>0.8) |> pull(gene)
+```
+
+```{r}
+res_tbl |> ggplot(aes(log10(baseMean)))+geom_density()
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+
+ res_highlight <-  res_tbl |> 
+  mutate(neg_log_pvalue_limit=ifelse((-log(pvalue))>100,100,-log(pvalue))) |>  
+   mutate(highlight=ifelse(gene %in% genes_highlight, "sig", "not")) %>% 
+    # mutate(highlight=ifelse(gene %in% c("MAFB"), "sig", "not")) %>% 
+  arrange(desc(highlight))
+
+res_highlight %>%
+  ggplot(aes(log2FoldChange, -log(pvalue))) +
+  geom_point(aes(color=highlight), alpha=0.5)+
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, -log(pvalue),label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+
+  
+  
+  res_highlight |> 
+    mutate(outlier=ifelse(-log(pvalue)>100,"outlier","no_outlier")) |> 
+  ggplot(aes(log2FoldChange, neg_log_pvalue_limit)) + 
+  geom_point(aes(color=highlight, shape=outlier), alpha=0.5)+ 
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+  
+  
+  
+  res_highlight |> 
+    filter(baseMean>10) |> 
+    mutate(outlier=ifelse(-log(pvalue)>100,"outlier","no_outlier")) |> 
+  ggplot(aes(log2FoldChange, neg_log_pvalue_limit)) + 
+  geom_point(aes(color=highlight, shape=outlier), alpha=0.5)+ 
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+```
+
+# interaction term  virus:Ms4a3
+```{r}
+
+expression_matrix_trimmed <- expression_matrix[(rowSums(expression_matrix))>50,]
+#design_x |> mutate(donor=paste(virus,"_",female))
+
+dds<- DESeqDataSetFromMatrix(expression_matrix_trimmed,
+                            colData=design_x,
+                            design= ~ 
+                              Ms4a3+virus+sex+ virus:Ms4a3)
+
+# c("MAV1_female"="two",
+#   "MAV1_male"="one",
+#   "MAV1_female"="two",
+#   "MAV1_male"="one",
+#   "MuHV4"=)
+# 
+```
+
+```{r message=FALSE, include=FALSE}
+res <- DESeq(dds)
+```
+
+### size factors
+
+```{r}
+ tibble(names(sizeFactors(res)),sizeFactors(res))
+```
+
+### available comparisons
+
+```{r}
+resultsNames(res)
+```
+
+## dispersion plot
+
+```{r}
+plotDispEsts(res)
+
+```
+
+
+# DEG Ms4a3Ms4a3_pos.virusPR8
+```{r}
+plt_lst <- list()
+for (dings in resultsNames(res)) {
+  plt_lst[[dings]] <- results(res, name = dings)%>% as_tibble(rownames = "gene") |> ggplot(aes(pvalue))+geom_histogram(bins = 50) +ggtitle(dings)
+  
+}
+plt_lst
+```
+
+```{r fig.width=15}
+results(res, name = "Ms4a3Ms4a3_pos.virusPR8")%>% as_tibble(rownames = "gene") %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
+```
+
+```{r}
+
+expression_plotter<-function(x) {x |> as_tibble(rownames="name") |>  separate(name, into = c("Virus","x", "Ms4a3_status","sex"), remove = FALSE) |> 
+  ggplot(aes(x=virus, y=count, color=Ms4a3_status, shape=sex)) + 
+  geom_point(position=position_jitter(w=0.1,h=0)) + 
+  scale_y_log10(breaks=c(25,100,400))}
+
+plotCounts(res, gene="Spp1", intgroup="virus", 
+                returnData=TRUE) |> expression_plotter()+ggtitle("Spp1")
+```
+```{r}
+plotCounts(res, gene="Fyb", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Fyb")
+```
+
+```{r}
+plotCounts(res, gene="Scd2", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Scd2")
+
+```
+```{r}
+plotCounts(res, gene="Scd1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Scd1")
+
+```
+
+```{r}
+
+plotCounts(res, gene="Serpinb6a", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Serpinb6a")
+
+```
+Viral infection with influenza H1N1 (PR8 strain) is associated with an increase of the difference of Spp1 between monocyte-derived and resident macrophages compared to MAV1. Likely, because there are no replicates of the the PR8 samples there is a low amount of significant genes in this test.
+
+## Ms4a3 Ms4a3_pos.virusMuHV4
+```{r}
+res_tbl <- results(res, name = "Ms4a3Ms4a3_pos.virusMuHV4")%>% as_tibble(rownames = "gene")
+res_tbl%>% filter(log2FoldChange>0) |> slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
+```
+```{r}
+res_tbl%>% filter(log2FoldChange<0) %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
+
+```
+
+```{r}
+plotCounts(res, gene="Fabp4", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Fabp4")
+```
+```{r}
+plotCounts(res, gene="Ccl9", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Ccl9")
+```
+```{r}
+plotCounts(res, gene="Cd93", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Cd93")
+```
+# Ms4a3_pos.virusPVM
+```{r}
+results(res, name = "Ms4a3Ms4a3_pos.virusPVM")%>% as_tibble(rownames = "gene") %>%
+  filter(log2FoldChange<0) %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
+```
+
+```{r}
+plotCounts(res, gene="Mmp12", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Mmp12")
+```
+```{r}
+plotCounts(res, gene="Ecm1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Ecm1")
+```
+```{r}
+plotCounts(res, gene="Wfdc17", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Wfdc17")
+```
+
+```{r}
+results(res, name = "Ms4a3Ms4a3_pos.virusPVM")%>% as_tibble(rownames = "gene") %>%
+  filter(log2FoldChange>0) %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
+```
+```{r}
+plotCounts(res, gene="Egfem1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Egfem1")
+```
+```{r}
+plotCounts(res, gene="Nav2", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Nav2")
+```
+
+```{r}
+plotCounts(res, gene="Apoc1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Apoc1")
+```
+
+```{r}
+ plotCounts(res, gene="Ecm1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Ecm1")
+```
+
+```{r}
+plotCounts(res, gene="Serpinb6a", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Serpinb6a")
+```
+
+```{r}
+
+plotCounts(res, gene="Nt5e", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Nt5e")
+```
+
+
+```{r}
+plotCounts(res, gene="Cd74", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Cd74")
+```
+
+
+
+# 1 to 1 comparisons
+
+```{r}
+results(res, contrast=list("Ms4a3Ms4a3_pos.virusPVM", "Ms4a3Ms4a3_pos.virusPR8"))
+```
+
+
+```{r}
+contrast_names <- c("Ms4a3Ms4a3_pos.virusPR8", "Ms4a3Ms4a3_pos.virusMuHV4","Ms4a3Ms4a3_pos.virusPVM")
+
+res_all <- tibble()
+for (variable in contrast_names) {
+  res_new <- results(res,name=variable) |>
+    as_tibble(rownames="gene") |>
+    mutate(reference="Ms4a3Ms4a3_pos.virusMAV1",
+           contrast=variable)
+    res_all <- bind_rows(res_all,res_new)
+  
+}
+
+for (i in seq_along(contrast_names)) {
+  variable_1 <- contrast_names[i]
+  for (j in seq_along(contrast_names)[-i]) {
+    print(seq_along(contrast_names)[-i])
+    variable_2 <- contrast_names[j]
+ print(paste(variable_1, "........", variable_2))
+ 
+  res_new <- results(res, contrast=list(variable_1, variable_2)) |>
+    as_tibble(rownames="gene") |>
+    mutate(reference=variable_1,
+           contrast=variable_2)
+  
+  res_all <- bind_rows(res_all,res_new)
+  
+}
+}
+
+diff_genes <- res_all |> filter(padj<0.2, log2FoldChange>0) |> pull(gene) |> unique()
+
+length(diff_genes)
+
+match("Spp1",diff_genes)
+
+diff_genes_5 <- diff_genes |> sample(5)
+dat <- res_all |>
+  mutate(reference=str_remove(reference,"Ms4a3Ms4a3_pos.virus"),
+                  contrast=str_remove(contrast,"Ms4a3Ms4a3_pos.virus")) |>
+  filter(gene %in% diff_genes) |>
+  mutate(x_rank=match(gene,diff_genes)) |> 
+  mutate(y_pos=ceiling(x_rank/9)) |> 
+  mutate(x_pos=ceiling(x_rank-((y_pos-1)*9))) |> 
+  mutate(neg_log_padj=(-log(padj))) |> 
+  na.omit()
+
+ dat |>  ggplot(aes(label=gene, x=x_pos,y=y_pos, color=log2FoldChange, size=neg_log_padj))+
+  geom_text()+
+  ylim(0.5,3.5)+xlim(-1,11)+
+   theme_dark()+
+  facet_grid(reference~contrast) +scale_color_gradient2()+
+  xlab("reference")+ scale_size(range = c(3, 5))
+
+```
+
+```{r}
+res_all |> mutate(ref_contr=paste(reference,contrast,sep = "_")) |> ggplot(aes(pvalue))+geom_histogram()+facet_wrap(~reference)
+```
+
+```{r}
+dat$contrast |> unique()
+dat$reference |> unique()
+```
+
+
+
+```{r}
+contrast_names <- c("PR8", "MAV1", "MuHV4", "PVM")
+plot_num=0
+plot_lst=vector(mode="list")
+for (i in seq_along(contrast_names)) {
+  for (j in seq_along(contrast_names)[-i]) {
+  plot_num=plot_num+1
+  print(plot_num)
+  print(contrast_names[i]) 
+  print(contrast_names[j])
+  dat_temp<- dat |>
+    filter(reference==contrast_names[i], contrast==contrast_names[j])
+  
+  plot_lst[[plot_num]] <- dat_temp|>  ggplot(aes(label=gene, x=x_pos,y=y_pos, color=log2FoldChange, size=neg_log_padj))+
+  geom_text()+
+  ylim(0.5,3.5)+xlim(-1,11)+theme_bw()+
+  scale_color_gradient2()+ggtitle(paste("reference:",contrast_names[i], "vs.",contrast_names[j] ))
+    
+  
+  }
+}
+plot_lst
+dat$reference |> unique()
+dat$contrast |> unique()
+
+
+```
+
+#comapred to rest
+
+
+
+# interaction term  virus:Ms4a3
+```{r}
+design_x_rest <- design_x |> mutate(virus=ifelse(virus=="PR8","PR8", "other"))
+dds_rest<- DESeqDataSetFromMatrix(expression_matrix,
+                            colData=design_x_rest,
+                            design= ~ 
+                              Ms4a3+virus+sex+ virus:Ms4a3)
+
+dds_rest <- DESeq(dds_rest)
+resultsNames(dds_rest)
+```
+
+```{r}
+res_tbl <- results(dds_rest, name ="Ms4a3Ms4a3_pos.virusPR8") |> as_tibble(rownames="gene")
+
+res_tbl |> arrange(padj)
+```
+
+```{r message=FALSE, include=FALSE}
+
+genes_highlight <- res_tbl%>% filter(padj<0.01&abs(log2FoldChange)>0.8) |> pull(gene)
+```
+
+
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+
+ res_highlight <-  res_tbl |> 
+  mutate(neg_log_pvalue_limit=ifelse((-log(pvalue))>100,100,-log(pvalue))) |>  
+   mutate(highlight=ifelse(gene %in% genes_highlight, "sig", "not")) %>% 
+    # mutate(highlight=ifelse(gene %in% c("MAFB"), "sig", "not")) %>% 
+  arrange(desc(highlight))
+
+res_highlight %>%
+  ggplot(aes(log2FoldChange, -log(pvalue))) +
+  geom_point(aes(color=highlight), alpha=0.5)+
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, -log(pvalue),label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+
+  
+  
+  res_highlight |> 
+    mutate(outlier=ifelse(-log(pvalue)>100,"outlier","no_outlier")) |> 
+  ggplot(aes(log2FoldChange, neg_log_pvalue_limit)) + 
+  geom_point(aes(color=highlight, shape=outlier), alpha=0.5)+ 
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+  
+  
+  
+  res_highlight |> 
+    filter(baseMean>10) |> 
+    mutate(outlier=ifelse(-log(pvalue)>100,"outlier","no_outlier")) |> 
+  ggplot(aes(log2FoldChange, neg_log_pvalue_limit)) + 
+  geom_point(aes(color=highlight, shape=outlier), alpha=0.5)+ 
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+```
+# interaction term  virus:Ms4a3
+```{r}
+res_all <- tibble()
+
+
+for (nominator in c("PR8", "MAV1", "MuHV4", "PVM")) {
+  
+design_x_rest <- design_x |> mutate(virus=factor(ifelse(virus==nominator,nominator, "other"), levels=c("other",nominator)))
+
+dds_rest<- DESeqDataSetFromMatrix(expression_matrix,
+                            colData=design_x_rest,
+                            design= ~ 
+                              Ms4a3+virus+sex+ virus:Ms4a3)
+
+dds_rest <- DESeq(dds_rest)
+resultsNames(dds_rest)
+
+res_tbl <- results(dds_rest, name =paste0("Ms4a3Ms4a3_pos.virus",nominator)) |> as_tibble(rownames="gene") |> mutate(nominator=nominator)
+
+res_all <- bind_rows(res_all, res_tbl)
+
+}
+
+res_all %>% filter(padj<0.9) 
+```
+
+
+
+```{r}
+plotCounts(res, gene="Ccnd1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Ccnd1")
+```
+```{r}
+plotCounts(res, gene="Socs3", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Socs3")
+```
+
+
+```{r}
+res_all |> ggplot(aes(pvalue))+geom_histogram()+facet_wrap(~nominator)
+```
+
+
+
+
+```{r}
+attr(dispersionFunction(dds_rest), "dispPriorVar")
+```
+
