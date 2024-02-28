@@ -1,0 +1,256 @@
+---
+title: "case_study_adjustment_of_Ms4a3_sorting_by_gabbr2"
+format: 
+  html:
+    code-fold: true
+editor: visual
+---
+
+## 
+
+```{r message=FALSE, warning=FALSE}
+library("easypackages")
+libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","patchwork"#,"Matrix", "ggpp","ggpubr","ggmosaic", "DT", "lemon"#, "gridExtra"
+)
+output_path <- "output/case_study_adjustment_of_Ms4a3_sorting_by_gabbr2"
+```
+
+```{r}
+pathx <- "intermediate_data/seurat_obj_experiment_1_2_integrated_dsb_added.rds"
+pathx <- "intermediate_data/seurat_obj_central.rds"
+
+obj.v5 <- read_rds(pathx)
+DefaultAssay(obj.v5) <- "RNA"
+```
+
+# adding meta data
+
+```{r}
+
+new_meta_data <- obj.v5 |>join_features("Gabbr2", slot="counts") |> 
+        select(orig.ident, condition, sampletag_Ms4a3,.abundance_RNA) |>
+        separate(orig.ident, c("exp", "sample_type"),sep="__") |>
+        mutate(day=ifelse(exp=="viral.experiment.1", "d60", "d8")) |>
+        mutate(day_sample_type=paste(day, sample_type, sep="_"),
+               day_mock=ifelse(condition=="Mock","Mock", day),
+               day_mock_sample_type=ifelse(condition=="Mock","Mock", day_sample_type),
+               day_sample_type_cond=paste(day, sample_type, condition, sep="_"),
+               day_sample_type_cond_ms4a3=paste(day, sample_type, condition,sampletag_Ms4a3, sep="_")) |> 
+        #filter(.abundance_RNA==0) |> filter(sampletag_Ms4a3=="Ms4a3_neg")
+  ####
+        mutate(sample_tag_ms4a3_pos_gabbr2= case_when(
+                .abundance_RNA>0 & sampletag_Ms4a3=="Ms4a3_neg" ~ "Gabbr2_pos_Ms4a3_neg",
+                TRUE~sampletag_Ms4a3 )) |> 
+  ####
+        mutate(day_sample_type_cond_ms4a3_pos_gabbr2=
+                        paste(day, sample_type, condition,sample_tag_ms4a3_pos_gabbr2, sep="_"))
+
+
+obj.v5$day_sample_type <- pull(new_meta_data, day_sample_type)
+obj.v5$day_mock <- pull(new_meta_data, day_mock)
+obj.v5$day_mock_sample_type <- pull(new_meta_data, day_mock_sample_type)
+obj.v5$day <- pull(new_meta_data, day)
+obj.v5$day_sample_type_cond <- pull(new_meta_data, day_sample_type_cond)
+obj.v5$day_sample_type_cond_ms4a3 <- pull(new_meta_data,day_sample_type_cond_ms4a3)
+
+#add ms4a3-based calculation corrected with  Gabbr2 
+obj.v5$day_sample_type_cond_ms4a3_pos_gabbr2 <- pull(new_meta_data, day_sample_type_cond_ms4a3_pos_gabbr2)
+obj.v5$sample_tag_ms4a3_pos_gabbr2 <- pull(new_meta_data,sample_tag_ms4a3_pos_gabbr2)
+```
+
+```{r include=FALSE, eval=FALSE}
+Idents(obj.v5) <- "sampletag_Ms4a3"
+DefaultAssay(obj.v5) <- "RNA"
+#markers_ms4a3 <- FindAllMarkers(obj.v5 , test.use = "roc", max.cells.per.ident = 1000,min.pct = 0.2,logfc.threshold = 0.5 ,only.pos = T)
+
+#calculate top markers for Ms4a3 pos and neg- use these markers later to calculate auc for individual sammples
+markers_ms4a3_neg <- FindMarkers(obj.v5 ,
+                                 ident.1 =  "Ms4a3_neg", ident.2 =  "Ms4a3_pos", test.use = "roc", max.cells.per.ident = 1000,min.pct = 0.2,logfc.threshold = 0.5 ,only.pos = T) |> as_tibble(rownames="gene")|> mutate("sampletag_Ms4a3"="Ms4a3_neg")
+
+markers_ms4a3_pos <- FindMarkers(obj.v5 , ident.1 =  "Ms4a3_pos", ident.2 =  "Ms4a3_neg", test.use = "roc", max.cells.per.ident = 1000,min.pct = 0.2,logfc.threshold = 0.5 ,only.pos = T)|> as_tibble(rownames="gene") |> mutate("sampletag_Ms4a3"="Ms4a3_pos")
+
+markers_ms4a3 <- bind_rows(head(markers_ms4a3_neg),head(markers_ms4a3_pos))
+
+conditions <- unique(obj.v5$condition)
+
+```
+
+```{r include=FALSE, eval=FALSE}
+day_sample_type_cond_v <- unique(obj.v5$day_sample_type_cond)
+Idents(obj.v5) <- "day_sample_type_cond_ms4a3"
+all_neg_pos_comps_tbl <- tibble()
+for (i in day_sample_type_cond_v) {
+                neg <- paste(i, "Ms4a3_neg", sep="_")
+                pos <- paste(i, "Ms4a3_pos" ,sep="_")
+                x1 <- FindMarkers(obj.v5, ident.1 = pos, ident.2 = neg, features = unique(pull(markers_ms4a3, gene)), test.use = "roc") |> as_tibble(rownames="gene") |> mutate(comparison=paste0(neg,"__vs.__",pos))
+                all_neg_pos_comps_tbl<- bind_rows(all_neg_pos_comps_tbl,x1)
+        
+}
+write_rds(all_neg_pos_comps_tbl,"intermediate_data/ms4a3_roc_specific_markers.rds")
+```
+
+```{r}
+all_neg_pos_comps_tbl <- read_rds("intermediate_data/ms4a3_roc_specific_markers.rds")
+```
+
+```{r include=FALSE, eval=FALSE}
+
+
+gc()
+
+
+obj.v5$day_sample_type_cond_ms4a3_pos_gabbr2 |> table()
+
+# calculate 
+Idents(obj.v5) <- "day_sample_type_cond_ms4a3_pos_gabbr2"
+
+gabbr2_cor_neg_pos_comps_tbl <- tibble()
+for (i in day_sample_type_cond_v) {
+                neg <- paste(i, "Ms4a3_neg", sep="_")
+                pos <- paste(i, "Ms4a3_pos" ,sep="_")
+                x1 <- FindMarkers(obj.v5, ident.1 = pos, ident.2 = neg, features = unique(pull(markers_ms4a3, gene)), test.use = "roc") |> as_tibble(rownames="gene") |> mutate(comparison=paste0(neg,"__vs.__",pos))
+                gabbr2_cor_neg_pos_comps_tbl<- bind_rows(gabbr2_cor_neg_pos_comps_tbl,x1)
+        
+}
+        
+        
+
+write_rds(gabbr2_cor_neg_pos_comps_tbl,"intermediate_data/ms4a3_roc_specific_markers_pos_gabbr2.rds")
+```
+
+```{r}
+gabbr2_cor_neg_pos_comps_tbl <- read_rds("intermediate_data/ms4a3_roc_specific_markers_pos_gabbr2.rds")
+```
+  
+Gabbr2, Siglecf, Csf1r, Actn1 and Cd2 are among the top genes globally differentiating Ms4a3+ fro Ms4a3- macrophages in all 4 sequenced batches.  Due to the measurement of high levels of Gabbr2 with very low p-values in cells sorted as Ms4a3+ (=Tomato+) it is hypothesized here that Gabbr2 is either a alignemnt artifact or a biolgical consequence of 
+
+
+
+```{r  out.height=50 }
+gabbr2_cor_neg_pos_comps_tbl <- gabbr2_cor_neg_pos_comps_tbl |> mutate(correction="gabbr2_cut")
+auc_top_markers_ms4a3_with_and_without_gabbr2_correction <-  all_neg_pos_comps_tbl |> mutate(correction="no_correction") |> bind_rows(gabbr2_cor_neg_pos_comps_tbl) |>
+  filter(gene %in% c("Gabbr2", "Siglecf", "Csf1r", "Actn1", "Cd2")) |>
+        ggplot(aes(myAUC, comparison,color=correction))+geom_point()+ xlim(0,1)+ facet_wrap(~gene, ncol = 1)
+
+ggsave(auc_top_markers_ms4a3_with_and_without_gabbr2_correction,
+       filename="auc_top_markers_ms4a3_with_and_without_gabbr2_correction.svg",
+       path=output_path,
+       width=10 , height = 14)
+```
+
+![auc_top_markers_ms4a3_with_and_without_gabbr2_correction](output/case_study_adjustment_of_Ms4a3_sorting_by_gabbr2/auc_top_markers_ms4a3_with_and_without_gabbr2_correction.svg)
+
+```{r}
+Idents(obj.v5) <- "sampletag_Ms4a3"
+
+
+p1x <- obj.v5 |> filter(sampletag_Ms4a3=="Ms4a3_neg") |> FeatureScatter( "Gabbr2", "Ms4a6c") +ggtitle("Ms4a3_neg")
+p2x <- obj.v5 |> filter(sampletag_Ms4a3=="Ms4a3_pos") |> FeatureScatter( "Gabbr2", "Ms4a6c")+ggtitle("Ms4a3_pos")
+
+
+p3x <- obj.v5 |> filter(sampletag_Ms4a3=="Ms4a3_neg") |> FeatureScatter( "Gabbr2", "Fyb")+ggtitle("Ms4a3_neg")
+p4x <- obj.v5 |> filter(sampletag_Ms4a3=="Ms4a3_pos") |> FeatureScatter( "Gabbr2", "Fyb")+ggtitle("Ms4a3_pos")
+p5x <- FeatureScatter(obj.v5, "Gabbr2", "Ms4a6c")
+scatter_plots <- ggpubr::ggarrange(p5x,p1x,p2x,p3x,p4x, rows=3)
+scatter_plots 
+
+ggsave(plot = scatter_plots, filename  = "scatter_plots.svg", path=output_path, width=18 , height = 14 )
+
+```
+
+![text](./output/case_study_adjustment_of_Ms4a3_sorting_by_gabbr2/scatter_plots.svg)
+
+## Checking for expresssion of Gabbr2 in Lung cells from C57BL/6 without Ms4a3/Tmt construct (Loos et. al)
+
+Sex: female\
+age: 8 weeks old\
+tissue: Lung\
+cell type: All cells\
+treatment: MuHV-4\
+time: Day 14\
+https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE218247
+
+```{r include=FALSE, eval=FALSE, message=FALSE}
+#Lung cells #strain: C57BL/6
+# Sex: female
+# age: 8 weeks old
+# tissue: Lung
+# cell type: All cells
+# treatment: MuHV-4 and mock
+# time: Day 14
+#https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE218247
+
+
+
+#download Loos et al data if not already present
+file_path <- "../../raw_data/loos_et_al/GSM6737830_D14/"
+if(!file.exists(file_path)){
+  dir.create(file_path)
+  
+  urls <- c("https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM6737nnn/GSM6737830/suppl/GSM6737830%5FD14%5Fbarcodes.tsv.gz",
+            "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM6737nnn/GSM6737830/suppl/GSM6737830%5FD14%5Ffeatures.tsv.gz",
+            "https://ftp.ncbi.nlm.nih.gov/geo/samples/GSM6737nnn/GSM6737830/suppl/GSM6737830%5FD14%5Fmatrix.mtx.gz")
+  
+  destinations <- file_path |> paste0( c("barcodes.tsv.gz","features.tsv.gz", "matrix.mtx.gz"))
+  
+  for (url_ in  urls){
+    for (destination in destinations) {
+      download.file(url_,destfile=destination)
+      
+    }
+  }
+  
+}
+
+MuHV4_D14 <- Read10X(file_path)
+
+
+MuHV4_D14 <- CreateSeuratObject(counts = MuHV4_D14, project = "GSM6737824")
+MuHV4_D14 <- MuHV4_D14 |> NormalizeData() |> ScaleData()
+write_rds(MuHV4_D14,"intermediate_data/MuHV4_D14.rds")
+```
+
+```{r}
+MuHV4_D14 <- read_rds("intermediate_data/MuHV4_D14.rds")
+```
+
+```{r include=FALSE, eval=FALSE}
+
+
+p3 <- MuHV4_D14 |> VlnPlot(c("Rp1","Gabbr2","Adamts9","Siglecf","Mrc1","Cd2")) 
+# MuHV4_D14 |> VlnPlot("Gabbr2") 
+# MuHV4_D14 |> VlnPlot("Adamts9") 
+# MuHV4_D14 |> VlnPlot("Siglecf") 
+# MuHV4_D14 |> VlnPlot("Mrc1") 
+# MuHV4_D14 |> VlnPlot("Cd2") 
+p3
+MuHV4_D14 |> FeatureScatter("Siglecf","Gabbr2" )
+```
+
+
+Gabbr2 is very lowly expressed in lung cells of wildtype mice.
+#gabbr2 expression in Ms4a3-tomato-mice
+
+```{r}
+DefaultAssay(obj.v5) <- "RNA"
+ggpubr::ggarrange((obj.v5 |> VlnPlot("Malat1")),
+                  (VlnPlot(obj.v5, features = "Gabbr2" ))
+                  )
+
+```
+
+## which are the cells that express gabbr2 in MuHV4 infected mice d14 pi?
+
+```{r}
+MuHV4_D14$gabbr2_expression <-  MuHV4_D14 |> join_features("Gabbr2") |> mutate(gabbr2_expression=ifelse(.abundance_RNA>0,"gabbr2_expressing", "non")) |> pull(gabbr2_expression)
+Idents(MuHV4_D14) <- "gabbr2_expression"
+gabbr2_expr_cells_markers <- FindAllMarkers(MuHV4_D14)
+
+gabbr2_expr_cells_markers |> filter(cluster=="gabbr2_expressing") |> DT::datatable()
+```
+
+Could be DCs:\
+Cd209c: DC-Sign\
+Clec4b2
+
+But also Desmosome expression: desmocollin 2
