@@ -83,3 +83,5 @@ obj.v5$sample_type <- pull(new_meta_data,sample_type)
 #add ms4a3-based calculation corrected with  Gabbr2 
 obj.v5$day_sample_type_cond_ms4a3_pos_gabbr2 <- pull(new_meta_data, day_sample_type_cond_ms4a3_pos_gabbr2)
 obj.v5$sample_tag_ms4a3_pos_gabbr2 <- pull(new_meta_data,sample_tag_ms4a3_pos_gabbr2)
+
+obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_central.rds")
