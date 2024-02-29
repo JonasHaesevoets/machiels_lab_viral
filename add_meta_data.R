@@ -1,4 +1,8 @@
 
+easypackages::libraries("Seurat", "tidyverse", "tidyseurat")
+obj.v5 <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_central.rds")
+DefaultAssay(obj.v5) <- "RNA"
+
 
 obj.v5 |>  as_tibble() |>
         separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
@@ -17,6 +21,7 @@ y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
 
 obj.v5$sex_classifier_2 <- obj.v5 |> 
         join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+        #as_tibble() |> 
         rowwise() |> 
         mutate(max_male_genes=max(c_across(Ddx3y:Kdm5d))
         ) |> 
@@ -30,6 +35,7 @@ obj.v5$sex_classifier_2 <- obj.v5 |>
 
 obj.v5$sex_classifier_1 <- obj.v5 |>
         join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+       # as_tibble() |> 
         rowwise() |> 
         mutate(max_male_genes=max(c_across(Ddx3y:Kdm5d))
         ) |> 
