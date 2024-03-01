@@ -1,19 +1,20 @@
 ---
 title: "final_march2024_joint_analysis"
 format: 
-  html:
+  pdf:
     code-fold: true
 editor: visual
 toc: true
 execute:
   warning: false
   message: false
+
 ---
 
 
 ```{r message=FALSE, warning=FALSE}
-#| cache: true
 
+##| cache: true
 easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "ggpubr")
 
 obj.v5 <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_central.rds")
@@ -115,7 +116,7 @@ frequency_heatmap <- function(x){
 
   add powerpoint-generated viral_data_analysis_flowchart.pdf -> readme
   
-![data analysis flowchart](viral_data_analysis_flowchart.svg)
+![data analysis flowchart](viral_data_analysis_flowchart.png)
   
 # 2)	Integrate macrophages of all datasets into a combined embedding (umap)
   
