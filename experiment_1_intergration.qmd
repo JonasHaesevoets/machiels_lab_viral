@@ -1,0 +1,300 @@
+---
+title: "experiment_1_intergration"
+format: html
+editor: visual
+---
+
+```{r}
+set.seed(2023)
+easypackages::libraries("Seurat","tidyverse", "SeuratWrappers","tidyseurat", "ggExtra"
+)
+
+
+```
+
+```{r}
+path <- "C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_viral.experiment.1.rds"
+path <- "D:\\danne\\intermediate_data\\seurat_obj_viral.experiment.1.rds"
+exp <- readRDS(path) #directly from counts_to_seurat.rds
+
+```
+
+## without filtering
+
+```{r}
+exp |>ggplot(aes(orig.ident, fill=orig.ident))+geom_bar()+theme_minimal()+ ggtitle("cell number")
+```
+
+```{r}
+
+exp |>
+  ggplot(aes(nCount_RNA, fill=orig.ident))+
+  geom_boxplot()+theme_minimal()
+
+exp |>
+  ggplot(aes(nCount_RNA))+
+  geom_histogram()+theme_minimal()+facet_wrap(~orig.ident)+xlim(0,40000)
+
+
+
+
+```
+
+```{r}
+exp |> group_by(orig.ident) |> summarise(sum_RNA_counts=sum(nCount_RNA)) |> ggplot(aes(orig.ident, sum_RNA_counts, fill=orig.ident)) + geom_col()+ ggtitle("sum of all RNA counts per batch")
+```
+
+## with filtering
+
+```{r eval=FALSE, include=FALSE}
+lung <- read_rds("C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_experiment_1_combined_lung_raw_dbec_cleaned.rds") 
+bal <- read_rds("C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_experiment_1_combined_bal_raw_dbec_cleaned.rds")
+
+gc()
+exp <- merge(bal, lung, add.cell.ids = c("bal", "lung")) 
+bal <- NULL
+lung <- NULL
+write_rds(exp, "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_merged_raw.rds")
+
+```
+
+```{r}
+path <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_merged_raw.rds"
+path <- "D:\\danne\\intermediate_data\\seurat_obj_experiment_1_merged_raw.rds"
+
+exp <- read_rds(path)
+
+options(Seurat.object.assay.version = "v5")
+
+UpdateSeuratObject(exp)
+exp[["RNA"]] <- as(object = exp[["RNA"]], Class = "Assay5")
+DefaultAssay(exp) <- "RNA"
+#exp[["RNA"]] <- NULL
+exp
+exp |>ggplot(aes(orig.ident, fill=orig.ident))+geom_bar()+theme_minimal()+ ggtitle("cell number")
+```
+
+```{r}
+
+exp |>
+  ggplot(aes(nCount_RNA, fill=orig.ident))+
+  geom_boxplot()+theme_minimal()
+
+exp |>
+  ggplot(aes(nCount_RNA))+
+  geom_histogram()+theme_minimal()+facet_wrap(~orig.ident)+xlim(0,40000)
+
+
+```
+
+```{r}
+exp |> group_by(orig.ident) |> summarise(sum_RNA_counts=sum(nCount_RNA)) |> ggplot(aes(orig.ident, sum_RNA_counts, fill=orig.ident)) + geom_col()
+```
+
+```{r}
+
+#exp[["RNA"]] <- split(exp[["RNA"]], f = exp$orig.ident)
+exp
+```
+
+```{r}
+
+exp |>ggplot(aes(orig.ident, fill=orig.ident))+geom_bar()+theme_minimal()
+
+```
+
+```{r}
+
+exp |>ggplot(aes(nCount_RNA, fill=orig.ident))+geom_boxplot()+theme_minimal()
+
+```
+
+```{r}
+#| title: nCount marginal
+#| 
+multiplet_n_count_RNA_n_Feature<- exp |>
+  ggplot(aes(nCount_RNA, nFeature_RNA, color=orig.ident)) +
+  geom_point(size=0.5) +
+  theme_bw() +
+  xlim(c(-100,70000)) +
+  ylim(c(-1000,8000)) +
+  scale_color_manual(values = c( "grey","red","green"))#+   geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+
+ # geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")
+
+ggMarginal(multiplet_n_count_RNA_n_Feature +
+             theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3) 
+
+```
+
+```{r eval=FALSE, include=FALSE}
+exp <- NormalizeData(exp)
+exp <- FindVariableFeatures(exp)
+exp <- ScaleData(exp)
+exp <- RunPCA(exp)
+exp <- FindNeighbors(exp, dims = 1:30, reduction = "pca")
+exp <- FindClusters(exp, resolution = 2, cluster.name = "unintegrated_clusters")
+exp <- RunUMAP(exp, dims = 1:30, reduction = "pca", reduction.name = "umap.unintegrated")
+write_rds(exp, "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_merged_cleaned_2.rds")
+```
+
+```{r}
+DimPlot(exp, reduction = "umap.unintegrated", group.by = "orig.ident", split.by = "orig.ident")
+```
+
+```{r }
+#exp <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_merged_cleaned_2.rds"")
+# visualize by batch and cell type annotation
+# cell type annotations were previously added by Azimuth
+DimPlot(exp, reduction = "umap.unintegrated", group.by = c("orig.ident", "seurat_clusters"))
+```
+
+```{r}
+#detach("package:tidyseurat")      
+
+exp[["RNA"]] <- split(exp[["RNA"]], f = exp$orig.ident)
+exp <- IntegrateLayers(
+  object = exp,
+  method = RPCAIntegration,
+  orig.reduction = "pca",
+  new.reduction = "integrated.rpca",
+  verbose = FALSE
+)
+
+exp[["RNA"]] <- JoinLayers(exp[["RNA"]])
+```
+
+```{r}
+ElbowPlot(exp)
+```
+
+```{r}
+exp <- FindNeighbors(exp, reduction = "integrated.rpca", dims = 1:5)
+exp <- FindClusters(exp, resolution = 1, cluster.name = "rcpa_clusters")
+
+exp <- RunUMAP(exp, reduction = "integrated.rpca", dims = 1:5, reduction.name = "umap.rcpa")
+write_rds(exp, "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_merged_cleaned_3.rds")
+
+
+```
+
+```{r}
+p1 <- DimPlot(
+  exp,
+  reduction = "umap.rcpa",
+  group.by = c("orig.ident", "rcpa_clusters"),
+  combine = FALSE, label.size = 2,label = T
+)
+p1
+```
+
+```{r}
+exp |> ggplot(aes(rcpa_clusters, fill=orig.ident))+geom_bar()
+```
+
+```{r}
+markers_clus_7 <- FindMarkers(exp, ident.1 = 7, max.cells.per.ident = 500, logfc.threshold = 0.5)
+```
+
+```{r}
+markers_clus_7 |> arrange(desc(avg_log2FC))
+```
+
+```{r}
+alv_mac <- exp |> filter()
+```
+
+```{r}
+p2 <- DimPlot(
+  exp,
+  reduction = "umap.rcpa",
+  group.by = c("orig.ident"),
+  label.size = 2,
+  split.by = "orig.ident"
+)
+p2
+```
+
+```{r}
+exp |> 
+```
+
+```{r}
+exp <- JoinLayers(exp)
+set.seed(2023)
+markers_roc <- FindAllMarkers(exp,test.use = "roc",max.cells.per.ident = 300 )
+write_csv(markers_roc, "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\markers_experiment_1_merged_9rcpa_clusters_roc_300_cells.csv")
+
+set.seed(2024)
+markers_roc_2 <- FindAllMarkers(exp,test.use = "roc",max.cells.per.ident = 300 )
+write_csv(markers_roc, "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\markers_2_experiment_1_merged_9rcpa_clusters_roc_300_cells.csv")
+set.seed(2023)
+markers_roc |> slice_max(myAUC,by =cluster,n=10 )
+
+markers_roc_2 <- FindAllMarkers(exp,test.use = "roc",max.cells.per.ident = 300, )
+write_csv(markers_roc, "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\markers_2_experiment_1_merged_9rcpa_clusters_roc_300_cells.csv")
+
+bal_alv_mac <- subset(exp,orig.ident=="viral.experiment.1__bal" & seurat_clusters %in% c(0,1,2))
+bal_alv_mac <- subset(exp,orig.ident=="viral.experiment.1__bal" & seurat_clusters %in% c(0,1,2))
+write_rds(bal_alv_mac, "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_macs_with_merged_groups.rds")
+
+lung_alv_mac <- subset(exp,orig.ident=="viral.experiment.1__lung" & seurat_clusters %in% c(0,1,2))
+write_rds(lung_alv_mac, "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_lung_alv_macs_with_merged_groups.rds")
+
+bal_alv_mac <- bal
+
+lung
+
+
+
+```
+
+```{r}
+
+FeaturePlot(exp, c("Cd9","Tgfbi","AU020206","Pou2f2","Slamf7","Ms4a6c","Stmn1","C1qb","Mafb","Mki67","Ccr7"),reduction = "umap.cca")
+```
+
+```{r}
+all.genes <- rownames(exp)
+exp <- exp |> NormalizeData()|>
+        FindVariableFeatures(selection.method = "vst", nfeatures = 2000) |> 
+ ScaleData( features = all.genes)
+
+
+exp <-  SCTransform(exp)
+
+
+exp <- exp |> RunPCA( features = VariableFeatures(object = exp)) |> 
+        FindNeighbors( dims = 1:10) |> 
+        FindClusters(resolution = 0.5) |>  
+        RunUMAP(dims = 1:10)
+
+
+
+```
+
+```{r}
+DimPlot(exp, group.by="orig.ident")
+DimPlot(exp, group.by="orig.ident", split.by = "orig.ident")
+
+
+```
+
+```{r}
+
+exp <- IntegrateLayers(object = exp, method = CCAIntegration,verbose = FALSE)
+
+```
+
+Questions:
+
+are there specific viral emprinted changes in the
+
+Are the changes that we oberve in monocyte-derived AM due to infection (inf vs mock) the same over all infections.
+
+level 1 level 2 level 3 mo-AM deg in inf/mock (inf 1 /mock)/(inf 2 /mock) vs (inf 1 /mock)/(inf 3 /mock) = FC1
+
+AM/mo-AM per infection
+
+```{r}
+
+```

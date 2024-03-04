@@ -6,7 +6,7 @@ format:
 editor: visual
 ---
 
-## 
+
 
 ```{r message=FALSE, warning=FALSE}
 library("easypackages")
@@ -89,9 +89,8 @@ markers_ms4a3 <- bind_rows(markers_ms4a3_neg,markers_ms4a3_pos)
 conditions <- unique(obj.v5$condition)
 ```
 
-
-
 ## Differentially expressed genes (cell-wise roc): Ms4a3+ vs. Ms4a3-
+
 ```{r message=FALSE, warning=FALSE}
 
 
@@ -144,15 +143,9 @@ for (i in day_sample_type_cond_v) {
 write_rds(gabbr2_cor_neg_pos_comps_tbl,"intermediate_data/ms4a3_roc_specific_markers_pos_gabbr2.rds")
 ```
 
+Gabbr2, Siglecf, Csf1r, Actn1 and Cd2 are among the top genes globally differentiating Ms4a3+ from Ms4a3- macrophages in all 4 sequenced batches. Due to the measurement of high levels of Gabbr2 with very low p-values in cells sorted as Ms4a3+ (=Tomato+) (especially in the robust DeSeq2 method shown elsewhere) it is hypothesized here that Gabbr2 is either an alignemnt artifact or a biological consequence of the construct.
 
-
-Gabbr2, Siglecf, Csf1r, Actn1 and Cd2 are among the top genes globally differentiating Ms4a3+ from Ms4a3- macrophages in all 4 sequenced batches.  Due to the measurement of high levels of Gabbr2 with very low p-values in cells sorted as Ms4a3+ (=Tomato+) (especially in the robust DeSeq2 method shown elsewhere) it is hypothesized here that Gabbr2 is either an alignemnt artifact or a biological consequence of the construct.
-  
-  
 Sorting gates for samples in experiment 2 were not 100% efficient. Here, an additional cleaning of the data using Gabbr2 expression is explored. Namely this it the removal og Gabbr2 expressing cells in the Ms4a3- labeled group.
-
-
-
 
 ```{r  out.height=50 }
 gabbr2_cor_neg_pos_comps_tbl <- read_rds("intermediate_data/ms4a3_roc_specific_markers_pos_gabbr2.rds")
@@ -170,6 +163,7 @@ ggsave(auc_top_markers_ms4a3_with_and_without_gabbr2_correction,
 ![auc_top_markers_ms4a3_with_and_without_gabbr2_correction](output/case_study_adjustment_of_Ms4a3_sorting_by_gabbr2/auc_top_markers_ms4a3_with_and_without_gabbr2_correction.svg)
 
 ## scatter plots of Gabbr2 with other genes, per cell
+
 ```{r message=FALSE}
 Idents(obj.v5) <- "sampletag_Ms4a3"
 
@@ -256,8 +250,7 @@ p3
 
 ```
 
-
-Gabbr2 is very lowly expressed in lung cells of wildtype mice.  
+Gabbr2 is very lowly expressed in lung cells of wildtype mice.
 
 ## In comparison: gabbr2 expression in Ms4a3-tomato-mice
 
@@ -272,6 +265,7 @@ ggpubr::ggarrange((obj.v5 |> VlnPlot("Malat1")),
 ## which are the cells that express gabbr2 in MuHV4 infected mice d14 pi?
 
 DEG testing of cells with Gabbr2 counts against all other
+
 ```{r message=FALSE}
 MuHV4_D14$gabbr2_expression <-  MuHV4_D14 |> join_features("Gabbr2") |> mutate(gabbr2_expression=ifelse(.abundance_RNA>0,"gabbr2_expressing", "non")) |> pull(gabbr2_expression)
 Idents(MuHV4_D14) <- "gabbr2_expression"
@@ -286,4 +280,8 @@ Clec4b2
 
 But also Desmosome expression: desmocollin 2
 
+Gabbr2 expresssing cells upregulate Ms4a7. Ms4a7 is chromosomally adjacent to Ms4a3. There is likely an genomic(same promotor)/signaling overlap of Gabbr2 and Ms4a3.
+
 Ms4a7!
+
+

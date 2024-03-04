@@ -1,0 +1,470 @@
+---
+title: "VIRAL - Experiment #1 - quality control"
+execute: 
+  echo: true
+format: 
+  html:
+    grid:
+      margin-width: 10px
+      body-width: 1500px
+editor: visual
+---
+
+```{r}
+#| warning: false
+#load packeges
+# 
+# packages <- c("Seurat", "tidyverse", "here", "janitor", "forcats","tidyseurat","Matrix", "vroom", "tidyfst", "ggExtra", "viridis", "ggridges", "CytoExploreR")
+# 
+# lapply(packages, require, character.only = TRUE)
+library(easypackages)
+libraries("Seurat", "tidyverse", "here", "janitor", "forcats","tidyseurat","Matrix", "vroom", "tidyfst", "ggExtra", "viridis", "ggridges", "CytoExploreR")
+
+set.seed(2023)
+#set up file paths
+file_path <- vector("list") 
+file_path$output <- ".\\output\\" 
+file_path$intermediate_data<- ".\\intermediate_data\\" 
+file_path$raw_data <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_Expression_Data_Unfiltered.st.gz"
+```
+
+```{r}
+#experiment_1 <- read_rds(file = paste0(file_path$intermediate_data, "seurat_obj_combined_experiment_1_raw_dbec.rds"))
+experiment_1 <- read_rds(file = paste0(file_path$intermediate_data, "seurat_obj_combined_experiment_1_raw_dbec_scaled.rds"))
+```
+
+Number of cells per dataset
+
+```{r reval=FALSE, include=FALSE}
+experiment_1 <- experiment_1 |> separate(.cell, into="origin", remove = F)
+experiment_1 <- experiment_1 |> PercentageFeatureSet("^Rp[sl]", col.name = "percent_ribo")
+experiment_1[["percent_mito"]] <- PercentageFeatureSet(experiment_1, pattern = "^Mt")
+```
+
+```{r}
+experiment_1$origin |> table()
+```
+
+```{r}
+plot_nCount_RNA_nFeature_RNA_dens <-  experiment_1 |> ggplot(aes(nCount_RNA, nFeature_RNA, color=origin)) + geom_density_2d() +theme_bw() +theme(legend.position = "none") +xlim(c(-1000,70000)) +ylim(c(-100,8000))
+plot_nCount_RNA_nFeature_RNA_point <- experiment_1 |> ggplot(aes(nCount_RNA, nFeature_RNA, color=origin)) + geom_point(size=0.5) +theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000))
+ggMarginal(plot_nCount_RNA_nFeature_RNA_point +theme(legend.position = "none") , type = "density", groupColour = TRUE, groupFill = TRUE)
+plot_nCount_RNA_nFeature_RNA_dens 
+```
+
+```{r}
+plot_percent_mito_nFeature_RNA_dens <-  experiment_1 |> ggplot(aes(nCount_RNA, percent_mito, color=origin)) + geom_density_2d() +theme_bw() +theme(legend.position = "none") +
+        xlim(c(-1000,70000)) +ylim(c(-0,6))
+plot_percent_mito_nFeature_RNA_point <- experiment_1 |> ggplot(aes(nCount_RNA, percent_mito, color=origin)) + geom_point(size=0.5) +theme_bw() +
+        xlim(c(-1000,70000)) +ylim(c(-0,6))
+plot_percent_mito_nFeature_RNA_dens 
+```
+
+```{r}
+ggMarginal(plot_percent_mito_nFeature_RNA_point, type = "density", groupColour = TRUE, groupFill = TRUE)
+```
+
+``` {reval="FALSE," include="FALSE"}
+experiment_1 <- NormalizeData(experiment_1, normalization.method = "LogNormalize", scale.factor = 10000)
+experiment_1 <- ScaleData(object = experiment_1)
+
+experiment_1 <- FindVariableFeatures(experiment_1, selection.method = "vst", nfeatures = 2000)
+```
+
+Variable features
+
+```{r variable features}
+top_variable_genes <- head(VariableFeatures(experiment_1), 30)
+
+# Identify the 30 most highly variable genes
+
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(experiment_1)
+plot2 <- LabelPoints(plot = plot1, points = top_variable_genes, repel = TRUE, xnudge=0, ynudge=0, max.overlaps = getOption("ggrepel.max.overlaps", default = 100))
+plot2
+```
+
+Most variable features are B cell associated genes. Otherwise accordance to typical (pulmonary) macrophage features.
+
+``` {reval="FALSE," include="FALSE"}
+all.genes <- rownames(experiment_1)
+experiment_1 <- ScaleData(experiment_1, features = all.genes)
+```
+
+``` {reval="FALSE," include="FALSE"}
+experiment_1 <- RunPCA(experiment_1, features = VariableFeatures(object = experiment_1))
+```
+
+```{r}
+DimPlot(experiment_1, reduction = "pca")
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 10
+DimHeatmap(experiment_1, dims = 1:3, cells = 500, balanced = TRUE,nfeatures = 14)
+```
+
+```{r}
+#experiment_1 <- JackStraw(experiment_1, num.replicate = 100)
+#experiment_1 <- ScoreJackStraw(experiment_1, dims = 1:20)
+```
+
+```{r}
+#JackStrawPlot(experiment_1, dims = 1:15)
+
+```
+
+```{r}
+ElbowPlot(experiment_1)
+```
+
+No clear elbow for determniation of relevant PCs
+
+``` {reval="FALSE," include="FALSE"}
+write_rds(experiment_1, file = paste0(file_path$intermediate_data, "seurat_obj_combined_experiment_1_raw_dbec_scaled.rds"))
+```
+
+``` {reval="FALSE," include="FALSE"}
+experiment_1 <- FindNeighbors(experiment_1, dims = 1:10)
+experiment_1 <- FindClusters(experiment_1, resolution = 0.5)
+# Look at cluster IDs of the first 5 cells
+head(Idents(experiment_1), 5)#
+# If you haven't installed UMAP, you can do so via reticulate::py_install(packages =
+# 'umap-learn')
+experiment_1 <- RunUMAP(experiment_1, dims = 1:10)
+
+
+# note that you can set `label = TRUE` or use the LabelClusters function to help label
+# individual clusters
+```
+
+```{r}
+# find markers for every cluster compared to all remaining cells, report only the positive
+# ones
+# experiment_1.markers <- FindAllMarkers(experiment_1, only.pos = TRUE, min.pct = 0.4, logfc.threshold = 0.25,max.cells.per.ident = 300 )
+# experiment_1.markers_top <- experiment_1.markers %>%
+#     group_by(cluster) %>%
+#     slice_max(n = 2, order_by = avg_log2FC)
+
+#write_rds(experiment_1.markers, file = paste0(file_path$intermediate_data, "experiment_1._QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds"))
+experiment_1.markers_top <- read_rds(file = paste0(file_path$intermediate_data, "experiment_1._QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds")) %>%
+        select(gene:cluster) |> 
+    group_by(cluster) %>%
+    slice_max(n = 2, order_by = avg_log2FC)
+
+experiment_1.markers_top_4 <- read_rds(file = paste0(file_path$intermediate_data, "experiment_1._QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds")) %>%
+        select(gene:cluster) |> 
+    group_by(cluster) %>%
+    slice_max(n = 4, order_by = avg_log2FC)
+
+
+levels_diff_exp_features_4 <-   pull(experiment_1.markers_top_4, gene) |> unique()
+experiment_1.markers_top_4 <- experiment_1.markers_top_4 |> mutate(gene=factor(gene, levels=levels_diff_exp_features_4))
+
+#write_rds(experiment_1.markers, file = paste0(file_path$intermediate_data, "experiment_1._QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds"))
+```
+
+```{r}
+# experiment_1_feature_tbl <- experiment_1 |> join_features(features = pull(experiment_1.markers_top, gene)) |> as_tibble() 
+# write_rds(experiment_1_feature_tbl, paste0(file_path$intermediate_data,"experiment_1_feature_tbl.rds"))
+experiment_1_feature_tbl <- read_rds(paste0(file_path$intermediate_data,"experiment_1_feature_tbl.rds"))
+
+levels_diff_exp_features <-   pull(experiment_1.markers_top, gene) |> unique()
+experiment_1_feature_tbl <- experiment_1_feature_tbl |> mutate(.feature=factor(.feature, levels=levels_diff_exp_features))
+#experiment_1_feature_tbl|> ggplot(aes(UMAP_1, UMAP_2, colour= origin))  + geom_density_2d()
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 15
+
+p_umap_clusters <-   experiment_1_feature_tbl |> 
+        group_by(seurat_clusters, .feature) |> 
+    slice_sample(n = 100,) |>
+         ggplot(aes(UMAP_1, UMAP_2, colour= seurat_clusters))  + geom_point()  + theme(legend.position = "none")  +theme_minimal()
+
+
+feature_facet_1 <- experiment_1_feature_tbl |> 
+        group_by(seurat_clusters, .feature) |> 
+    slice_sample(n = 100) |>
+        ungroup() |> 
+        dplyr::filter(.feature%in% levels_diff_exp_features[1:12] ) |> 
+        ggplot(aes(UMAP_1, UMAP_2, colour= .abundance_RNA))  + geom_point() + 
+        facet_wrap(~.feature) + theme(legend.position = "none") + scale_color_viridis_b() +theme_minimal() +theme(legend.position = "none")
+
+
+feature_facet_2 <- experiment_1_feature_tbl |> 
+        group_by(seurat_clusters, .feature) |> 
+    slice_sample(n = 100,) |>
+        ungroup() |> 
+        dplyr::filter(.feature%in% levels_diff_exp_features[13:24] ) |> 
+        ggplot(aes(UMAP_1, UMAP_2, colour= .abundance_RNA))  + geom_point() + 
+        facet_wrap(~.feature) + theme(legend.position = "none") + scale_color_viridis_b() +theme_minimal()
+
+
+feature_facet_3 <- experiment_1_feature_tbl |> 
+        group_by(seurat_clusters, .feature) |> 
+    slice_sample(n = 100,) |>
+        ungroup() |> 
+        dplyr::filter(.feature%in% levels_diff_exp_features[25:31] ) |> 
+        ggplot(aes(UMAP_1, UMAP_2, colour= .abundance_RNA))  + geom_point() +
+        facet_wrap(~.feature) + theme(legend.position = "none") + scale_color_viridis_b() +theme_minimal()
+
+
+(DimPlot(experiment_1, label = T) +feature_facet_1)/ (feature_facet_2 +feature_facet_3)
+```
+
+```{r}
+#| fig-width: 17
+DimPlot(experiment_1, group.by = "orig.ident", shuffle = T ) +
+DimPlot(experiment_1, group.by = "orig.ident", shuffle = T , split.by =  "orig.ident")
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 6
+experiment_1.markers_top_4 |>
+  #mutate(gene= factor(gene, levels= levels_diff_exp_features)) |> 
+  ggplot(aes(gene,cluster, size=pct.1, colour=avg_log2FC)) +
+  geom_point()+
+  scale_color_viridis(option="magma")+
+  theme_minimal()+ theme(axis.text.x = element_text(angle = 90))
+
+experiment_1_feature_tbl$.feature |> unique()
+```
+
+```{r}
+experiment_1_feature_tbl  |> ggplot(aes(percent_mito,seurat_clusters, fill=origin)) +geom_boxplot() + coord_flip()
+experiment_1_feature_tbl  |> ggplot(aes(percent_ribo,seurat_clusters, fill=origin)) +geom_boxplot() + coord_flip()
+experiment_1_feature_tbl  |> ggplot(aes(nCount_RNA, seurat_clusters, fill=origin)) +geom_boxplot() + coord_flip()
+experiment_1_feature_tbl  |> ggplot(aes(nFeature_RNA, seurat_clusters, fill=origin)) +geom_boxplot() + coord_flip()
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 6
+lung_sample_tag_calls <- read_csv("C:/Users/danne/raw_data/machiels_lab/viral/2023-10-02_output_lung/Output_Lung/BD-Analysis-BMachiels_Sample_Tag_Calls.csv", skip = 7) |> mutate(Cell_Index=paste0("lung_",Cell_Index))
+bal_sample_tag_calls <- read_csv("C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_bal\\Output_BAL\\BD-Analysis-BMachiels_Sample_Tag_Calls.csv", skip = 7)|> mutate(Cell_Index=paste0("bal_",Cell_Index))
+
+(lung_sample_tag_calls |> ggplot(aes(Sample_Name)) + geom_bar()+theme(axis.text.x = element_text(angle = 90))+ggtitle("lung sample tags"))+
+(bal_sample_tag_calls |> ggplot(aes(Sample_Name)) + geom_bar()+theme(axis.text.x = element_text(angle = 90))+ggtitle("bal sample tags"))
+
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 10
+experiment_1$sample_tag_name <- lung_sample_tag_calls  |> bind_rows(bal_sample_tag_calls) |> right_join(tibble(Cell_Index=colnames(experiment_1))) |> pull(Sample_Name)
+
+experiment_1 <- experiment_1 |>  mutate(sampletag_multiplets=case_when(
+  sample_tag_name=="Multiplet" ~ "multiplet",
+  sample_tag_name=="Undetermined" ~"undeterminded",
+  TRUE ~ "single_hashtag")
+  )
+
+experiment_1 <- experiment_1 |>  mutate(sampletag_Ms4a3=case_when(
+  sample_tag_name=="Multiplet" ~ "multiplet",
+  sample_tag_name=="Undetermined" ~"undeterminded",
+  str_detect(sample_tag_name, pattern="\\+") ~ "Ms4a3_pos",
+  str_detect(sample_tag_name, pattern="\\-") ~ "Ms4a3_neg",
+  TRUE ~ "single_hashtag")
+  )
+
+experiment_1$condition <- experiment_1 |> pull(sample_tag_name) |> str_split_i(i=1, pattern = "_")
+
+
+(DimPlot(experiment_1, group.by = "sampletag_Ms4a3") +
+experiment_1 |> ggplot(aes(seurat_clusters, fill=sampletag_Ms4a3))+geom_bar())
+
+(DimPlot(experiment_1, group.by = "sampletag_multiplets") +
+
+experiment_1 |> ggplot(aes(seurat_clusters, fill=sample_tag_name))+geom_bar())
+
+```
+
+```{r}
+experiment_1 <- experiment_1 |> mutate(sample_tag_name=str_replace(sample_tag_name, pattern="-", replacement="_")) |> 
+mutate(sample_tag_name=str_replace(sample_tag_name, pattern="-", replacement="_negative")) |> 
+  mutate(sample_tag_name=str_replace(sample_tag_name, pattern="\\+", replacement="_positive")) 
+  
+experiment_1 <- experiment_1 |> mutate(sample_tag_origin=paste0(sample_tag_name,"_",origin)) # creat column that specifies both lung/bal dataset and sample_tag
+
+experiment_1 |>
+  join_features("Xist", slot= "scale.data", assay= "RNA") |> 
+  ggplot(aes(.abundance_RNA,sample_tag_origin, fill=sample_tag_origin))+
+  geom_density_ridges() +theme(legend.position = "none")+
+  ggtitle("xist scaled data")
+
+experiment_1 |>
+  join_features(features="Xist", slot= "data") |>
+  mutate(xist_pos =ifelse(.abundance_RNA>0, "xist_pos", "xist_neg")) |>
+  ggplot(aes(sample_tag_origin, fill=xist_pos)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+experiment_1 |>
+  join_features(features="Xist", slot= "data") |>
+  mutate(xist_pos =ifelse(.abundance_RNA>0, "xist_pos", "xist_neg")) |>
+  ggplot(aes(seurat_clusters, fill=xist_pos)) +geom_bar() +  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+  
+```
+
+```{r}
+experiment_1$condition <- experiment_1 |> pull(sample_tag_name) |> str_split_i(i=1, pattern = "_")
+```
+
+##Sample Tag Mulitplet Calls
+
+```{r}
+multiplet_n_count_RNA_n_Feature<- experiment_1 |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=sampletag_multiplets)) + geom_point(size=0.5) +theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000)) +scale_color_manual(values = c( "red","green","grey"))
+
+ggMarginal(multiplet_n_count_RNA_n_Feature +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3, ) # +ggtitle("")
+```
+
+```{r}
+protein_counts <- t(experiment_1@assays$protein@counts) |> as_tibble(rownames="cell") 
+#colnames(protein_counts) <- colnames(protein_counts) |>  str_split_i(pattern = "-", i=2)
+#colnames(protein_counts)
+
+protein_counts |> 
+  pivot_longer(cols = -cell, names_to = "protein", values_to = "value")|>
+  group_by(protein) |>
+  summarise(all_cells_sum=sum(value)) |>
+  dplyr::filter(all_cells_sum>5) |>
+  separate(protein, sep = "-", into = c("prot_1", "prot_2")) |> 
+  mutate(protein= paste0(prot_1,"_",prot_2))|> 
+  
+  ggplot(aes(protein, all_cells_sum)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+```{r}
+VlnPlot(experiment_1, features = "Lrg1")
+
+FeaturePlot(experiment_1, features = "Lrg1")
+```
+
+```{r}
+cell_no <- round(runif(min=1,max=10000, n=7))
+
+
+cell_counts_tbl <- tibble()
+for (i in cell_no) {
+  cell_counts_tbl_new <- tibble(cell_rank= rank(-experiment_1@assays$RNA@counts[,i],ties.method = "random"), counts=experiment_1@assays$RNA@counts[,i], cell_no=as.character(i) )
+  cell_counts_tbl <- bind_rows(cell_counts_tbl,cell_counts_tbl_new)
+  
+}
+
+cell_counts_tbl|> dplyr::filter(cell_rank<50) |> ggplot(aes(cell_rank,counts, color=cell_no ))+geom_point()+geom_line() + ggtitle("non-normalized reads")
+
+cell_counts_tbl |> group_by(cell_no) |> mutate(sum_cell=sum(counts)) |>
+  mutate(norm_10000=((10000*counts/sum_cell) ))|>
+  dplyr::filter(cell_rank<50) |>
+  ggplot(aes(cell_rank,norm_10000, color=cell_no ))+
+  geom_point()+geom_line() + ggtitle("counts*10000 normalized, no log")
+
+
+cell_counts_tbl |> group_by(cell_no) |> mutate(sum_cell=sum(counts)) |>
+  mutate(norm=((counts/sum_cell) ))|>
+  dplyr::filter(cell_rank<50) |>
+  ggplot(aes(cell_rank,norm, color=cell_no ))+
+  geom_point()+geom_line() + ggtitle("counts normalized by counts sum of cell, no log, no ...scale.factor..")
+
+
+cell_counts_tbl |> group_by(cell_no) |> mutate(sum_cell=sum(counts)) |>
+  mutate(norm_10000=((10000*counts/sum_cell) ))|>
+  dplyr::filter(cell_rank<50) |>
+  ggplot(aes(cell_rank,log(norm_10000+1), color=cell_no ))+
+  geom_point()+geom_line() + ggtitle("normalized by hand")
+
+
+cell_data_tbl <- tibble()
+for (i in cell_no) {
+  cell_data_tbl_new <- tibble(cell_rank= rank(-experiment_1@assays$RNA@data[,i],ties.method = "random"), data=experiment_1@assays$RNA@data[,i], cell_no=as.character(i) )
+  cell_data_tbl <- bind_rows(cell_data_tbl,cell_data_tbl_new)
+  
+}
+
+cell_data_tbl|> dplyr::filter(cell_rank<50) |> ggplot(aes(cell_rank,data, color=cell_no ))+geom_point()+geom_line() + ggtitle("seurat nmormalization ..data..")
+```
+
+```{r}
+y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
+module_scores <-vector(mode = "list")
+module_scores[[1]] <-   y_chromosome_genes
+module_scores[[2]] <-   c("Xist")
+
+
+
+experiment_1 <- AddModuleScore(experiment_1, features = module_scores, name = "module_score")
+
+experiment_1 |> join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+  mutate(avg_male_gens=Ddx3y+Eif2s3y+Kdm5d) |> 
+  mutate(avg_male_gens=avg_male_gens) |>
+  mutate(female_sex_ratio=Xist-avg_male_gens) |>
+  ggplot(aes(x=female_sex_ratio,y=condition)) + geom_jitter()
+
+
+experiment_1 |> join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+  mutate(avg_male_gens=Ddx3y+Eif2s3y+Kdm5d) |> 
+  mutate(avg_male_gens=avg_male_gens) |>
+  mutate(female_sex_ratio=Xist-avg_male_gens) |>
+  ggplot(aes(x=female_sex_ratio,y=condition)) + geom_density_ridges()
+
+experiment_1 |> join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+  mutate(avg_male_gens=Ddx3y+Eif2s3y+Kdm5d) |> 
+  mutate(avg_male_gens=avg_male_gens) |>
+  mutate(female_sex_ratio=Xist-avg_male_gens) |>
+  ggplot(aes(x=female_sex_ratio,y=condition)) + geom_boxplot()
+
+
+y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
+experiment_1 |>
+  join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+  mutate(avg_male_gens=Ddx3y+Eif2s3y+Kdm5d) |> 
+  #mutate(avg_male_gens=avg_male_gens) |>
+  mutate(female_sex_ratio=Xist-avg_male_gens) |>
+  mutate(sex_classifier=case_when(
+    female_sex_ratio==0~"no_expression_of_specific_genes",
+    female_sex_ratio<0~"classifyed_as_female",
+    female_sex_ratio>0~"classifyed_as_male",
+    TRUE~"something is wrong")) |>
+  ggplot(aes(condition, fill=sex_classifier))+
+  geom_bar()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+
+experiment_1 |>
+  join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+  mutate(avg_male_gens=Ddx3y+Eif2s3y+Kdm5d) |> 
+  #mutate(avg_male_gens=avg_male_gens) |>
+  select(avg_male_gens,Xist) |> 
+  pivot_longer(cols = c(avg_male_gens,Xist), names_to = "gene",values_to = "normalized_expression") |> 
+  ggplot(aes(gene,normalized_expression )) + geom_point() + geom_line(aes(group=gene))
+  
+
+# experiment_1 |>
+#   join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+#   mutate(avg_male_gens=Ddx3y+Eif2s3y+Kdm5d) |> 
+#   ggplot(aes(cyto_transformer_biex,avg_male_gens)) + geom_point()
+
+
+
+experiment_1 |> 
+  ggplot(aes(x=module_score1,y=condition)) + geom_density_ridges()
+
+experiment_1 |> 
+  ggplot(aes(x=module_score2,y=condition)) + geom_density_ridges()
+
+
+
+VlnPlot(experiment_1,features = c(y_chromosome_genes, "Xist"), group.by = "condition" )
+
+VlnPlot(experiment_1, features = "Xist")
+
+FeatureScatter(experiment_1,"Xist","Kdm5d")
+
+```

@@ -1,0 +1,105 @@
+---
+title: "case_study_protein_analysis"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+```{r}
+
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat")
+
+```
+
+```{r}
+obj.v5 <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_central.rds" )
+```
+
+```{r}
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="adt", slot="scale.data")  |> 
+group_by(.feature,orig.ident,condition,sampletag_Ms4a3) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  mutate(experiment=str_replace_all(orig.ident,c("viral.experiment.1_"="d60",
+                                                 "viral.experiment.2_"="d8") )) |> 
+  mutate(sample= paste(experiment,condition, sep = "_")) |> 
+  ggplot(aes(.feature,sample, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+
+
+```
+
+```{r}
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="adt", slot="scale.data")  |> 
+group_by(.feature,orig.ident,condition,sampletag_Ms4a3) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  mutate(experiment=str_replace_all(orig.ident,c("viral.experiment.1_"="d60",
+                                                 "viral.experiment.2_"="d8") )) |> 
+  mutate(sample= paste(experiment,condition, sep = "_")) |> 
+  ggplot(aes(.feature,sample, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  facet_wrap(~sampletag_Ms4a3)
+```
+
+```{r}
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="adt", slot="scale.data")  |> 
+group_by(.feature,orig.ident,condition,sampletag_Ms4a3) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  mutate(experiment=str_replace_all(orig.ident,c("viral.experiment.1_"="d60",
+                                                 "viral.experiment.2_"="d8") )) |> 
+  mutate(sample= paste(experiment,condition, sep = "_")) |> 
+  ggplot(aes(.feature,experiment, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+  facet_grid(condition~sampletag_Ms4a3)
+```
+
+protein expression by cluster
+
+```{r}
+
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="adt", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="adt", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt))  |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=
+mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized and max scaled per batch protein expression")
+```
+
+\`\`\`

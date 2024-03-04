@@ -1,0 +1,37 @@
+---
+title: "sex_derminination_case_study"
+format: html
+editor: visual
+---
+
+```{r}
+library(speckle)
+library(tidyverse)
+library(org.Mm.eg.db)
+
+file_path <- vector("list") 
+file_path$output <- ".\\output\\" 
+file_path$intermediate_data<- ".\\intermediate_data\\" 
+file_path$raw_data <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_Expression_Data_Unfiltered.st.gz"
+
+```
+
+```{r}
+
+#experiment_1 <- read_rds(file = paste0(file_path$intermediate_data, "seurat_obj_combined_experiment_1_raw_dbec.rds"))
+experiment_1 <- read_rds(file = paste0(file_path$intermediate_data, "seurat_obj_combined_experiment_1_raw_dbec_scaled.rds"))
+```
+
+```{r}
+counts <- experiment_1@assays$RNA@counts
+
+ann <- select(org.Mm.eg.db, keys=rownames(sc_10x),
+             columns=c("ENSEMBL","SYMBOL"), keytype="ENSEMBL")
+m <- match(rownames(counts), ann$ENSEMBL)
+rownames(counts) <- ann$SYMBOL[m]
+
+sex <- classifySex(counts, genome="Mm")
+
+table(sex$prediction)
+boxplot(counts["XIST",]~sex$prediction)
+```

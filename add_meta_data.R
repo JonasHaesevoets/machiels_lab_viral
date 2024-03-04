@@ -58,6 +58,7 @@ new_meta_data <- obj.v5 |>join_features("Gabbr2", slot="counts") |>
                day_mock=ifelse(condition=="Mock","Mock", day),
                day_mock_sample_type=ifelse(condition=="Mock","Mock", day_sample_type),
                day_sample_type_cond=paste(day, sample_type, condition, sep="_"),
+               day_mock_sample_type_cond=paste(day_mock_sample_type, condition, sep="_"),
                day_sample_type_cond_ms4a3=paste(day, sample_type, condition,sampletag_Ms4a3, sep="_")) |> 
         #filter(.abundance_RNA==0) |> filter(sampletag_Ms4a3=="Ms4a3_neg")
         ####
@@ -78,8 +79,8 @@ obj.v5$day <- pull(new_meta_data, day)
 obj.v5$day_sample_type_cond <- pull(new_meta_data, day_sample_type_cond)
 obj.v5$day_sample_type_cond_ms4a3 <- pull(new_meta_data,day_sample_type_cond_ms4a3)
 obj.v5$sample_type <- pull(new_meta_data,sample_type)
-
-
+obj.v5$day_factor <- obj.v5 |>  mutate(day_factor=factor(day, levels=c("Mock", "d8","d60"))) |> pull(day_factor)
+obj.v5$day_mock_sample_type_cond <-  new_meta_data |>  pull(day_mock_sample_type_cond)
 #add ms4a3-based calculation corrected with  Gabbr2 
 obj.v5$day_sample_type_cond_ms4a3_pos_gabbr2 <- pull(new_meta_data, day_sample_type_cond_ms4a3_pos_gabbr2)
 obj.v5$sample_tag_ms4a3_pos_gabbr2 <- pull(new_meta_data,sample_tag_ms4a3_pos_gabbr2)

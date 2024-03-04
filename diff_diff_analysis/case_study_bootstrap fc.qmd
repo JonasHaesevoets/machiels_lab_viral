@@ -1,0 +1,464 @@
+---
+title: "bootstrap fc"
+format: html
+editor: visual
+---
+
+```{r}
+
+easypackages::libraries("tidyverse","Seurat", "tidyseurat", "ggridges", "ggpointdensity")
+bal_alv_mac <- read_rds( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_macs_with_merged_groups.rds")
+
+lung_alv_mac <- read_rds( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_lung_alv_macs_with_merged_groups.rds")
+
+bal_alv_mac$virus <- tibble(sampletag_name=bal_alv_mac |> pull(sampletag_name)) |> separate(sampletag_name,into = c("virus")) |> pull("virus")
+
+lung_alv_mac$virus <- tibble(sampletag_name=bal_alv_mac |> pull(sampletag_name)) |> separate(sampletag_name,into = c("virus")) |> pull("virus")
+
+```
+```{r}
+Idents(bal_alv_mac) <- "sampletag_Ms4a3"
+BAL_Ms4a3_markers <- FindMarkers(bal_alv_mac,ident.1 = "Ms4a3_pos", ident.2 = "Ms4a3_neg", max.cells.per.ident = 300, min.pct = 0.5)
+BAL_Ms4a3_markers |> arrange(desc(avg_log2FC))
+BAL_Ms4a3_markers |> arrange(avg_log2FC)
+BAL_Ms4a3_markers |> arrange(p_val)
+```
+```{r}
+Idents(bal_alv_mac) <- "sampletag_name"
+BAL_Mock_Ms4a3_pos_vs_neg_markers <- FindMarkers(bal_alv_mac,ident.1 = "Mock_Ms4a3_pos", ident.2 = "Mock_Ms4a3_neg",slot  = "counts")
+BAL_Mock_Ms4a3_pos_vs_neg_markers
+BAL_Mock_Ms4a3_pos_vs_neg_markers
+```
+```{r}
+Idents(bal_alv_mac) <- "sampletag_name"
+BAL_PR8_Ms4a3_pos_vs_neg_markers <- FindMarkers(bal_alv_mac,ident.1 = "PR8_Ms4a3_pos", ident.2 = "PR8_Ms4a3_neg",slot  = "counts")
+BAL_PR8_Ms4a3_pos_vs_neg_markers
+```
+
+
+```{r}
+bal_alv_mac |> DimPlot()
+```
+
+
+
+
+```{r}
+VlnPlot(bal_alv_mac, features =c("Gabbr2","Siglecf" ), slot = "data",group.by = "sampletag_name")
+VlnPlot(bal_alv_mac, features =c("Gabbr2","Siglecf" ), slot = "counts",group.by = "sampletag_name")
+VlnPlot(bal_alv_mac, features =c("Adamts9"), slot = "counts",group.by = "sampletag_name")
+
+	
+```
+```{r}
+VlnPlot(bal_alv_mac, features =c("Epcam","Spp1", "Siglecf" ), group.by = "sampletag_name",pt.size = 0)
+VlnPlot(bal_alv_mac, features =c("Cd36", "Gabbr2" ), group.by = "sampletag_name",pt.size = 0)
+VlnPlot(bal_alv_mac, features =c("Adamts9"), slot = "data",group.by = "sampletag_name")
+
+```
+
+```{r}
+bal_alv_mac |> ggplot()+ geom_bar(aes(sampletag_name, fill=sampletag_name))+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r}
+
+diff_bootstrap <- function(gene,group_size_=50,
+samples_no_=1000, scale_it=F){
+
+        
+dat_A_x <- bal_alv_mac |>  filter(virus=="PR8" & sampletag_Ms4a3=="Ms4a3_pos")
+dat_A_y <- bal_alv_mac |>  filter(virus=="PR8" & sampletag_Ms4a3=="Ms4a3_neg")
+
+dat_B_x <- bal_alv_mac |>  filter(virus=="Mock" & sampletag_Ms4a3=="Ms4a3_pos")
+dat_B_y <- bal_alv_mac |>  filter(virus=="Mock" & sampletag_Ms4a3=="Ms4a3_neg")
+
+
+gene_index_A <- which(gene == rownames(dat_A_x))[[1]]
+values_A_x <- dat_A_x@assays$RNA@layers$data[gene_index_A,]
+
+
+gene_index_A <- which(gene == rownames(dat_A_y))[[1]]
+values_A_y <- dat_A_y@assays$RNA@layers$data[gene_index_A,]
+
+
+
+gene_index_B <- which(gene == rownames(dat_B_x))[[1]]
+values_B_x <- dat_B_x@assays$RNA@layers$data[gene_index_B,]
+
+
+gene_index_B <- which(gene == rownames(dat_B_y))[[1]]
+values_B_y <- dat_B_y@assays$RNA@layers$data[gene_index_B,]
+
+
+
+group_size=group_size_
+samples_no=samples_no_
+vector_size=group_size*samples_no
+
+
+diff_A_tbl <- tibble(nominator=sample(values_A_x,size =vector_size ,replace = T),
+                denominator=sample(values_A_y,size = vector_size, replace = T),
+                group=as_factor(rep(1:samples_no,group_size))) |> 
+                group_by(group) 
+  
+  
+  if (scale_it==T){diff_A_tbl <- diff_A_tbl |> mutate(nominator=nominator/group_size,denominator=nominator/group_size) }
+  
+  
+  
+  
+       diff_A_tbl <- diff_A_tbl |>  summarize(group_diff=sum(nominator)-sum(denominator))|> ungroup() |> mutate(diff="diff_A")
+
+diff_B_tbl <- tibble(nominator=sample(values_B_x,size =vector_size ,replace = T),
+                denominator=sample(values_B_y,size = vector_size, replace = T),
+                group=as_factor(rep(1:samples_no,group_size))) |>        
+  group_by(group) 
+  
+
+if (scale_it==T){
+  diff_B_tbl <- diff_B_tbl |> mutate(nominator=nominator/group_size,denominator=nominator/group_size) }
+
+diff_B_tbl <- diff_B_tbl |> summarize(group_diff=sum(nominator)-sum(denominator)) |> ungroup()|> mutate(diff="diff_B")
+        
+group_size=1
+samples_no=samples_no*10
+vector_size=group_size*samples_no       
+
+diff_diff_tbl  <- tibble(nominator= sample(pull(diff_A_tbl,group_diff),size =vector_size ,replace = T),
+       denominator= sample(pull(diff_B_tbl,group_diff),size =vector_size ,replace = T),
+       group=as_factor(rep(1:samples_no,group_size))
+       ) |>  group_by(group) 
+  
+  if (scale_it==T){
+    diff_diff_tbl <- diff_diff_tbl |> mutate(nominator=nominator/group_size,denominator=nominator/group_size)}
+      
+  
+diff_diff_tbl <- diff_diff_tbl |> summarize(group_diff=sum(nominator)-sum(denominator)) |> ungroup()|> mutate(diff="ddiff_AB")
+
+return(bind_rows(diff_A_tbl,diff_B_tbl,diff_diff_tbl))
+}
+
+
+```
+```{r}
+accuracy_function <- function(gene="Spp1", scale_it=F){
+
+value <- 0
+accuracy_tbl <- tibble(cell_count=0,percent_above=0)
+seq_along(pull(accuracy_tbl,cell_count))
+distibution_tbl <- tibble()
+steps <- seq(5,120,by=5)
+for (cell_count in steps) {
+        print(cell_count)
+        x <- diff_bootstrap(gene,group_size_=cell_count, scale_it=scale_it) |> mutate(cell_count=as.character(cell_count))
+above_value <- x|> filter(diff=="ddiff_AB") |> mutate(actuall_differance=ifelse(group_diff>0,1,0)) |> group_by(actuall_differance) |> count() |> pull(n)
+percent_above_value <- above_value[2]/sum(above_value)
+
+        distibution_tbl <- distibution_tbl |> bind_rows(mutate(x,accuracy=percent_above_value))
+
+}
+distibution_tbl<- distibution_tbl |> mutate(cell_count=factor(cell_count, levels=steps))
+return(distibution_tbl)
+
+}
+
+
+```
+```{r}
+distibution_tbl_spp1 <- accuracy_function(gene="Spp1")
+distibution_tbl_spp1_scaled <- accuracy_function(gene="Spp1",scale_it=T)
+```
+
+
+
+```{r}
+
+distibution_tbl_spp1 |> pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal() +facet_wrap(~cell_count)+ggtitle("Spp1 dFC with, sample sizes, unscaled")
+
+
+distibution_tbl_spp1_scaled |> pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal() +facet_wrap(~cell_count)+ggtitle("Spp1 dFC with, sample sizes, scaled")
+
+```
+
+
+```{r}
+spp1_scaled   |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Spp1")
+
+spp1_unscaled  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Spp1")
+
+
+
+```
+```{r}
+
+Gabrr2_scaled_flipped|>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num>400) |>   pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Spp1")
+
+Gabrr2_scaled   |>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num>400) |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Gabrr2 scaled")
+
+Gabrr2_unscaled  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Gabrr2 unscaled")
+
+Gabrr2_scaled |>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num==425) |> ggplot(aes(group_diff,fill=diff))+geom_histogram()
+```
+
+
+
+```{r}
+Adamts9_scaled   |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Adamts9 scaled")
+
+Adamts9_unscaled  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Adamts9 unscaled")
+```
+
+```{r}
+
+# Siglecf_scaled_PR8_MuHV4_scaled_flipped|>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num>400) |>   pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+#         geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+#         geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+#         geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+#   #xlim(c(-2,2))+ylim(c(-2,2)) +
+#   facet_wrap(~cell_count)+ggtitle("Spp1")
+
+Siglecf_scaled_PR8_MuHV4   |>mutate(cell_count_num=as.numeric(as.character(cell_count)))  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Siglecf_scaled_PR8_MuHV4 scaled")
+
+Siglecf_unscaled_PR8_MuHV4  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Siglecf_scaled_PR8_MuHV4 unscaled")
+
+Siglecf_scaled_PR8_MuHV4 |>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num==425) |> ggplot(aes(group_diff,fill=diff))+geom_histogram()
+```
+```{r}
+
+# Siglecf_scaled_flipped|>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num>400) |>   pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+#         geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+#         geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+#         geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+#   #xlim(c(-2,2))+ylim(c(-2,2)) +
+#   facet_wrap(~cell_count)+ggtitle("Spp1")
+
+Siglecf_scaled   |>mutate(cell_count_num=as.numeric(as.character(cell_count)))  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Siglecf scaled")
+
+Siglecf_unscaled  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Siglecf unscaled")
+
+Siglecf_scaled |>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num==425) |> ggplot(aes(group_diff,fill=diff))+geom_histogram()
+```
+
+```{r}
+
+# Siglecf_scaled_flipped|>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num>400) |>   pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+#         geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+#         geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+#         geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+#   #xlim(c(-2,2))+ylim(c(-2,2)) +
+#   facet_wrap(~cell_count)+ggtitle("Spp1")
+
+Siglecf_scaled   |>mutate(cell_count_num=as.numeric(as.character(cell_count)))  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Siglecf scaled")
+
+Siglecf_unscaled  |>  pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Siglecf unscaled")
+
+Siglecf_scaled |>mutate(cell_count_num=as.numeric(as.character(cell_count))) |> filter(cell_count_num==425) |> ggplot(aes(group_diff,fill=diff))+geom_histogram()
+```
+
+
+
+
+```{r}
+Gabrr2_scaled  |> filter(cell_count==105) |>   pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+  facet_wrap(~cell_count)+ggtitle("Gabrr2 unscaled")
+
+Gabrr2_unscaled  |> filter(cell_count==105) |>   pivot_wider(names_from=diff, values_from =group_diff ) |> ungroup()|> ggplot(aes(diff_A, diff_B))+ geom_point()+
+        # geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        # geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        # geom_vline(xintercept = 0, color="black", linewidth=1)+ 
+  #scale_color_viridis_b()+
+  theme_minimal()+
+  #xlim(c(-2,2))+ylim(c(-2,2)) +
+ # facet_wrap(~cell_count)+
+  ggtitle("Gabrr2 unscaled")
+
+Gabrr2_unscaled  |> filter(cell_count==395) |>   pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_point()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+
+  xlim(c(-2,2))+ylim(c(-2,2)) +
+  #facet_wrap(~cell_count)+
+  ggtitle("Gabrr2 unscaled")
+```
+
+
+```{r}
+distibution_tbl_spp1_scaled <- accuracy_function(gene="Spp1", scale_it = T)
+
+distibution_tbl_spp1_scaled |> pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal() +facet_wrap(~cell_count)+ggtitle("Spp1 dFC with, sample sizes, scaled")
+```
+
+```{r}
+distibution_tbl_epcam_scaled <- accuracy_function(gene="Epcam", scale_it = T)
+
+distibution_tbl_epcam_scaled |> pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+xlim(c(-2,2))+ylim(c(-2,2)) +facet_wrap(~cell_count)+ggtitle("Epcam1 dFC with, sample sizes, scaled")
+```
+
+```{r}
+distibution_tbl_epcam <- accuracy_function(gene="Epcam", scale_it = F)
+
+distibution_tbl_epcam |> pivot_wider(names_from=diff, values_from =group_diff ) |> ggplot(aes(diff_A, diff_B))+ geom_pointdensity()+
+        geom_abline(intercept = 0, slope = 0, color="black", linewidth=1)+
+        geom_abline(intercept = 0, slope = 1, color="black", linewidth=1, linetype="dotted")+
+        geom_vline(xintercept = 0, color="black", linewidth=1)+ scale_color_viridis_b()+theme_minimal()+xlim(c(-100,100))+ylim(c(-100,100)) +facet_wrap(~cell_count)+ggtitle("Epcam1 dFC with, sample sizes, scaled")
+```
+
+```{r}
+distibution_tbl_spp1 |> pivot_wider(names_from=diff, values_from =group_diff )
+
+
+distibution_tblsd |> select(cell_count, accuracy) |> unique() |> 
+        ggplot(aes(cell_count,accuracy)) +  geom_point()
+
+```
+
+
+
+```{r}
+spp1_fc  |> mutate(fc=ifelse(group_fraction>10,10,group_fraction))|> ggplot(aes(group_fraction,y=fc, fill=fc))  +geom_density_ridges()
+lepr_fc |> ggplot(aes(group_fraction,y=fc, fill=fc))  +geom_density_ridges()
+S100a4_fc |> mutate(fc=ifelse(fc>10,10,fc))|>  ggplot(aes(group_fraction, fill=fc))  +geom_histogram()
+```
+```{r}
+fc_bootstrap <- function(gene,group_size_=50,
+samples_no_=1000){
+
+        
+dat_A_x <- bal_alv_mac |>  filter(virus=="PR8" & sampletag_Ms4a3=="Ms4a3_pos")
+dat_A_y <- bal_alv_mac |>  filter(virus=="PR8" & sampletag_Ms4a3=="Ms4a3_neg")
+
+dat_B_x <- lung_alv_mac |>  filter(virus=="PR8" & sampletag_Ms4a3=="Ms4a3_pos")
+dat_B_y <- lung_alv_mac |>  filter(virus=="PR8" & sampletag_Ms4a3=="Ms4a3_neg")
+
+
+gene_index_A <- which(gene == rownames(dat_A_x))[[1]]
+values_A_x <- dat_A_x@assays$RNA@layers$data[gene_index_A,]
+
+
+gene_index_A <- which(gene == rownames(dat_A_y))[[1]]
+values_A_y <- dat_A_y@assays$RNA@layers$data[gene_index_A,]
+
+
+
+gene_index_B <- which(gene == rownames(dat_B_x))[[1]]
+values_B_x <- dat_B_x@assays$RNA@layers$data[gene_index_B,]
+
+
+gene_index_B <- which(gene == rownames(dat_B_y))[[1]]
+values_B_y <- dat_B_y@assays$RNA@layers$data[gene_index_B,]
+
+
+
+group_size_=50
+samples_no_=1000
+vector_size=group_size*samples_no
+
+
+fc_A_tbl <- tibble(nominator=sample(values_A_x,size =vector_size ,replace = T),
+                denominator=sample(values_A_y,size = vector_size, replace = T),
+                group=as_factor(rep(1:samples_no,group_size))) |> 
+                group_by(group) |> 
+        summarize(group_fraction=sum(nominator)/sum(denominator))|> ungroup() |> mutate(fc="FC_A")
+
+fc_B_tbl <- tibble(nominator=sample(values_B_x,size =vector_size ,replace = T),
+                denominator=sample(values_B_y,size = vector_size, replace = T),
+                group=as_factor(rep(1:samples_no,group_size))) |>         group_by(group) |> 
+        summarize(group_fraction=sum(nominator)/sum(denominator)) |> ungroup()|> mutate(fc="FC_B")
+        
+group_size=1
+samples_no=1000
+vector_size=group_size*samples_no       
+
+fc_fc_tbl  <- tibble(nominator= sample(pull(fc_A_tbl,group_fraction),size =vector_size ,replace = T),
+       denominator= sample(pull(fc_B_tbl,group_fraction),size =vector_size ,replace = T),
+       group=as_factor(rep(1:samples_no,group_size))
+       ) |>  group_by(group) |> 
+        summarize(group_fraction=sum(nominator)/sum(denominator)) |> ungroup()|> mutate(fc="dFC_AB")
+
+return(bind_rows(fc_A_tbl,fc_B_tbl,fc_fc_tbl))
+}
+
+```
+

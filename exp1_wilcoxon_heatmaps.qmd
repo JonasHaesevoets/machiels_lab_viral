@@ -1,0 +1,396 @@
+---
+title: "exp1_wilcoxon_heatmaps"
+format: pdf
+editor: visual
+knitr:
+    opts_chunk: 
+      dev: "ragg_png"
+---
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(Seurat)
+library(tidyseurat)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(forcats)
+library(ragg)
+library(ggpubr)
+
+recalculate=FALSE
+save_excel_bool <- FALSE
+```
+
+```{r, load data, echo=FALSE, message=FALSE, warning=FALSE}
+
+bal_alv_mac <- read_rds( "intermediate_data\\seurat_obj_experiment_1_bal_alv_macs_with_merged_groups.rds")
+bal_alv_mac$virus <- tibble(sampletag_name=bal_alv_mac |> pull(sampletag_name)) |> separate(sampletag_name,into = c("virus")) |> pull("virus")
+
+ms4a3_neg <- bal_alv_mac|> filter(sampletag_Ms4a3=="Ms4a3_neg")
+ms4a3_pos <- bal_alv_mac |> filter(sampletag_Ms4a3=="Ms4a3_pos")
+#bal_alv_mac <- NULL
+
+```
+
+```{r, functions, echo=FALSE, message=FALSE}
+top_markers_named_list_maker <-
+  function(markers_tibble, #FindAllMarkers Output
+           n_ = 10,
+           grouping= cluster,
+           p_adj_thresh=0.01) {
+    #takes Seurat::FindAllMarkers output  (Wilcoxon test), returns list of top n_ markers by p_val_adj
+    marker_gene_list <- markers_tibble |>
+      filter(avg_log2FC > 0) |>
+      filter(p_val_adj<p_adj_thresh) |> 
+      group_by({{grouping}}) |>
+      slice_min(p_val_adj, n = n_) |> 
+      select({{grouping}}, gene) |>
+      summarise(gene = list(gene)) |>
+      as.list(gene)
+    names(marker_gene_list$gene) <-
+      as.character(marker_gene_list[[1]])
+    return(marker_gene_list$gene)
+  }
+
+dot_heatmap <- function(seurat_obj = ms4a3_pos,
+                        named_feature_list = ms4a3_pos_markers_list,
+                        limits = c(-2, 2),
+                        seurat_grouping = "sampletag_name") {
+  #takes a ORDERED named list of features, names are groups in "seurat_grouping", returns heatmap
+  named_feature_vec <-  named_feature_list |> unlist()
+  named_feature_vec <-
+    named_feature_vec[!duplicated(named_feature_vec)] # like "unique()" but without losing names
+  group_names_sorted <- names(named_feature_list)
+  
+  
+  tbl <-seurat_obj |> join_features(named_feature_vec, slot = "data", assay = "RNA") |>
+    group_by(.feature, .data[[seurat_grouping]]) |>
+    summarise(
+      mean_data = mean(.abundance_RNA),
+      percent_exp = mean(.abundance_RNA > 0)
+    ) |>
+    group_by(.feature) |>
+    mutate(z_score_mean_abundance_over_groups = (mean_data - mean(mean_data)) /
+             sd(mean_data)) |>
+          mutate(z_score_mean_abundance_over_groups=ifelse(z_score_mean_abundance_over_groups>2,2,z_score_mean_abundance_over_groups)) |>
+          mutate(z_score_mean_abundance_over_groups=ifelse(z_score_mean_abundance_over_groups<(-2),(-2),z_score_mean_abundance_over_groups)) |>
+    mutate(
+      gene = factor(.feature, levels = named_feature_vec),
+      "{seurat_grouping}" := factor(.data[[seurat_grouping]], levels = group_names_sorted)
+    ) |> 
+    arrange(gene)
+  
+  #browser()
+  plt <- tbl |>
+    ggplot(aes(gene, .data[[seurat_grouping]],
+               color = z_score_mean_abundance_over_groups,
+               size = percent_exp)) +
+    geom_point() +
+    ggplot2::geom_point() +
+    ggplot2::guides(
+      color = ggplot2::guide_colorbar(
+        barwidth  = 18,
+        barheight = 1,
+        ticks = FALSE,
+        frame.colour = "black",
+        title.position = "top",
+        title.hjust = 0.5
+      ),
+      size  = ggplot2::guide_legend(title.position = "top", title.hjust = 0.5)
+    ) +
+    ggplot2::labs(col  = "z-score of mean", size = "% expressed") +
+    ggplot2::theme_classic(base_size = 25) +
+    ggplot2::theme(
+      legend.position = "top",
+      axis.text.x     = ggplot2::element_text(
+        angle = 45,
+        hjust = 1,
+        vjust = 1,
+        face = "italic"
+      ),
+      axis.title      = ggplot2::element_blank()
+    ) +
+    ggplot2::scale_color_distiller(palette = "RdBu", limits = limits) +
+    ggplot2::scale_size_area(max_size = 10)
+  return(plt)
+  
+  
+}
+
+
+marker_list_density_plots <- function(marker_list, seurat_object, max_scaled=FALSE) {
+  plt_list_data <- list()
+  for (i in seq_along(marker_list)) {
+    plt_list_data[[i]] <- seurat_object |>
+      join_features(marker_list[[i]]) |>
+      ggplot(aes(.abundance_RNA, fill = sampletag_name, color = sampletag_name)) +
+      facet_wrap( ~ .feature, ncol = 5) +
+      ggtitle(names(marker_list)[i]) + theme_minimal()+ylim(0,1.3)
+    
+    if (max_scaled) {
+      plt_list_data[[i]] <- plt_list_data[[i]]+ geom_density(aes(y = after_stat(scaled)), alpha = 0.05)
+      }else plt_list_data[[i]] <- plt_list_data[[i]]+ geom_density( alpha = 0.05)
+    
+    
+  }
+  return(plt_list_data)
+  
+}
+
+marker_list_histogram_plots <- function(marker_list, seurat_object) {
+  plt_list_counts <- list()
+  for (i in seq_along(marker_list)) {
+    plt_list_counts[[i]] <- seurat_object |>
+      join_features(marker_list[[i]], slot = "counts") |>
+      ggplot(aes(.abundance_RNA, fill = sampletag_name, color = sampletag_name)) +
+      geom_histogram(aes(y = after_stat(count / sum(count))), alpha = 0.05) +
+      facet_wrap(~ .feature,
+                 ncol = 5) +
+      ggtitle(names(marker_list)[i]) + theme_minimal()
+    
+  }
+  return(plt_list_counts)
+}
+```
+
+```{r, ms4a3_neg_markers, echo=FALSE, message=FALSE}
+if ((!file.exists("intermediate_data\\exp_1_bal_ms4a3_neg_markers.rds" )| recalculate)) {
+  Idents(ms4a3_neg) <- "sampletag_name"
+ms4a3_neg_markers <-
+  FindAllMarkers(ms4a3_neg, max.cells.per.ident = 300, logfc.threshold = 0.5)
+write_rds(ms4a3_neg_markers,
+          "intermediate_data\\exp_1_bal_ms4a3_neg_markers.rds")
+  
+  
+} else ms4a3_neg_markers <-
+  read_rds("intermediate_data\\exp_1_bal_ms4a3_neg_markers.rds")
+```
+
+```{r ,ms4a3_pos_markers, echo=FALSE, message=FALSE}
+
+if ((!file.exists("intermediate_data\\exp_1_bal_ms4a3_pos_markers.rds")| recalculate)) {
+  Idents(ms4a3_pos) <- "sampletag_name"
+ms4a3_pos_markers <-
+  FindAllMarkers(ms4a3_pos, max.cells.per.ident = 300, logfc.threshold = 0.5)
+write_rds(ms4a3_pos_markers,
+          "intermediate_data\\exp_1_bal_ms4a3_pos_markers.rds")
+} else ms4a3_pos_markers <- read_rds("intermediate_data\\exp_1_bal_ms4a3_pos_markers.rds")
+
+```
+
+```{r ,markers_pos_viruses_vs_mock, echo=FALSE, message=FALSE}
+
+if ((!file.exists("intermediate_data\\exp_1_bal_markers_pos_viruses_vs_mock.rds")| recalculate)) {
+  
+  markers_pos_viruses_vs_mock <- tibble()
+  groupings <- unique(ms4a3_pos$sampletag_name)[1:4]
+  for (grouping in groupings) {
+    print(grouping)
+    markers <- FindMarkers(
+      ms4a3_pos,
+      ident.1 = grouping,
+      ident.2 = "Mock_Ms4a3_pos",
+      group.by = "sampletag_name",
+      max.cells.per.ident = 300,
+      logfc.threshold = 0.5
+    )
+    
+    markers_pos_viruses_vs_mock <-
+      markers |> as_tibble(rownames = "gene") |> mutate(comparison = grouping) |> bind_rows(markers_pos_viruses_vs_mock)
+  }
+      write_rds(
+      markers_pos_viruses_vs_mock,
+      "intermediate_data\\exp_1_bal_markers_pos_viruses_vs_mock.rds")
+      
+}else markers_pos_viruses_vs_mock <- read_rds("intermediate_data\\exp_1_bal_markers_pos_viruses_vs_mock.rds")
+
+```
+
+```{r ,markers_neg_viruses_vs_mock, echo=FALSE, message=FALSE}
+
+if ((!file.exists("intermediate_data//exp_1_bal_markers_neg_viruses_vs_mock.rds")| recalculate)) {
+  
+  markers_neg_viruses_vs_mock <- tibble()
+  groupings <- unique(ms4a3_neg$sampletag_name)[1:4]
+  for (grouping in groupings) {
+    print(grouping)
+    markers <-
+      FindMarkers(
+        ms4a3_neg,
+        ident.1 = grouping,
+        ident.2 = "Mock_Ms4a3_neg",
+        group.by = "sampletag_name",
+        max.cells.per.ident = 300,
+        logfc.threshold = 0.5
+      )
+    
+    markers_neg_viruses_vs_mock <-
+      markers |> as_tibble(rownames = "gene")|> mutate(comparison = grouping)|> bind_rows(markers_neg_viruses_vs_mock)
+  }
+  
+  write_rds(
+    markers_neg_viruses_vs_mock,
+    "intermediate_data//exp_1_bal_markers_neg_viruses_vs_mock.rds"
+  )
+  
+}else markers_neg_viruses_vs_mock <- read_rds("intermediate_data//exp_1_bal_markers_neg_viruses_vs_mock.rds")
+
+```
+
+```{r include=FALSE, eval=save_excel_bool}
+library(xlsx)
+
+file <- ".\\output\\sheets\\exp1_wilcoxon_heatmaps\\exp_1_d60_cell-wise_wilcoxon_downsampled_.xlsx"
+write.xlsx(ms4a3_neg_markers, file, sheetName = "ms4a3_neg_markers", 
+  col.names = TRUE, row.names = TRUE, append = TRUE)
+
+
+
+write.xlsx(ms4a3_pos_markers, file, sheetName = "ms4a3_pos_markers", 
+  col.names = TRUE, row.names = TRUE, append = TRUE)
+
+
+
+write.xlsx(markers_pos_viruses_vs_mock, file, sheetName = "markers_pos_viruses_vs_mock", 
+  col.names = TRUE, row.names = TRUE, append = TRUE)
+
+
+
+write.xlsx(markers_neg_viruses_vs_mock, file, sheetName = "markers_neg_viruses_vs_mock", 
+  col.names = TRUE, row.names = TRUE, append = TRUE)
+```
+
+# BAL umap
+
+```{r echo=FALSE, message=FALSE}
+bal_alv_mac |> DimPlot(group.by = "sampletag_Ms4a3")
+```
+
+```{r echo=FALSE, message=FALSE}
+
+bal_alv_mac |> DimPlot(group.by = "sampletag_name")
+
+```
+
+```{r echo=FALSE, message=FALSE}
+#| fig-width: 16
+
+bal_alv_mac |> DimPlot(group.by = "sampletag_name", split.by = "sampletag_name")
+```
+
+# Ms4a3 negative cells : condition vs mean(all conditons)
+
+```{r echo=FALSE, message=FALSE}
+#| fig-width: 12
+#| fig-height: 10
+m_list_neg <- top_markers_named_list_maker(markers_tibble =ms4a3_neg_markers,n_=7)
+m_list_neg <- m_list_neg[order(names(m_list_neg))]
+p1 <- dot_heatmap(seurat_obj = ms4a3_neg,
+            named_feature_list = m_list_neg,
+            seurat_grouping = "sampletag_name"
+              )
+p1
+```
+
+# Ms4a3 positive and negative cells : condition vs mean(all conditons)
+
+```{r echo=FALSE, message=FALSE }
+#| fig-width: 10
+#| fig-height: 10
+
+m_list_pos <- top_markers_named_list_maker(markers_tibble =ms4a3_pos_markers,n_=7)
+m_list_pos <- m_list_pos[order(names(m_list_pos))]
+m_list_pos$Mock_Ms4a3_pos <- c("")
+
+dot_heatmap(seurat_obj = ms4a3_pos,
+            named_feature_list = m_list_pos,
+            seurat_grouping = "sampletag_name"
+                )
+```
+
+# Ms4a3 positive cells : condition vs mean of all conditons
+
+```{r, echo=FALSE, message=FALSE}
+#| fig-width: 16
+#| fig-height: 10
+m_list <- c(m_list_neg, m_list_pos)
+m_list <- m_list[order(names(m_list))]
+dot_heatmap(seurat_obj = bal_alv_mac,
+            named_feature_list = m_list,
+            seurat_grouping = "sampletag_name"
+                )
+
+
+```
+
+# Ms4a3 negative cells : condition vs mock
+
+```{r, echo=FALSE, message=FALSE}
+#| fig-width: 12
+#| fig-height: 10
+
+neg_virus_vs_mock_lst <- top_markers_named_list_maker(markers_neg_viruses_vs_mock ,grouping = comparison)
+neg_virus_vs_mock_lst$Mock_Ms4a3_neg <- c("")
+dot_heatmap(seurat_obj = ms4a3_neg,
+            named_feature_list = neg_virus_vs_mock_lst,
+            seurat_grouping = "sampletag_name"
+                )
+```
+
+# Ms4a3 positive cells : condition vs mock
+
+```{r, echo=FALSE, message=FALSE}
+#| fig-width: 12
+#| fig-height: 10
+
+pos_virus_vs_mock_lst <- top_markers_named_list_maker(markers_pos_viruses_vs_mock ,grouping = comparison)
+pos_virus_vs_mock_lst$Mock_Ms4a3_pos <- c("")
+dot_heatmap(seurat_obj = ms4a3_pos,
+            named_feature_list = pos_virus_vs_mock_lst,
+            seurat_grouping = "sampletag_name"
+                )
+```
+
+# Ms4a3 positive and negative cells : condition vs mock
+
+```{r, echo=FALSE, message=FALSE}
+#| fig-width: 16
+#| fig-height: 10
+m_list <- c(neg_virus_vs_mock_lst, pos_virus_vs_mock_lst)
+m_list <- m_list[order(names(m_list))]
+
+dot_heatmap(seurat_obj = bal_alv_mac,
+            named_feature_list = m_list,
+            seurat_grouping = "sampletag_name"
+                )
+
+
+```
+
+```{r, echo=FALSE, message=FALSE}
+#| fig-width: 12
+
+plt_list_data <- marker_list_density_plots(m_list,bal_alv_mac) 
+plt_list_data
+```
+
+## markers Ms4a3 negative, transformed counts, "data" slot
+
+```{r echo=FALSE, message=FALSE}
+#| fig-width: 12
+
+plt_list_data <- marker_list_density_plots(m_list_neg,ms4a3_neg, max_scaled = T) 
+plt_list_data <- marker_list_density_plots(m_list_neg,ms4a3_neg) 
+
+plt_list_data
+
+```
+
+## markers Ms4a3 negative, raw counts, "counts" slot
+
+```{r echo=FALSE, message=FALSE}
+#| fig-width: 12
+
+plt_list_counts <- marker_list_histogram_plots(m_list_neg, ms4a3_neg)
+plt_list_counts
+```

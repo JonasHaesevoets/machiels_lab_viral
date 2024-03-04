@@ -1,10 +1,15 @@
 ---
-title: "DeSeq2_exp1_all_conditions"
+title: "case_study_DeSeq2_exp1_sex_demultiplex"
 format:
     html:
       code-fold: true
       code-summary: "Show the code"
 editor: visual
+execute:
+  warning: false
+  message: false
+toc: true  
+
 ---
 
 ## controlled for virus, no Mock
@@ -32,7 +37,8 @@ easypackages::libraries(
 "scran",
 "pheatmap",
 "DESeq2",
-"patchwork")
+"patchwork",
+"ggrepel")
 ```
 
 ```{r functions}
@@ -117,7 +123,6 @@ bal_alv_mac_wide_sex |>
   geom_bar()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + ggtitle("sex classification No 1", "by difference of log-normalized data (Xist- max(Ddx3y,Eif2s3y,Kdm5d)")
 ```
 
-
 ```{r}
 
 bal_alv_mac_wide_sex <- bal_alv_mac_wide_sex |> 
@@ -135,7 +140,6 @@ bal_alv_mac_wide_sex |>
   geom_bar()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+ ggtitle("sex classification No 2", "female: (Xist>0)AND(max_male_genes==0);male= Xist== AND(max_male_genes>0)")
 ```
 
-
 ```{r fig.height=15}
 library(ggridges)
 theme_x1 <- theme_minimal()+
@@ -151,35 +155,34 @@ bal_alv_mac_wide_sex |>
   select(.cell,sampletag_name,sex_classifier_2 ) |>
   mutate(paste0(sampletag_name,sex_classifier_2, sep="_"))
 
-p1+p2
 
+
+
+```
+## Ddx3y Eif2s3y
+```{r}
+p1+p2
+```
+## Kdm5d max_male_genes
+```{r}
 p3+p4
 ```
-
 
 ```{r}
 bal_alv_mac_wide_sex |>
   ggplot(aes(max_male_genes+1, Xist+1)) + geom_point() +ylim(0,3)     +xlim(0,3) +facet_wrap( ~sampletag_name) + ggtitle("Xist vs. max. male gene")
 ```
 
-
-
-
-
 ```{r}
-bal_alv_mac_wide_sex |> ggplot(aes(Eif2s3y, sampletag_name, fill=sampletag_name)) + geom_density_ridges()+ggtitle("Eif2s3y per sample")
+p1 <- bal_alv_mac_wide_sex |> ggplot(aes(Eif2s3y, sampletag_name, fill=sampletag_name)) + geom_density_ridges()+ggtitle("Eif2s3y per sample") +theme(legend.position = "none")
+p2 <- bal_alv_mac_wide_sex |> ggplot(aes(Kdm5d, sampletag_name, fill=sampletag_name)) + geom_density_ridges()+ggtitle("Kdm5d per sample")+theme(legend.position = "none")
+p3 <- bal_alv_mac_wide_sex |> ggplot(aes(max_male_genes, sampletag_name, fill=sampletag_name)) + geom_density_ridges() +ggtitle("max. male gene")+theme(legend.position = "none")
+
+(p1+p2)/(p3+plot_spacer())
 ```
 
-
-```{r}
-bal_alv_mac_wide_sex |> ggplot(aes(Kdm5d, sampletag_name, fill=sampletag_name)) + geom_density_ridges()+ggtitle("Kdm5d per sample")
-```
-
-
-```{r}
-bal_alv_mac_wide_sex |> ggplot(aes(max_male_genes, sampletag_name, fill=sampletag_name)) + geom_density_ridges() +ggtitle("max. male gene")
-```
 # filter by sex classifier 2
+
 ```{r}
 keep <- bal_alv_mac_wide_sex |> filter(sex_classifier_2 %in% c("male","female")) |> select(.cell,sex_classifier_2 )
 
@@ -219,7 +222,9 @@ design_x <- tibble(sampletag=colnames(expression_matrix)) |> separate(col=sample
 #design_x <-design_x |> separate(sex,into="sex", extra="drop")
 design_x
 ```
+
 ## DeSeq2 Experiment 1 formula: Ms4a3+virus+sex
+
 ```{r}
 #| code-fold: true
 #| code-summary: "model specification"
@@ -290,7 +295,9 @@ resultsNames(res)
 plotDispEsts(res)
 
 ```
+
 # Ms4a3_Ms4a3_pos_vs_Ms4a3_neg
+
 ```{r}
 res_tbl <- results(res, name = "Ms4a3_Ms4a3_pos_vs_Ms4a3_neg")%>% as_tibble(rownames = "gene")
 res_tbl%>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
@@ -360,6 +367,7 @@ bal_alv_mac |> VlnPlot("Gt(ROSA)26Sor", group.by = "sampletag_name", pt.size = 0
 ```{r}
 res_tbl%>% ggplot(aes(pvalue)) + geom_histogram(bins = 200)
 ```
+
 ```{r}
 res |> colnames()
 
@@ -417,7 +425,8 @@ geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldCha
 geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
 ```
 
-# interaction term  virus:Ms4a3
+# interaction term virus:Ms4a3
+
 ```{r}
 
 expression_matrix_trimmed <- expression_matrix[(rowSums(expression_matrix))>50,]
@@ -459,20 +468,13 @@ plotDispEsts(res)
 
 ```
 
-
 # DEG Ms4a3Ms4a3_pos.virusPR8
-```{r}
-plt_lst <- list()
-for (dings in resultsNames(res)) {
-  plt_lst[[dings]] <- results(res, name = dings)%>% as_tibble(rownames = "gene") |> ggplot(aes(pvalue))+geom_histogram(bins = 50) +ggtitle(dings)
-  
-}
-plt_lst
-```
 
 ```{r fig.width=15}
 results(res, name = "Ms4a3Ms4a3_pos.virusPR8")%>% as_tibble(rownames = "gene") %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 ```
+
+
 
 ```{r}
 
@@ -481,124 +483,122 @@ expression_plotter<-function(x) {x |> as_tibble(rownames="name") |>  separate(na
   geom_point(position=position_jitter(w=0.1,h=0)) + 
   scale_y_log10(breaks=c(25,100,400))}
 
-plotCounts(res, gene="Spp1", intgroup="virus", 
-                returnData=TRUE) |> expression_plotter()+ggtitle("Spp1")
-```
-```{r}
-plotCounts(res, gene="Fyb", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Fyb")
-```
 
-```{r}
-plotCounts(res, gene="Scd2", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Scd2")
-
-```
-```{r}
-plotCounts(res, gene="Scd1", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Scd1")
-
-```
-
-```{r}
-
-plotCounts(res, gene="Serpinb6a", intgroup="virus", 
+plotlist <- list()
+plotlist[[1]] <- plotCounts(res, gene="Spp1", intgroup="virus", 
+                returnData=TRUE) |> expression_plotter()+ggtitle("Spp1")+ theme(legend.position = "none")
+plotlist[[2]] <- plotCounts(res, gene="Fyb", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Fyb")+ theme(legend.position = "none")
+plotlist[[3]] <- plotCounts(res, gene="Scd2", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Scd2")+ theme(legend.position = "none")
+plotlist[[4]] <-plotCounts(res, gene="Scd1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Scd1")+ theme(legend.position = "none")
+plotlist[[5]] <-plotCounts(res, gene="Serpinb6a", intgroup="virus", 
                 returnData=TRUE)|> expression_plotter()+ggtitle("Serpinb6a")
 
+ggarrange(plotlist = plotlist)
 ```
+
+
+```{r}
+plt_lst <- list()
+for (dings in resultsNames(res)) {
+  plt_lst[[dings]] <- results(res, name = dings)%>% as_tibble(rownames = "gene") |> ggplot(aes(pvalue))+geom_histogram(bins = 50) +ggtitle(dings)
+  
+}
+ggarrange(plotlist =  plt_lst)
+```
+
 Viral infection with influenza H1N1 (PR8 strain) is associated with an increase of the difference of Spp1 between monocyte-derived and resident macrophages compared to MAV1. Likely, because there are no replicates of the the PR8 samples there is a low amount of significant genes in this test.
 
 ## Ms4a3 Ms4a3_pos.virusMuHV4
+### postive
 ```{r}
 res_tbl <- results(res, name = "Ms4a3Ms4a3_pos.virusMuHV4")%>% as_tibble(rownames = "gene")
 res_tbl%>% filter(log2FoldChange>0) |> slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 ```
+
+### negative
 ```{r}
 res_tbl%>% filter(log2FoldChange<0) %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 
 ```
 
+
 ```{r}
-plotCounts(res, gene="Fabp4", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Fabp4")
-```
-```{r}
-plotCounts(res, gene="Ccl9", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Ccl9")
-```
-```{r}
-plotCounts(res, gene="Cd93", intgroup="virus", 
+plotlist <- list()
+plotlist[[1]] <-  plotCounts(res, gene="Fabp4", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Fabp4") + theme(legend.position = "none")
+
+plotlist[[2]] <- plotCounts(res, gene="Ccl9", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Ccl9") + theme(legend.position = "none")
+
+plotlist[[3]] <- plotCounts(res, gene="Cd93", intgroup="virus", 
                 returnData=TRUE)|> expression_plotter()+ggtitle("Cd93")
+
+ggarrange(plotlist = plotlist)
 ```
+
+
 # Ms4a3_pos.virusPVM
+
 ```{r}
 results(res, name = "Ms4a3Ms4a3_pos.virusPVM")%>% as_tibble(rownames = "gene") %>%
   filter(log2FoldChange<0) %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 ```
 
 ```{r}
-plotCounts(res, gene="Mmp12", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Mmp12")
+
+plotlist <- list()
+plotlist[[1]] <-  plotCounts(res, gene="Mmp12", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Mmp12")+ theme(legend.position = "none")
+
+plotlist[[2]] <- plotCounts(res, gene="Ecm1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Ecm1")+ theme(legend.position = "none")
+
+plotlist[[3]] <- plotCounts(res, gene="Wfdc17", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Wfdc17")+ theme(legend.position = "none")
+
+ggarrange(plotlist = plotlist)
 ```
-```{r}
-plotCounts(res, gene="Ecm1", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Ecm1")
-```
-```{r}
-plotCounts(res, gene="Wfdc17", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Wfdc17")
-```
+
 
 ```{r}
 results(res, name = "Ms4a3Ms4a3_pos.virusPVM")%>% as_tibble(rownames = "gene") %>%
   filter(log2FoldChange>0) %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 ```
-```{r}
-plotCounts(res, gene="Egfem1", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Egfem1")
-```
-```{r}
-plotCounts(res, gene="Nav2", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Nav2")
-```
+
 
 ```{r}
-plotCounts(res, gene="Apoc1", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Apoc1")
-```
+plotlist <- list()
+plotlist[[1]] <-  plotCounts(res, gene="Egfem1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Egfem1")+ theme(legend.position = "none")
 
-```{r}
- plotCounts(res, gene="Ecm1", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Ecm1")
-```
+plotlist[[2]] <- plotCounts(res, gene="Nav2", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Nav2")+ theme(legend.position = "none")
+plotlist[[3]] <- plotCounts(res, gene="Apoc1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Apoc1")+ theme(legend.position = "none")
+plotlist[[4]] <-   plotCounts(res, gene="Ecm1", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Ecm1")+ theme(legend.position = "none")
 
-```{r}
-plotCounts(res, gene="Serpinb6a", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Serpinb6a")
-```
+plotlist[[5]] <- plotCounts(res, gene="Serpinb6a", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Serpinb6a")+ theme(legend.position = "none")
+plotlist[[6]] <- plotCounts(res, gene="Nt5e", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Nt5e")+ theme(legend.position = "none")
+plotlist[[7]] <-plotCounts(res, gene="Cd74", intgroup="virus", 
+                returnData=TRUE)|> expression_plotter()+ggtitle("Cd74")+ theme(legend.position = "none")
+  
+ggarrange(plotlist = plotlist)
 
-```{r}
-
-plotCounts(res, gene="Nt5e", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Nt5e")
 ```
 
-
-```{r}
-plotCounts(res, gene="Cd74", intgroup="virus", 
-                returnData=TRUE)|> expression_plotter()+ggtitle("Cd74")
-```
-
-
-
-# 1 to 1 comparisons
-
-```{r}
-results(res, contrast=list("Ms4a3Ms4a3_pos.virusPVM", "Ms4a3Ms4a3_pos.virusPR8"))
-```
+# 1 to 1 comparisons Interaction effects virus1(Ms4a3+ vs Ms4a3) vs. virus1(Ms4a3+ vs Ms4a3) 
 
 
 ```{r}
+#| fig-width: 13
+
+
 contrast_names <- c("Ms4a3Ms4a3_pos.virusPR8", "Ms4a3Ms4a3_pos.virusMuHV4","Ms4a3Ms4a3_pos.virusPVM")
 
 res_all <- tibble()
@@ -646,16 +646,23 @@ dat <- res_all |>
   na.omit()
 
  dat |>  ggplot(aes(label=gene, x=x_pos,y=y_pos, color=log2FoldChange, size=neg_log_padj))+
-  geom_text()+
+  geom_text_repel()+
   ylim(0.5,3.5)+xlim(-1,11)+
    theme_dark()+
   facet_grid(reference~contrast) +scale_color_gradient2()+
-  xlab("reference")+ scale_size(range = c(3, 5))
+  xlab("reference")+ scale_size(range = c(1.5, 5))
 
 ```
 
 ```{r}
-res_all |> mutate(ref_contr=paste(reference,contrast,sep = "_")) |> ggplot(aes(pvalue))+geom_histogram()+facet_wrap(~reference)
+res_all |> mutate(ref_contr=paste(reference,contrast,sep = " \n ")) |> 
+
+
+ggplot(aes(pvalue))+geom_histogram()+facet_wrap(~ref_contr,ncol = 3,
+             labeller = labeller(group = label_wrap_gen(width =5)))+
+  ggtitle("p-value histpogram interaction effects virus1 vs. virus2")
+
+
 ```
 
 ```{r}
@@ -663,41 +670,40 @@ dat$contrast |> unique()
 dat$reference |> unique()
 ```
 
-
-
 ```{r}
+#| fig-width: 12
+#| #| fig-width: 4
+
 contrast_names <- c("PR8", "MAV1", "MuHV4", "PVM")
 plot_num=0
 plot_lst=vector(mode="list")
 for (i in seq_along(contrast_names)) {
   for (j in seq_along(contrast_names)[-i]) {
   plot_num=plot_num+1
-  print(plot_num)
-  print(contrast_names[i]) 
-  print(contrast_names[j])
+  #print(plot_num)
+  #print(contrast_names[i]) 
+  #print(contrast_names[j])
   dat_temp<- dat |>
     filter(reference==contrast_names[i], contrast==contrast_names[j])
   
   plot_lst[[plot_num]] <- dat_temp|>  ggplot(aes(label=gene, x=x_pos,y=y_pos, color=log2FoldChange, size=neg_log_padj))+
-  geom_text()+
+  geom_text_repel()+
   ylim(0.5,3.5)+xlim(-1,11)+theme_bw()+
-  scale_color_gradient2()+ggtitle(paste("reference:",contrast_names[i], "vs.",contrast_names[j] ))
+  scale_color_gradient2()+ggtitle(paste("reference:",contrast_names[i], "vs.",contrast_names[j] ))+theme(legend.position = "none")
     
   
   }
 }
-plot_lst
-dat$reference |> unique()
-dat$contrast |> unique()
+
+ggarrange(plotlist = plot_lst, ncol = 4)
 
 
 ```
 
-#comapred to rest
+## Specific virus compared to rest interaction term virus:Ms4a3
 
+## PR8 vs other
 
-
-# interaction term  virus:Ms4a3
 ```{r}
 design_x_rest <- design_x |> mutate(virus=ifelse(virus=="PR8","PR8", "other"))
 dds_rest<- DESeqDataSetFromMatrix(expression_matrix,
@@ -717,10 +723,8 @@ res_tbl |> arrange(padj)
 
 ```{r message=FALSE, include=FALSE}
 
-genes_highlight <- res_tbl%>% filter(padj<0.01&abs(log2FoldChange)>0.8) |> pull(gene)
+genes_highlight <- res_tbl%>% filter(padj<0.5&abs(log2FoldChange)>0.8) |> pull(gene)
 ```
-
-
 
 ```{r}
 #| fig-width: 14
@@ -737,30 +741,14 @@ res_highlight %>%
   geom_point(aes(color=highlight), alpha=0.5)+
   scale_color_manual(values = c("sig"="red", "not"= "black"),
                      aesthetics = c("colour", "fill"))+
-geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, -log(pvalue),label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, -log(pvalue),label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()+ggtitle("Ms4a3:virus interaction PR8 vs other virus ")
 
   
-  
-  res_highlight |> 
-    mutate(outlier=ifelse(-log(pvalue)>100,"outlier","no_outlier")) |> 
-  ggplot(aes(log2FoldChange, neg_log_pvalue_limit)) + 
-  geom_point(aes(color=highlight, shape=outlier), alpha=0.5)+ 
-  scale_color_manual(values = c("sig"="red", "not"= "black"),
-                     aesthetics = c("colour", "fill"))+
-geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
-  
-  
-  
-  res_highlight |> 
-    filter(baseMean>10) |> 
-    mutate(outlier=ifelse(-log(pvalue)>100,"outlier","no_outlier")) |> 
-  ggplot(aes(log2FoldChange, neg_log_pvalue_limit)) + 
-  geom_point(aes(color=highlight, shape=outlier), alpha=0.5)+ 
-  scale_color_manual(values = c("sig"="red", "not"= "black"),
-                     aesthetics = c("colour", "fill"))+
-geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+
 ```
-# interaction term  virus:Ms4a3
+
+# interaction term virus:Ms4a3 all viruses
+
 ```{r}
 res_all <- tibble()
 
@@ -783,29 +771,25 @@ res_all <- bind_rows(res_all, res_tbl)
 
 }
 
-res_all %>% filter(padj<0.9) 
+res_all |> relocate(nominator) %>% filter(padj<0.9) |> DT::datatable()
 ```
 
-
-
 ```{r}
-plotCounts(res, gene="Ccnd1", intgroup="virus", 
+plotlist <- list()
+plotlist[[1]] <- plotCounts(res, gene="Ccnd1", intgroup="virus", 
                 returnData=TRUE)|> expression_plotter()+ggtitle("Ccnd1")
-```
-```{r}
-plotCounts(res, gene="Socs3", intgroup="virus", 
+
+plotlist[[2]] <- plotCounts(res, gene="Socs3", intgroup="virus", 
                 returnData=TRUE)|> expression_plotter()+ggtitle("Socs3")
-```
 
+ggarrange(plotlist=plotlist)
+```
 
 ```{r}
-res_all |> ggplot(aes(pvalue))+geom_histogram()+facet_wrap(~nominator)
+res_all |> ggplot(aes(pvalue))+geom_histogram()+facet_wrap(~nominator)+ggtitle("p-value histpogram interaction effects virus vs. rest")
 ```
-
-
-
 
 ```{r}
 attr(dispersionFunction(dds_rest), "dispPriorVar")
+sessionInfo()
 ```
-

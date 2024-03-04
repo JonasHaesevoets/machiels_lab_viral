@@ -1,0 +1,357 @@
+---
+title: "DeSeq2, day 60 all alveolar macrophages"
+format: pdf
+editor: visual
+always_allow_html: yes 
+
+---
+```{r}
+set.seed(2023)
+easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", 
+                        "patchwork", "pheatmap", "ggrepel", "tidyseurat")
+
+```
+
+```{r functions}
+make_idents_counts <- function(
+    ds,
+    idents_choose="seurat_clusters",
+    assay_="RNA",
+    min_cell_num=200,
+    keep=NULL,
+    perc_expressed=1){
+        slot_ <- "counts"
+        Idents(ds) <- idents_choose
+        group_names <- unique(Idents(ds))
+        if (!is.null(keep)) {group_names <- keep
+          
+        }
+        reads <- LayerData(ds,"counts")
+        #get rid of false genes / . in there name
+        reads <- reads[rownames(reads) %>% str_subset(pattern = "[.]",negate = T),]
+        #cut out genes with less then perc_expressed percent of cells that eypress the gene
+        i_cells <- WhichCells(ds, idents = keep)
+        
+        reads_group <- reads[,i_cells]
+        
+        reads <- reads[(((reads_group > 1) %>% rowSums())> (length(i_cells)/100*perc_expressed)),]
+        print(paste0(as.character(nrow(reads))," genes kept"))
+        sum_counts_ds <- tibble(.rows =  nrow(reads))
+        #z=1
+        for (i in seq_along(group_names)) {
+          print(i)
+          #print(colnames(sum_counts_ds))
+          print(group_names[i])
+          i_cells <- WhichCells(object =ds,idents = group_names[i])
+          if (length(i_cells)<min_cell_num) {
+            sum_counts_ds <- sum_counts_ds %>%
+            add_column(dings=0)
+          colnames(sum_counts_ds)[i] <- paste0(as.character(group_names[i]),"_smaller" , as.character(min_cell_num))
+
+          next}
+          #i_cells <- WhichCells(object =ds,idents = "hla_d_rlo_s100a_monocytes_C19-CB-0003")
+          reads_group <- reads[,i_cells] %>%  sparse_Sums(rowSums=T)
+          
+          sum_counts_ds <- sum_counts_ds %>%
+            add_column(dings=reads_group)
+          colnames(sum_counts_ds)[i] <- as.character(group_names[i])
+          #print(as.character(colnames(sum_counts_ds)[i]))
+          
+        }
+        
+        sum_counts_ds <- sum_counts_ds %>%  mutate(gene=rownames(reads)) %>% relocate(gene)
+        return(sum_counts_ds)
+}
+```
+
+
+## Loading data
+
+60 days after viral infection Ms4a3-tdTomato mice were sacrificed. Every mouse was subjected to a broncho-alveolar lavage (BAL). Sorted BAL macrophages were processed in the "BAL" library. Lung tissue of the same mice was digested. FACS-sorted macrophages hereof were processed in a second "lung" libaray. Samples were hashtagged according to viral infection and Ms4a3 status (sorted by tdTomato fluorescence).
+
+![experimental design](external_material/design_exp1.jpg)
+
+
+```{r}
+exp <- read_rds( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_merged_cleaned_3.rds")#from experiment_1_integration.qmd 21.12.23
+```
+
+```{r}
+p1 <- DimPlot(
+  exp,
+  reduction = "umap.rcpa",
+  group.by = c("orig.ident", "rcpa_clusters"),
+  combine = FALSE, label.size = 2,label = T
+)
+p1+theme_bw()
+```
+```{r}
+p2 <- DimPlot(
+  exp,
+  reduction = "umap.rcpa",
+  group.by = c("orig.ident"),
+  label.size = 2,
+  split.by = "orig.ident"
+)
+p2+theme_bw()
+```
+
+k-NN clusters with predominantly cells from the bal library will be alv. macrophages. 
+```{r}
+exp |> ggplot(aes(rcpa_clusters, fill=orig.ident))+geom_bar()+theme_bw()
+```
+```{r}
+markers_clus_7 <- FindMarkers(exp, ident.1 = 7, max.cells.per.ident = 500, logfc.threshold = 3)
+```
+
+
+Cluster 7 might constitute ..... ?? 
+```{r}
+markers_clus_7 |> filter(avg_log2FC>0) |>  arrange(p_val)
+```
+
+Clusters chosen from the "lung" libary for further analysis:
+```{r}
+exp |> group_by(seurat_clusters) |> summarise(n())
+#chose all clusters with a majority of cells from the bal data set to be alveolar macrophages
+alv_mac_clusters <- exp |> count(seurat_clusters, orig.ident) |> pivot_wider(values_from = n, names_from = orig.ident) |> mutate(bal_fraction= (viral.experiment.1__bal/(viral.experiment.1__bal+ viral.experiment.1__lung))) |> filter(bal_fraction>0.05) |> pull(seurat_clusters) |> as.character() |> as.numeric()
+
+print(alv_mac_clusters)
+```
+```{r}
+exp <- exp |> mutate(is_alv_mac=ifelse(((seurat_clusters %in% alv_mac_clusters &
+                                          orig.ident== "viral.experiment.1__lung")|
+                        orig.ident== "viral.experiment.1__bal" ), "alvelar_macrophage","other"))
+
+
+exp |> as_tibble() |> ggplot(aes(is_alv_mac, fill=is_alv_mac))+geom_bar()+facet_wrap(~orig.ident) +theme_bw()
+```
+
+
+```{r}
+
+names_sorted <- unique(exp$sampletag_name) |> sort()
+y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
+#y_chromosome_genes<-   c( "Ddx3y")
+sex_classifier<- exp |>
+        mutate(sampletag_name=as.factor(sampletag_name)) |> 
+  join_features(features=c(y_chromosome_genes, "Xist"), slot="count", shape="wide") |>
+  rowwise() |> 
+  mutate(max_male_genes=max(c_across(Ddx3y:Kdm5d))
+         ) |> 
+    mutate(sex_classifier_2=case_when(
+    (Xist==0)&(max_male_genes==0)~"no_expression_of_specific_genes",
+    (Xist>0)&(max_male_genes==0)~"female",
+    (Xist==0)&(max_male_genes>0)~"male",
+    (Xist>0)&(max_male_genes>0)~"detection_of_male_and_female_genes",
+    TRUE~"something is wrong")) |>
+  pull(sex_classifier_2)
+  
+exp <- exp |> 
+  mutate(sampletag_name=factor(sampletag_name, levels= names_sorted),
+         sex_classifier_2=sex_classifier) |> mutate(seq_library=ifelse(orig.ident=="viral.experiment.1__lung", "lung", "bal"))
+
+```
+
+```{r}
+
+p1 <- exp |> 
+  ggplot(aes(sampletag_name, fill=sex_classifier_2))+
+  geom_bar()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+ theme_bw()+facet_wrap( ~seq_library)
+
+p1+ theme(axis.text.x = element_text(angle = 45, hjust=1, vjust = 1))
+```
+
+```{r}
+
+exp <- exp |> filter(sex_classifier_2 %in% c("male","female")) 
+exp <- exp |> mutate(library_virus_ms4a3_sex=paste(seq_library,sampletag_name,sex_classifier_2, sep="-"))
+
+p1 <- exp |> 
+  ggplot(aes(sampletag_name, fill=sex_classifier_2))+
+  geom_bar()+theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))+ theme_bw()+facet_wrap( ~seq_library)
+
+p1+ theme(axis.text.x = element_text(angle = 45, hjust=1, vjust = 1))
+
+```
+
+```{r}
+
+exp_sums <- make_idents_counts(ds=exp,idents_choose = "library_virus_ms4a3_sex",perc_expressed = 0.05)
+exp_sums <- exp_sums[,sort(names(exp_sums))] |> relocate(gene)
+exp_sums |> glimpse()
+```
+
+```{r}
+expression_matrix <- as.matrix(exp_sums %>% select(-gene)|> select(-contains("smaller"))) 
+rownames(expression_matrix) <- exp_sums %>% pull(gene)
+
+
+design_x <- tibble(sampletag=colnames(expression_matrix)) |> separate(col=sampletag, into =c("library","virus","x"),remove = F, extra="merge") |> 
+  separate(col=x, into=c("Ms4a3", "sex"),sep = "-")#|> 
+
+#design_x <- design_x|> separate(col=sampletag, into =c("library","sampletag"),remove = T, extra="merge")## sampltega not full rank
+
+#design_x <-design_x |> separate(sex,into="sex", extra="drop")
+design_x
+```
+
+```{r}
+#| code-fold: true
+#| code-summary: "model specification"
+
+
+dds<- DESeqDataSetFromMatrix(expression_matrix,
+                            colData=design_x,
+                            design= ~ library+sex+virus+Ms4a3+ virus:Ms4a3)
+
+
+```
+
+```{r}
+rld <- rlog(dds, blind=TRUE)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+pcaplot <- plotPCA(object=rld, intgroup=c("sampletag"))
+
+p1 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+pcaplot <- plotPCA(object=rld, intgroup=c("Ms4a3"))
+
+p2 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+pcaplot <- plotPCA(object=rld, intgroup=c("virus"))
+
+p3 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+pcaplot <- plotPCA(object=rld, intgroup=c("library"))
+
+p4 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+
+(p1+p2)/(p3+p4)
+
+```
+```{r}
+rld_mat <- assay(rld)
+rld_cor <- cor(rld_mat)
+conds <- (names(exp_sums)[-1])
+
+paste(design_x$virus,design_x$Ms4a3, sep="_")
+
+design_x <- design_x |> mutate(name=paste(virus,Ms4a3, sep="_"))
+# Plot heatmap
+pheatmap(rld_cor  )
+```
+
+```{r}
+rld <- rlog(dds, blind=FALSE)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+pcaplot <- plotPCA(object=rld, intgroup=c("sampletag"))
+
+p1 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+pcaplot <- plotPCA(object=rld, intgroup=c("Ms4a3"))
+
+p2 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+pcaplot <- plotPCA(object=rld, intgroup=c("virus"))
+
+p3 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+pcaplot <- plotPCA(object=rld, intgroup=c("library"))
+
+p4 <- pcaplot+theme_classic()+geom_text(aes(label=group),nudge_y = 0.5)
+
+
+(p1+p2)/(p3+p4)
+
+```
+```{r}
+rld_mat <- assay(rld)
+rld_cor <- cor(rld_mat)
+conds <- (names(exp_sums)[-1])
+
+paste(design_x$virus,design_x$Ms4a3, sep="_")
+
+design_x <- design_x |> mutate(name=paste(virus,Ms4a3, sep="_"))
+# Plot heatmap
+pheatmap(rld_cor  )
+```
+
+```{r message=FALSE, include=FALSE}
+res <- DESeq(dds)
+```
+
+### size factors
+
+```{r}
+sizeFactors(res)
+```
+
+### available comparisons
+
+```{r}
+resultsNames(res)
+```
+
+
+## dispersion plot
+
+```{r}
+plotDispEsts(res)
+
+```
+
+```{r}
+res_tbl <- results(res, name = "Ms4a3_Ms4a3_pos_vs_Ms4a3_neg")%>% as_tibble(rownames = "gene")
+res_tbl%>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
+```
+
+```{r}
+genes_highlight <- res_tbl%>% filter(padj<0.01&abs(log2FoldChange)>0.8) |> pull(gene)
+```
+
+```{r}
+#| fig-width: 14
+#| fig-height: 10
+
+ res_highlight <-  res_tbl |> 
+  mutate(neg_log_pvalue_limit=ifelse((-log(pvalue))>100,100,-log(pvalue))) |>  
+   mutate(highlight=ifelse(gene %in% genes_highlight, "sig", "not")) %>% 
+    # mutate(highlight=ifelse(gene %in% c("MAFB"), "sig", "not")) %>% 
+  arrange(desc(highlight))
+
+res_highlight %>%
+  ggplot(aes(log2FoldChange, -log(pvalue))) +
+  geom_point(aes(color=highlight), alpha=0.5)+
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, -log(pvalue),label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+
+  
+  
+  res_highlight |> 
+    mutate(outlier=ifelse(-log(pvalue)>100,"outlier","no_outlier")) |> 
+  ggplot(aes(log2FoldChange, neg_log_pvalue_limit)) + 
+  geom_point(aes(color=highlight, shape=outlier), alpha=0.5)+ 
+  scale_color_manual(values = c("sig"="red", "not"= "black"),
+                     aesthetics = c("colour", "fill"))+
+geom_label_repel(data = filter(res_highlight, highlight!= "not"),aes(log2FoldChange, neg_log_pvalue_limit,label=gene),arrow = arrow(length = unit(0.01, "npc")),box.padding = 0.5,max.overlaps = 20)+  theme_bw()
+```
+
+```{r}
+res_tbl%>% ggplot(aes(pvalue)) + geom_histogram(bins = 200)
+```
+```{r}
+
+```
+
+

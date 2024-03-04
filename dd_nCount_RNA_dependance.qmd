@@ -1,0 +1,286 @@
+---
+title: "dd_nCount_RNA_dependance"
+format: html
+editor: visual
+---
+
+## Quarto
+
+```{r}
+library(patchwork)
+library(directlabels)
+library(tidyverse)
+library(Seurat)
+library(tidyseurat)
+bal_alv_mac <- read_rds( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_macs_with_merged_groups.rds")
+
+bal_alv_mac$virus <- tibble(sampletag_name=bal_alv_mac |> pull(sampletag_name)) |> separate(sampletag_name,into = c("virus")) |> pull("virus")
+
+
+tbl <- tibble(gene=rownames(bal_alv_mac), sums=bal_alv_mac@assays$RNA@layers$counts |>
+               rowSums()) |>
+        arrange(desc(sums)) |> 
+        slice_max(sums,n=500)|>
+        mutate(rank=rank(sums)) 
+
+tbl |>  mutate(is_gene=if_else(gene=="Spp1","is gene","other")) |> 
+        mutate(gene=factor(gene,levels=unique(gene))) |> 
+        ggplot(aes(gene,log(sums), color=is_gene))+ geom_point()
+        
+        
+        tibble(gene=rownames(bal_alv_mac), sums=bal_alv_mac@assays$RNA@layers$counts |>
+                       rowSums()) |>
+                arrange(desc(sums)) |> 
+                slice_max(sums,n=500) |>
+                mutate(rank=rank(sums))
+        
+        
+rank_gene <- tbl|> filter(gene=="Spp1") |> pull(rank)
+
+similarly_expressed_genes <- tbl |> filter(rank %in% ((rank_gene-4):(rank_gene+4))) |> pull(gene)
+
+
+bal_alv_mac |> join_features(similarly_expressed_genes) |> select(.feature,.abundance_RNA,nCount_RNA) |> 
+        ggplot(aes(nCount_RNA,.abundance_RNA,color=.feature))+geom_smooth(method='lm')+theme_minimal()
+```
+
+```{r}
+p1 <- bal_alv_mac |> join_features(similarly_expressed_genes) |>
+        filter(sampletag_name=="PR8_Ms4a3_neg") |> 
+        select(.feature,.abundance_RNA,nCount_RNA) |> 
+        ggplot(aes(nCount_RNA,.abundance_RNA,color=.feature))+geom_smooth(method='lm')+theme_minimal()+
+        ylim(0,5)+
+        ggtitle("PR8_Ms4a3_neg")
+
+
+
+p2 <- bal_alv_mac |> join_features(similarly_expressed_genes) |>
+        filter(sampletag_name=="PR8_Ms4a3_pos") |> 
+        select(.feature,.abundance_RNA,nCount_RNA) |> 
+        ggplot(aes(nCount_RNA,.abundance_RNA,color=.feature))+geom_smooth(method='lm')+theme_minimal() +
+        ylim(0,5)+
+        ggtitle("PR8_Ms4a3_pos")
+
+
+p3 <- bal_alv_mac |> join_features(similarly_expressed_genes) |>
+        filter(virus=="PR8") |> 
+        select(.feature,.abundance_RNA,nCount_RNA) |> 
+        ggplot(aes(nCount_RNA,.abundance_RNA,color=.feature))+geom_smooth(method='lm')+
+        theme_minimal() +
+        ylim(0,5)+
+        ggtitle("PR8")
+
+p4 <- bal_alv_mac |> join_features(similarly_expressed_genes) |>
+        filter(virus=="Mock") |>
+        mutate(.feature=as_factor(.feature)) |>  select(.feature,.abundance_RNA,nCount_RNA) |> 
+        ggplot(aes(nCount_RNA,.abundance_RNA,color=.feature,))+geom_smooth(method='lm')+theme_minimal() +
+       # geom_dl(label=p4$.feature, method="first.qp", inherit.aes=T)+
+
+        ylim(0,5)+
+        ggtitle("Mock")
+
+(p1+p2)/(p3+p4)+plot_layout(guides = "collect") & theme(legend.position = 'right')
+```
+
+```{r}
+bal_alv_mac_quantil <- bal_alv_mac|>
+        join_features("Spp1",slot="counts") |> 
+        filter(virus=="PR8") |> 
+        mutate(nCount_RNA_quantil=ntile(nCount_RNA,20)) |>
+        group_by(nCount_RNA_quantil,sampletag_name) |>
+        summarise(mean=mean(.abundance_RNA), variance=var(.abundance_RNA),n=n())|> 
+        ungroup()
+
+pr8 <- bal_alv_mac_quantil |>
+        filter(sampletag_name=="PR8_Ms4a3_pos") |> 
+        left_join((bal_alv_mac_quantil |> filter(sampletag_name=="PR8_Ms4a3_neg")),by="nCount_RNA_quantil") |> 
+        mutate(meandiff=mean.x-mean.y, se=sqrt((variance.x/n.x)+(variance.y/n.y))) |>
+        mutate(upper_2se=meandiff+2*se,lower_2se=meandiff-2*se) |> 
+        ggplot()+
+        geom_point(aes(nCount_RNA_quantil , meandiff),shape=3)+
+        geom_path(aes(nCount_RNA_quantil ,upper_2se),color="blue")+
+        geom_path(aes(nCount_RNA_quantil ,lower_2se),color="blue")+
+        #geom_smooth(method='lm')+ 
+        ggtitle("Spp1 quantile mean diff. of PR Ms4a3+ vs Ms4a3+")+theme_classic()+ylim(-10,60)
+
+```
+
+```{r}
+bal_alv_mac_quantil <- bal_alv_mac|>
+        join_features("Spp1",slot="counts") |> 
+        filter(virus=="Mock") |> 
+        mutate(nCount_RNA_quantil=ntile(nCount_RNA,20)) |>
+        group_by(nCount_RNA_quantil,sampletag_name) |>
+        summarise(mean=mean(.abundance_RNA), variance=var(.abundance_RNA),n=n())|> 
+        ungroup()
+
+mock <- bal_alv_mac_quantil |>
+        filter(sampletag_name=="Mock_Ms4a3_pos") |> 
+        left_join((bal_alv_mac_quantil |> filter(sampletag_name=="Mock_Ms4a3_neg")),by="nCount_RNA_quantil") |> 
+        mutate(meandiff=mean.x-mean.y, se=sqrt((variance.x/n.x)+(variance.y/n.y))) |>
+        mutate(upper_se=meandiff+se,lower_se=meandiff-se) |> 
+        ggplot()+
+        geom_point(aes(nCount_RNA_quantil , meandiff),shape=3)+
+        geom_path(aes(nCount_RNA_quantil ,upper_se),color="red")+
+        geom_path(aes(nCount_RNA_quantil ,lower_se),color="red")+
+        #geom_smooth(method='lm')+ 
+        ggtitle("Spp1 quantile mean diff. of Mock Ms4a3+ vs Ms4a3+")+theme_classic()+ylim(-10,60)
+
+
+pr8+mock
+
+###ceck thid
+#https://stats.stackexchange.com/questions/402021/standard-error-confidence-intervals-for-a-difference-in-differences-analysis
+```
+
+```{r}
+bal_alv_mac_quantil <- bal_alv_mac|>
+        join_features("Vasp",slot="counts") |> 
+        filter(virus=="PR8") |> 
+        mutate(nCount_RNA_quantil=ntile(nCount_RNA,20)) |>
+        group_by(nCount_RNA_quantil,sampletag_name) |>
+        summarise(mean=mean(.abundance_RNA), variance=var(.abundance_RNA),n=n())|> 
+        ungroup()
+
+Vasp <- bal_alv_mac_quantil |>
+        filter(sampletag_name=="PR8_Ms4a3_pos") |> 
+        left_join((bal_alv_mac_quantil |> filter(sampletag_name=="PR8_Ms4a3_neg")),by="nCount_RNA_quantil") |> 
+        mutate(meandiff=mean.x-mean.y, se=sqrt((variance.x/n.x)+(variance.y/n.y))) |>
+        mutate(upper_2se=meandiff+2*se,lower_2se=meandiff-2*se) |> 
+        ggplot()+
+        geom_point(aes(nCount_RNA_quantil , meandiff),shape=3)+
+        geom_path(aes(nCount_RNA_quantil ,upper_2se),color="blue")+
+        geom_path(aes(nCount_RNA_quantil ,lower_2se),color="blue")+
+        #geom_smooth(method='lm')+ 
+        ggtitle("Vasp quantile mean diff. of PR Ms4a3+ vs Ms4a3+")+theme_classic()+ylim(-10,60)
+```
+
+```{r}
+bal_alv_mac_quantil <- bal_alv_mac|>
+        join_features("Vasp",slot="counts") |> 
+        filter(virus=="Mock") |> 
+        mutate(nCount_RNA_quantil=ntile(nCount_RNA,20)) |>
+        group_by(nCount_RNA_quantil,sampletag_name) |>
+        summarise(mean=mean(.abundance_RNA), variance=var(.abundance_RNA),n=n())|> 
+        ungroup()
+
+mock <- bal_alv_mac_quantil |>
+        filter(sampletag_name=="Mock_Ms4a3_pos") |> 
+        left_join((bal_alv_mac_quantil |> filter(sampletag_name=="Mock_Ms4a3_neg")),by="nCount_RNA_quantil") |> 
+        mutate(meandiff=mean.x-mean.y, se=sqrt((variance.x/n.x)+(variance.y/n.y))) |>
+        mutate(upper_se=meandiff+se,lower_se=meandiff-se) |> 
+        ggplot()+
+        geom_point(aes(nCount_RNA_quantil , meandiff),shape=3)+
+        geom_path(aes(nCount_RNA_quantil ,upper_se),color="red")+
+        geom_path(aes(nCount_RNA_quantil ,lower_se),color="red")+
+        #geom_smooth(method='lm')+ 
+        ggtitle("Vasp quantile mean diff. of Mock Ms4a3+ vs Ms4a3+")+theme_classic()+ylim(-10,60)
+
+
+Vasp+mock
+
+###ceck thid
+#https://stats.stackexchange.com/questions/402021/standard-error-confidence-intervals-for-a-difference-in-differences-analysis
+```
+
+```{r}
+bal_alv_mac_quantil <- bal_alv_mac|>
+        join_features("Gabbr2",slot="data") |> 
+        filter(virus=="PR8") |> 
+        mutate(nCount_RNA_quantil=ntile(nCount_RNA,20)) |>
+        group_by(nCount_RNA_quantil,sampletag_name) |>
+        summarise(mean=mean(.abundance_RNA), variance=var(.abundance_RNA),n=n())|> 
+        ungroup()
+
+Gabbr2 <- bal_alv_mac_quantil |>
+        filter(sampletag_name=="PR8_Ms4a3_pos") |> 
+        left_join((bal_alv_mac_quantil |> filter(sampletag_name=="PR8_Ms4a3_neg")),by="nCount_RNA_quantil") |> 
+        mutate(meandiff=mean.x-mean.y, se=sqrt((variance.x/n.x)+(variance.y/n.y))) |>
+        mutate(upper_2se=meandiff+2*se,lower_2se=meandiff-2*se) |> 
+        ggplot()+
+        geom_point(aes(nCount_RNA_quantil , meandiff),shape=3)+
+        geom_path(aes(nCount_RNA_quantil ,upper_2se),color="blue")+
+        geom_path(aes(nCount_RNA_quantil ,lower_2se),color="blue")+
+        #geom_smooth(method='lm')+ 
+        ggtitle("Gabbr2 quantile  data mean diff. of PR Ms4a3+ vs Ms4a3+")+theme_classic()+ylim(-1,1)
+
+```
+
+```{r}
+bal_alv_mac_quantil <- bal_alv_mac|>
+        join_features("Gabbr2",slot="data") |> 
+        filter(virus=="Mock") |> 
+        mutate(nCount_RNA_quantil=ntile(nCount_RNA,20)) |>
+        group_by(nCount_RNA_quantil,sampletag_name) |>
+        summarise(mean=mean(.abundance_RNA), variance=var(.abundance_RNA),n=n())|> 
+        ungroup()
+
+mock <- bal_alv_mac_quantil |>
+        filter(sampletag_name=="Mock_Ms4a3_pos") |> 
+        left_join((bal_alv_mac_quantil |> filter(sampletag_name=="Mock_Ms4a3_neg")),by="nCount_RNA_quantil") |> 
+        mutate(meandiff=mean.x-mean.y, se=sqrt((variance.x/n.x)+(variance.y/n.y))) |>
+        mutate(upper_se=meandiff+se,lower_se=meandiff-se) |> 
+        ggplot()+
+        geom_point(aes(nCount_RNA_quantil , meandiff),shape=3)+
+        geom_path(aes(nCount_RNA_quantil ,upper_se),color="red")+
+        geom_path(aes(nCount_RNA_quantil ,lower_se),color="red")+
+        #geom_smooth(method='lm')+ 
+        ggtitle("Gabbr2 quantile data mean diff. of Mock Ms4a3+ vs Ms4a3+")+theme_classic()+ylim(-1,1)
+
+
+Gabbr2+mock
+
+###ceck thid
+#https://stats.stackexchange.com/questions/402021/standard-error-confidence-intervals-for-a-difference-in-differences-analysis
+```
+
+```{r}
+bal_alv_mac_quantil <- bal_alv_mac|>
+        join_features("Gabbr2",slot="counts") |> 
+        filter(virus=="PR8") |> 
+        mutate(nCount_RNA_quantil=ntile(nCount_RNA,20)) |>
+        group_by(nCount_RNA_quantil,sampletag_name) |>
+        summarise(mean=mean(.abundance_RNA), variance=var(.abundance_RNA),n=n())|> 
+        ungroup()
+
+Gabbr2 <- bal_alv_mac_quantil |>
+        filter(sampletag_name=="PR8_Ms4a3_pos") |> 
+        left_join((bal_alv_mac_quantil |> filter(sampletag_name=="PR8_Ms4a3_neg")),by="nCount_RNA_quantil") |> 
+        mutate(meandiff=mean.x-mean.y, se=sqrt((variance.x/n.x)+(variance.y/n.y))) |>
+        mutate(upper_2se=meandiff+2*se,lower_2se=meandiff-2*se) |> 
+        ggplot()+
+        geom_point(aes(nCount_RNA_quantil , meandiff),shape=3)+
+        geom_path(aes(nCount_RNA_quantil ,upper_2se),color="blue")+
+        geom_path(aes(nCount_RNA_quantil ,lower_2se),color="blue")+
+        #geom_smooth(method='lm')+ 
+        ggtitle("Gabbr2 quantile counts mean diff. of PR Ms4a3+ vs Ms4a3+")+theme_classic()+ylim(-3,3)
+
+```
+
+```{r}
+bal_alv_mac_quantil <- bal_alv_mac|>
+        join_features("Gabbr2",slot="counts") |> 
+        filter(virus=="Mock") |> 
+        mutate(nCount_RNA_quantil=ntile(nCount_RNA,20)) |>
+        group_by(nCount_RNA_quantil,sampletag_name) |>
+        summarise(mean=mean(.abundance_RNA), variance=var(.abundance_RNA),n=n())|> 
+        ungroup()
+
+mock <- bal_alv_mac_quantil |>
+        filter(sampletag_name=="Mock_Ms4a3_pos") |> 
+        left_join((bal_alv_mac_quantil |> filter(sampletag_name=="Mock_Ms4a3_neg")),by="nCount_RNA_quantil") |> 
+        mutate(meandiff=mean.x-mean.y, se=sqrt((variance.x/n.x)+(variance.y/n.y))) |>
+        mutate(upper_se=meandiff+se,lower_se=meandiff-se) |> 
+        ggplot()+
+        geom_point(aes(nCount_RNA_quantil , meandiff),shape=3)+
+        geom_path(aes(nCount_RNA_quantil ,upper_se),color="red")+
+        geom_path(aes(nCount_RNA_quantil ,lower_se),color="red")+
+        #geom_smooth(method='lm')+ 
+        ggtitle("Gabbr2 quantile counts mean diff. of Mock Ms4a3+ vs Ms4a3+")+theme_classic()+ylim(-3,3)
+
+
+Gabbr2+mock
+
+###ceck thid
+#https://stats.stackexchange.com/questions/402021/standard-error-confidence-intervals-for-a-difference-in-differences-analysis
+```

@@ -1,0 +1,191 @@
+---
+title: "compositional_analysis"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+```{r}
+library(Seurat)
+library(tidyseurat)
+library(tidyverse)
+
+obj.v5 <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_central.rds" )
+#obj.v5 <-   read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged_v5_split_integrated.rds")
+
+obj.v5@misc <-  read_rds("intermediate_data/exp1_exp2_misc_list.rds") #can be deleted later
+        
+        
+obj.v5 <- JoinLayers(obj.v5)
+x_axis_text_90 <-  theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r}
+prefiltering_data<- bind_rows(
+obj.v5@misc[[1]][[1]][[2]] |> mutate(dataset="d60_lung", orig.ident="viral.experiment.1__lung",exp="exp_1_lung_") ,
+obj.v5@misc[[1]][[2]][[2]] |> mutate(dataset="d60_bal", orig.ident="viral.experiment.1__bal",exp="exp_1_bal_"),
+obj.v5@misc[[2]][[1]][[2]] |> mutate(dataset="d8_lung", orig.ident="viral.experiment.2__lung",exp="exp_2_lung_"),
+obj.v5@misc[[2]][[2]][[2]] |> mutate(dataset="d8_bal", orig.ident="viral.experiment.2__bal",exp="exp_2_bal_")) |>
+  
+  mutate(cell_id_comb=paste0( exp,.cell)) |>
+  relocate(cell_id_comb)
+
+obj_tbl <- tibble(cell_id_comb=colnames(obj.v5),
+       orig.ident= obj.v5$orig.ident,
+       sampletag_Ms4a3=obj.v5$sampletag_Ms4a3 )## |>
+        #mutate(.cell=str_remove_all(.cell, "[abcdefghijklmnopqrstuvwxyz_]"))
+               
+tab2 <-  obj.v5 |> as_tibble() |>
+        mutate(cell_id_comb=.cell) |> 
+        right_join(prefiltering_data,
+                   by = c("cell_id_comb" #,"orig.ident"
+                                             ))
+```
+
+# freq of live single cells
+
+## no correction
+
+```{r}
+
+freq_harmony_rough_clustes_of_live_single_live_cells <- tab2 |>
+        filter(is_single_live_cell=="is_single_live_cell") |>
+        #filter(!is.na(dataset) , !is.na(sampletag_Ms4a3), !is.na(harmony_cluster_8dims_rough)) |> 
+        group_by(dataset,sampletag_name,harmony_cluster_8dims_rough) |>
+        count() |> 
+        group_by(dataset,sampletag_name) |> 
+        mutate(freq=n/sum(n))
+        
+freq_harmony_rough_clustes_of_live_single_live_cells |> write.csv("output/compositional_analysis/freq_harmony_rough_clustes_of_live_single_live_cells.csv")
+
+freq_harmony_rough_clustes_of_live_single_live_cells |> DT::datatable()
+```
+
+## gabbr2 corrected
+
+```{r}
+#| fig-width: 12
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected  <- tab2 |>
+        filter(is_single_live_cell=="is_single_live_cell") |>
+        #filter(!is.na(dataset) , !is.na(sample_tag_ms4a3_pos_gabbr2), !is.na(harmony_cluster_8dims_rough)) |> #do we need this??
+        mutate(harmony_cluster_8dims_rough_group = paste(harmony_cluster_8dims_rough,
+                                                         sample_tag_ms4a3_pos_gabbr2)) |> 
+        group_by(dataset,
+                 sampletag_name,
+                 sample_tag_ms4a3_pos_gabbr2) |>
+        count(harmony_cluster_8dims_rough_group) |> 
+        group_by(dataset,sampletag_name) |> 
+        mutate(dataset_sampletag=paste(dataset,sampletag_name, sep="_")) |> 
+        mutate(freq=n/sum(n))
+        
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected |> write.csv("output/compositional_analysis/freq_harmony_rough_clustes_of_live_single_macrophages.csv")
+
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected  |> DT::datatable()
+
+
+```
+
+```{r}
+##
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected |>
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=sample_tag_ms4a3_pos_gabbr2)) + 
+  geom_bar(stat = "identity")+
+  x_axis_text_90 +ggtitle("freqeucnies of single live cells")
+
+###
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected |>
+  separate(harmony_cluster_8dims_rough_group, into = "cluster") |> 
+        filter(sample_tag_ms4a3_pos_gabbr2!="Gabbr2_pos_Ms4a3_neg") |> 
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=cluster)) + 
+  geom_bar(stat = "identity")+ x_axis_text_90 +
+        ggtitle("freqeucnies of single live cells")
+
+# scaled to 1
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected |>
+  separate(harmony_cluster_8dims_rough_group, into = "cluster") |> 
+        filter(sample_tag_ms4a3_pos_gabbr2!="Gabbr2_pos_Ms4a3_neg") |> 
+          group_by(dataset,sampletag_name) |> 
+        mutate(freq=n/sum(n)) |> 
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=cluster)) + 
+  geom_bar(stat = "identity")+ x_axis_text_90
+```
+
+# freq of live single macrophages
+
+## freq harmony rough clustes of live single macrophages
+
+```{r}
+
+freq_harmony_rough_clustes_of_live_single_macrophages <- tab2 |> filter(is_single_live_macrophage=="is_single_live_macrophage") |>
+        filter(!is.na(dataset) , !is.na(sampletag_Ms4a3), !is.na(harmony_cluster_8dims_rough)) |> 
+        group_by(dataset,sampletag_Ms4a3,harmony_cluster_8dims_rough) |>
+        count() |> 
+        group_by(dataset,sampletag_Ms4a3) |> 
+        mutate(freq=n/sum(n)) 
+        
+freq_harmony_rough_clustes_of_live_single_macrophages |> write.csv("output/compositional_analysis/freq_harmony_rough_clustes_of_live_single_macrophages")
+
+DT::datatable(freq_harmony_rough_clustes_of_live_single_macrophages)
+```
+
+## freq harmony rough clustes of live single macrophages, gabbr2 corrected negative sorted (sample_tag_ms4a3_pos_gabbr2)
+
+```{r}
+
+freq_harmony_rough_clustes_of_live_single_macrophages_gabbr2_corrected <- tab2 |>
+        filter(is_single_live_macrophage=="is_single_live_macrophage") |>
+        #filter(!is.na(dataset) , !is.na(sample_tag_ms4a3_pos_gabbr2), !is.na(harmony_cluster_8dims_rough)) |> #do we need this??
+        mutate(harmony_cluster_8dims_rough_group = paste(harmony_cluster_8dims_rough,
+                                                         sample_tag_ms4a3_pos_gabbr2)) |> 
+        group_by(dataset,
+                 sampletag_name,
+                 sample_tag_ms4a3_pos_gabbr2) |>
+        count(harmony_cluster_8dims_rough_group) |> 
+        group_by(dataset,sampletag_name) |> 
+        mutate(dataset_sampletag=paste(dataset,sampletag_name, sep="_")) |> 
+        mutate(freq=n/sum(n))|> 
+    separate(harmony_cluster_8dims_rough_group, into = "cluster",remove = FALSE) 
+        
+freq_harmony_rough_clustes_of_live_single_macrophages_gabbr2_corrected |> write.csv("output/compositional_analysis/freq_harmony_rough_clustes_of_live_single_macrophages.csv")
+
+DT::datatable(freq_harmony_rough_clustes_of_live_single_macrophages)
+```
+
+## macrophages gabbr2_corrected
+
+```{r}
+freq_harmony_rough_clustes_of_live_single_macrophages_gabbr2_corrected |>
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=sample_tag_ms4a3_pos_gabbr2)) + 
+  geom_bar(stat = "identity")+ x_axis_text_90   
+
+
+freq_harmony_rough_clustes_of_live_single_macrophages_gabbr2_corrected |>
+        filter(sample_tag_ms4a3_pos_gabbr2!="Gabbr2_pos_Ms4a3_neg") |> 
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=cluster)) + 
+  geom_bar(stat = "identity")+ x_axis_text_90
+
+#scaled to 1
+freq_harmony_rough_clustes_of_live_single_macrophages_gabbr2_corrected |>
+        filter(sample_tag_ms4a3_pos_gabbr2!="Gabbr2_pos_Ms4a3_neg") |> 
+            group_by(dataset,sampletag_name) |> 
+        mutate(freq=n/sum(n)) |>
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=cluster)) + 
+  geom_bar(stat = "identity")+ x_axis_text_90
+```

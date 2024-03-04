@@ -1,16 +1,14 @@
 ---
-title: "final_march2024_joint_analysis"
+title: "2024-03_concluding_analysis"
 format: 
-  pdf:
+  html:
     code-fold: true
 editor: visual
 toc: true
 execute:
   warning: false
   message: false
-
 ---
-
 
 ```{r message=FALSE, warning=FALSE}
 
@@ -29,7 +27,6 @@ cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
 cbp2 <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
           "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 ```
-
 
 ```{r functions, fig.height=12, fig.height=7}
 
@@ -73,66 +70,79 @@ frequency_heatmap <- function(x){
     scale_fill_gradient2( low = "blue", mid = "white", high = "red")}
 ```
 
-
-
 # Analyses all macrophages:
+
 # Outline
-#### 1)	Explanation of scientific approach   
-        a.	Experimental design diagram
-        b.	Analytical workflow diagram
-#### 2)	Integrate macrophages of all datasets into a combined embedding (umap)  
-        a.	Highlight the following groups:
-                i.	K-nearest neighbor clusters
-                ii.	Lung/BAL
-                iii.	td+/td-
-                iv.	mock(d0)/d8/d60
-                v.	virus
-                vi.	individual samples (virus per time point)
-#### 3)	Compositional analysis 
-        a.	Stacked bar chart (beware varying base rates)
-                i.	Grouping: ???
-        b.	Cluster frequency per group
-        c.	Z-scores of cluster frequencies: heatmap
-        d.	Posterior probability of frequency fold change scCoda
-        
-#### 4)	Define clusters by aid of:
-        a.	Differential gene expression heatmap
-        b.	Heatmap of previously defined signatures 
-                i.	Module scores (average logFC of gene set compared to ref.
-                        gene set with similar average expression)
-        c.	Volcano plots
-                i.	Only mock mice: Ms4a3+ vs Ms4a3-
-  
-  
-                  
-# Explanation of scientific approach 
+
+#### 1) Explanation of scientific approach
+
+```         
+    a.  Experimental design diagram
+    b.  Analytical workflow diagram
+```
+
+#### 2) Integrate macrophages of all datasets into a combined embedding (umap)
+
+```         
+    a.  Highlight the following groups:
+            i.  K-nearest neighbor clusters
+            ii. Lung/BAL
+            iii.    td+/td-
+            iv. mock(d0)/d8/d60
+            v.  virus
+            vi. virus-Ms4a3-status
+            vii. individual samples (virus per time point)
+```
+
+#### 3) Compositional analysis
+
+```         
+    a.  Stacked bar chart (beware varying base rates)
+            i.  Grouping: ???
+    b.  Cluster frequency per group
+    c.  Z-scores of cluster frequencies: heatmap
+    d.  Posterior probability of frequency fold change scCoda
+    
+```
+
+#### 4) Define clusters by aid of:
+
+```         
+    a.  Differential gene expression heatmap
+    b.  Heatmap of previously defined signatures 
+            i.  Module scores (average logFC of gene set compared to ref.
+                    gene set with similar average expression)
+    c.  Volcano plots
+            i.  Only mock mice: Ms4a3+ vs Ms4a3-
+```
+
+# Explanation of scientific approach
 
 ## Experimental design
 
-![layout of scRNA samples in batches](experimental_design.png)
-  add mouse diagram
-  
+![layout of scRNA samples in batches](experimental_design.png) add mouse diagram
+
 ## Analytical workflow
 
-  add powerpoint-generated viral_data_analysis_flowchart.pdf -> readme
-  
-![data analysis flowchart](viral_data_analysis_flowchart.png)
-  
-# 2)	Integrate macrophages of all datasets into a combined embedding (umap)
-  
-  In the file *case_study_experiment_1_2_integration.qmd* various scenarios of the integration of the data sets were tested.
-  Harmony integration of log normalized counts data was chosen.
-  Umap representation and k-nearest neighbor of the first eight Harmony dimensions was chosen for a noise-reduced
-  analysis and depiction of main effects
+add powerpoint-generated viral_data_analysis_flowchart.pdf -\> readme
 
-## 2ai) K-nearest neighbor clusters
+![data analysis flowchart](viral_data_analysis_flowchart.png)
+
+# 2) Integrate macrophages of all datasets into a combined embedding (umap)
+
+In the file *case_study_experiment_1_2_integration.qmd* various scenarios of the integration of the data sets were tested. Harmony integration of log normalized counts data was chosen. Umap representation and k-nearest neighbor of the first eight Harmony dimensions was chosen for a noise-reduced analysis and depiction of main effects
+
+## 2a) i. K-nearest neighbor clusters
 
 ```{r}
 obj.v5 |> DimPlot(group.by = "harmony_cluster_8dims_rough", label=T)
 
 ```
-## 2aii) Embedding of cells from Lung/Bal
+
+## 2a) ii.  Embedding of cells from Lung/Bal
+
 ### alpha point
+
 ```{r}
 obj.v5  |> ggplot(aes(umapharmony8dims_1,umapharmony8dims_2, color=day_sample_type))+
   geom_point(aes(color="cell"))+
@@ -140,7 +150,6 @@ obj.v5  |> ggplot(aes(umapharmony8dims_1,umapharmony8dims_2, color=day_sample_ty
   scale_color_manual(values = cbp1)+ theme_bw()+
   ggtitle("local density of sample in umap embedding")
 ```
-
 
 ```{r  fig.width=16, fig.height = 12}
 # 1 cond : density by color
@@ -155,7 +164,6 @@ obj.v5  |>
   ggtitle("local density of sample in umap embedding")+
   facet_wrap(~day_sample_type)
 ```
-
 
 ```{r  fig.width=16, fig.height = 12}
 samples <- obj.v5$day_mock_sample_type |> unique()
@@ -182,9 +190,8 @@ ggarrange(plotlist = umap_sampletype_mock_point_plotlist)
 ggsave(plot= ggarrange(plotlist = umap_sampletype_mock_point_plotlist),path = output_file_path, filename = "umap_sampletype_mock_point_plotlist.svg", width = 20,height = 15)
 #only lung or bal -> color:day
 ```
+
 ### umap_sampletype_mock_dens_plotlist
-
-
 
 ```{r  fig.width=16, fig.height = 12}
 samples <- obj.v5$day_mock_sample_type |> unique()
@@ -214,9 +221,9 @@ ggarrange(plotlist =umap_sampletype_mock_dens_plotlist)
 #![umap_sampletype_mock_dens_plotlist.svg](output/final_march2024_joint_analysis/umap_sampletype_mock_dens_plotlist.svg)
 ```
 
+## 2a) iii. td+/td-
 
-## 2aiii.	td+/td-
-```{r  fig.width=16, fig.height = 12}
+```{r  fig.width=16, fig.height = 7}
 samples <- obj.v5$sampletag_Ms4a3 |> unique()
 umap_sampletag_Ms4a3_point_plotlist <- list()
 for (sample in samples) {
@@ -243,7 +250,7 @@ ggarrange(plotlist = umap_sampletag_Ms4a3_point_plotlist)
 #only lung or bal -> color:day
 ```
 
-```{r  fig.width=16, fig.height = 12}
+```{r  fig.width=16, fig.height = 7}
 samples <- obj.v5$sampletag_Ms4a3 |> unique()
 umap_sampletag_Ms4a3_dens_plotlist <- list()
 for (sample in samples) {
@@ -269,7 +276,9 @@ ggarrange(plotlist =umap_sampletag_Ms4a3_dens_plotlist)
 #ggsave(plot= ggarrange(plotlist =umap_sampletag_Ms4a3_dens_plotlist ,common.legend = T ),path = output_file_path, filename = "umap_sampletag_Ms4a3_dens_plotlist.svg", width = 20,height = 15)
 
 ```
-## 2aiv.	mock(d0)/d8/d60
+
+## 2a) iv. mock(d0)/d8/d60
+
 ```{r fig.width=16, fig.height = 12}
 samples <- obj.v5$day_mock |> unique()
 umap_day_mock_point_plotlist <- list()
@@ -297,8 +306,7 @@ ggarrange(plotlist = umap_day_mock_point_plotlist)
 #only lung or bal -> color:day
 ```
 
-
-## 2av.	virus
+## 2a) v. virus
 
 ```{r fig.width=16, fig.height = 12}
 
@@ -328,10 +336,9 @@ ggarrange(plotlist = umap_condition_plotlist)
 #only lung or bal -> color:day
 ```
 
-## 2avi.	individual samples (virus per time point)
-
+## 2a) vi. virus-Ms4a3-status
 ```{r fig.width=20, fig.height = 15}
-samples <- obj.v5$sampletag_name |> unique()
+samples <-  obj.v5$sampletag_name |> unique()
 umap_sampletag_name_plotlist <- list()
 for (sample in samples) {
   obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_name==sample)
@@ -361,9 +368,120 @@ ggarrange(plotlist = umap_sampletag_name_plotlist)
 #only lung or bal -> color:day
 ```
 
-# 3)	Compositional analysis 
+## 2a) vii. individual samples (virus per time point)
+```{r fig.width=20, fig.height = 15}
+samples <-  obj.v5$day_mock_sample_type_cond_ms4a3|> unique()
+umap_sampletag_name_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(day_mock_sample_type_cond_ms4a3==sample)
+  obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(day_mock_sample_type_cond_ms4a3!=sample)
+  
+  umap_sampletag_name_plotlist[[sample]] <- obj.v5 |> 
+    ggplot() +
+    geom_point(data= obj.v5_not_sample,
+               aes(umapharmony8dims_1,umapharmony8dims_2),
+               color="grey")+
+    geom_point(data= obj.v5_filtered_for_sample,
+               aes(umapharmony8dims_1,umapharmony8dims_2),
+               color="red",
+               alpha=0.4,
+               #plot points without outer border without alpha
+               stroke = 0,
+               shape=16)+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+ggarrange(plotlist = umap_sampletag_name_plotlist)
+
+#ggsave(plot= ggarrange(plotlist = umap_sampletag_name_plotlist),path = output_file_path, filename = "umap_sampletag_name_plotlist.svg", width = 20,height = 15)
+
+#only lung or bal -> color:day
+```
+
+# 3) Compositional analysis
+
+```{r}
+
+obj.v5@misc <-  read_rds("intermediate_data/exp1_exp2_misc_list.rds") #can be deleted later
+x_axis_text_90 <-  theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r}
+prefiltering_data<- bind_rows(
+obj.v5@misc[[1]][[1]][[2]] |> mutate(dataset="d60_lung", orig.ident="viral.experiment.1__lung",exp="exp_1_lung_") ,
+obj.v5@misc[[1]][[2]][[2]] |> mutate(dataset="d60_bal", orig.ident="viral.experiment.1__bal",exp="exp_1_bal_"),
+obj.v5@misc[[2]][[1]][[2]] |> mutate(dataset="d8_lung", orig.ident="viral.experiment.2__lung",exp="exp_2_lung_"),
+obj.v5@misc[[2]][[2]][[2]] |> mutate(dataset="d8_bal", orig.ident="viral.experiment.2__bal",exp="exp_2_bal_")) |>
+  
+  mutate(cell_id_comb=paste0( exp,.cell)) |>
+  relocate(cell_id_comb)
+
+obj_tbl <- tibble(cell_id_comb=colnames(obj.v5),
+       orig.ident= obj.v5$orig.ident,
+       sampletag_Ms4a3=obj.v5$sampletag_Ms4a3 )## |>
+        #mutate(.cell=str_remove_all(.cell, "[abcdefghijklmnopqrstuvwxyz_]"))
+               
+tab2 <-  obj.v5 |> as_tibble() |>
+        mutate(cell_id_comb=.cell) |> 
+        right_join(prefiltering_data,
+                   by = c("cell_id_comb" #,"orig.ident"
+                                             ))
+```
+
+### 3a) freq of live single cells-gabbr2 corrected
+
+```{r}
+#| fig-width: 12
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected  <- tab2 |>
+        filter(is_single_live_cell=="is_single_live_cell") |>
+        #filter(!is.na(dataset) , !is.na(sample_tag_ms4a3_pos_gabbr2), !is.na(harmony_cluster_8dims_rough)) |> #do we need this??
+        mutate(harmony_cluster_8dims_rough_group = paste(harmony_cluster_8dims_rough,
+                                                         sample_tag_ms4a3_pos_gabbr2)) |> 
+        group_by(dataset,
+                 sampletag_name,
+                 sample_tag_ms4a3_pos_gabbr2) |>
+        count(harmony_cluster_8dims_rough_group) |> 
+        group_by(dataset,sampletag_name) |> 
+        mutate(dataset_sampletag=paste(dataset,sampletag_name, sep="_")) |> 
+        mutate(freq=n/sum(n))
         
-## 3a) cluster frequencies per group
+```
+
+```{r}
+##
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected |>
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=sample_tag_ms4a3_pos_gabbr2)) + 
+  geom_bar(stat = "identity")+
+  x_axis_text_90 +ggtitle("freqeucnies of single live cells")
+
+###
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected |>
+  separate(harmony_cluster_8dims_rough_group, into = "cluster") |> 
+        filter(sample_tag_ms4a3_pos_gabbr2!="Gabbr2_pos_Ms4a3_neg") |> 
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=cluster)) + 
+  geom_bar(stat = "identity")+ x_axis_text_90 +
+        ggtitle("freqeucnies of single live cells")
+
+# scaled to 1
+freq_harmony_rough_clusters_of_live_single_live_cells_gabbr2_corrected |>
+  separate(harmony_cluster_8dims_rough_group, into = "cluster") |> 
+        filter(sample_tag_ms4a3_pos_gabbr2!="Gabbr2_pos_Ms4a3_neg") |> 
+          group_by(dataset,sampletag_name) |> 
+        mutate(freq=n/sum(n)) |> 
+        ggplot(aes(dataset_sampletag,
+                   freq,
+                   fill=cluster)) + 
+  geom_bar(stat = "identity")+ x_axis_text_90
+```
+
+
+## 3b) cluster frequencies per group
 
 ```{r fig.width=15, fig.height = 5}
 #group frequencies with Ms4a3 correction
@@ -395,10 +513,10 @@ p4 <- obj.v5 |>  as_tibble()  |> filter(sample_tag_ms4a3_pos_gabbr2!= "Gabbr2_po
   (p3+theme(strip.text.x = element_blank()))/
   p4 +
   plot_layout(guides = 'collect')
-```        
-        
+```
 
-## 3b) Z-scores of cluster frequencies: heatmap
+## 3c Z-scores of cluster frequencies: heatmap
+
 ```{r }
 #| fig-asp: 0.3
 #| fig-width: 12
@@ -438,6 +556,19 @@ obj.v5 |>  as_tibble() |>
   high = "red")+ggtitle("proportions of cells from a given sample distributed across clusters ",
                         "Ms4a3 classification as sorted")
 ```
-## 3c) Option: Posterior probability of frequency fold change scCoda
+
+## 3d) Option: Posterior probability of frequency fold change scCoda
 
 
+![example analysis from other paper](example_sccoda.JPG)
+
+
+
+#### 4) Define clusters by aid of:
+      
+    a.  Differential gene expression heatmap
+    b.  Heatmap of previously defined signatures 
+            i.  Module scores (average logFC of gene set compared to ref.
+                    gene set with similar average expression)
+    c.  Volcano plots
+            i.  Only mock mice: Ms4a3+ vs Ms4a3-

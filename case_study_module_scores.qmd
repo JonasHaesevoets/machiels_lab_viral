@@ -1,19 +1,29 @@
 ---
-title: "case_study_moduel_scores"
-format: html
+title: "Case Study Module Scores"
+format: 
+  html:
+    code-fold: true
 editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
 ---
 
-#Module scores
+# Module scores
 
 ```{r}
-easypackages::libraries("ggridges")
+easypackages::libraries("Seurat","tidyverse","tidyseurat", "ggridges", "viridis", "ggh4x")
+
+obj.v5 <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_central.rds")
+#helper for ggplot
+x_axis_text_90 <-  theme(axis.text.x = element_text(angle = 90))
 ```
 
-##aergerter markers
+## Aergerter markers
 
 ```{r}
-aergerter_markers <- "C:\\Users\\danne\\OneDrive - Charité - Universitätsmedizin Berlin\\Liege\\aergerter_2022_macs.xlsx" |> readxl::read_excel()
+aergerter_markers <- "../../raw_data/machiels_lab/viral/aergerter_2022_macs.xlsx" |> readxl::read_excel()
 colnames(aergerter_markers) <- colnames(aergerter_markers) |> paste("aergerter", sep="__")
 aergerter_markers_long <- aergerter_markers |> pivot_longer(cols=everything(), names_to = "module_score", values_to = ".feature")
 aergerter_markers_lst <- as.vector(aergerter_markers) 
@@ -27,10 +37,10 @@ aergerter_combined_vector <- as.vector(aergerter_markers) |> unlist() |> na.omit
 # setdiff(aergerter_combined_vector, rownames(obj.v5@assays$RNA))
 ```
 
-##vanneste markers
+## Vanneste markers
 
 ```{r}
-vanneste_markers <- readxl::read_excel("C:\\Users\\danne\\OneDrive - Charité - Universitätsmedizin Berlin\\Liege\\dataset_vanneste_et_al.xlsx")
+vanneste_markers <- readxl::read_excel("../../raw_data/machiels_lab/viral/dataset_vanneste_et_al.xlsx")
 colnames(vanneste_markers) <- colnames(vanneste_markers) |> paste("vanneste", sep="__")
 vanneste_markers_long <- vanneste_markers |> pivot_longer(cols=everything(), names_to = "module_score", values_to = ".feature")
 vanneste_markers_lst <- as.vector(vanneste_markers)
@@ -42,7 +52,7 @@ vanneste_combined_vector <- as.vector(vanneste_markers) |> unlist()|> na.omit()
 # setdiff(combined_vector, rownames(obj.v5@assays$RNA))
 ```
 
-##Add module scores
+## Add module scores
 
 ```{r}
 DefaultAssay(obj.v5) <- "RNA"
@@ -53,8 +63,9 @@ obj.v5 <- AddModuleScore(object = obj.v5,all_markers_lst,
                          name = names(all_markers_lst) )
 #obj.v5 <- AddModuleScore(object = obj.v5,aergerter_markers_lst, name = names(aergerter_markers_lst) )
 ```
-
-```{r}
+## module score ridge plot
+```{r message=FALSE}
+#| fig-asp: 2
 #prepare long format for faceting and to remove the extraneous digits AddModuleScore added
 
 length(all_markers_lst)
@@ -81,11 +92,16 @@ obj.v5[[names(just_mod_scores)]] <- just_mod_scores |> as_vector()
 
 # plot whatever
 long_mod_score_tbl |> 
+   mutate(module_scores=str_replace_all(module_scores,"__"," \n ")) |>
 ggplot(aes(value,harmony_cluster_8dims_rough, fill=harmony_cluster_8dims_rough))+
-  geom_density_ridges()+facet_wrap(~module_scores, scales = "free")
+  theme(legend.position = "none")+
+  geom_density_ridges()+facet_wrap(~module_scores, scales = "free", ncol = 4,
+             labeller = labeller(group = label_wrap_gen(width =5)))
 ```
 
 ```{r}
+#| fig-asp: 0.6
+
 modul_score_means_tbl <- long_mod_score_tbl |>
   group_by(harmony_cluster_8dims_rough, module_scores) |> 
   summarise(mean_module_score=mean(value)) |>
@@ -107,6 +123,7 @@ modul_score_means_tbl |>  ggplot(aes( x=module_scores,                          
    fill=max_min_scaled_module_score))+
   geom_tile()+
   scale_fill_viridis() +
+  theme(legend.position = "bottom")+
   x_axis_text_90+
   #guides(x = ggh4x::guide_axis_nested(delim = "__")) +
   ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") +
@@ -122,6 +139,7 @@ modul_score_means_tbl |>  ggplot(aes( x=module_scores,                          
    fill=z_score_module_score))+
   geom_tile()+
   scale_fill_viridis() +
+theme(legend.position = "bottom")+
   x_axis_text_90+
   #guides(x = ggh4x::guide_axis_nested(delim = "__")) +
  # ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") +
@@ -134,9 +152,12 @@ modul_score_means_tbl |>  ggplot(aes( x=module_scores,                          
 
 ```
 
-#gene expression of gene sets
+# Gene expression of gene sets
 
 ```{r}
+#| fig-asp: 0.23
+#| fig-width: 17
+#| 
 #library(forcats)
 all_markers_vector <- c(aergerter_combined_vector, vanneste_combined_vector)
 
@@ -172,8 +193,13 @@ dat |>  ggplot(aes( x=feat_group,                                               
   geom_tile()+
   scale_fill_viridis() +
   x_axis_text_90+
+
   guides(x = ggh4x::guide_axis_nested(delim = "__")) +
-  ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") + facet_wrap(~module_score, nrow=1, scales = "free_x") + theme(panel.spacing = unit(0.5, "lines"),strip.background = element_blank(), strip.text = element_blank())
+  ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") + facet_wrap(~module_score, nrow=1, scales = "free_x") +
+  theme(panel.spacing = unit(0.5, "lines"),
+        strip.background = element_blank(), strip.text = element_blank(),
+        legend.position = "bottom",
+        axis.text.x = element_text(vjust = 0.65))
 
 #plot min-max scaled
 
@@ -181,9 +207,15 @@ dat |>  ggplot(aes( x=feat_group,                                               
    fill=feat_max_min_scaled))+
   geom_tile()+
   scale_fill_viridis() +
+  theme(legend.position = "bottom")+
   x_axis_text_90+
   guides(x = ggh4x::guide_axis_nested(delim = "__")) +
-  ggtitle("Mean module scores of published datasets", "min-max scaled") + facet_wrap(~module_score, nrow=1, scales = "free_x") + theme(panel.spacing = unit(0.5, "lines"),strip.background = element_blank(), strip.text = element_blank())
+  ggtitle("Mean module scores of published datasets", "min-max scaled") + facet_wrap(~module_score, nrow=1, scales = "free_x") +
+  theme(panel.spacing = unit(0.5, "lines"),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "bottom",
+        axis.text.x = element_text(vjust = 0.65))
 
 
 a <- c("darkgrey","black")[dat |> arrange (feat_group ) |> filter(harmony_cluster_8dims_rough ==0) |> pull(module_score)  |> as.numeric() %% 2+1]
@@ -196,7 +228,9 @@ dat |>  ggplot(aes( x=feat_group,                                               
   x_axis_text_90+
   guides(x = ggh4x::guide_axis_nested(delim = "__")) +
   ggtitle("Mean expression of genes of published datasets", "Z-scores, trimmed at 2") +
-  theme(axis.text.x = element_text(colour = a))
+  theme(axis.text.x = element_text(colour = a),
+        legend.position = "bottom"#,axis.text.x = element_text(vjust = 0.65)
+        )
                                                                                                                   
                                                                                                                   
                                                                            
@@ -208,8 +242,9 @@ dat |>  ggplot(aes( x=.feature,                                                 
   x_axis_text_90+
   #guides(x = ggh4x::guide_axis_nested(delim = "__")) +
   ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") +
-  facet_nested(~ mod_score_child + mod_score_parent, nest_line = element_line(linetype = 2), scales = "free_x", space="free")
+  facet_nested(~ mod_score_child + mod_score_parent, nest_line = element_line(linetype = 2), scales = "free_x", space="free")+
 
-  theme(panel.spacing = unit(0.02, "cm", data = NULL),strip.background = element_blank()#, strip.text = element_blank()
-        )
+  theme(panel.spacing = unit(0.02, "cm", data = NULL),strip.background = element_blank(),
+        legend.position = "bottom",
+        axis.text.x = element_text(vjust = 0.65))
 ```

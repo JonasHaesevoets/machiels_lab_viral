@@ -519,11 +519,10 @@ obj.v5 <- SCTransform(obj.v5) %>%
     RunUMAP(dims = 1:30)
 
 ```
+
 ## ScTransform
 
 ```{r}
 obj.v5 <- readRDS("C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_experiment_1_2_merged_v5_split_integrated_sct_1.rds")
 DimPlot(obj.v5, group.by = "orig.ident")
 ```
-
-

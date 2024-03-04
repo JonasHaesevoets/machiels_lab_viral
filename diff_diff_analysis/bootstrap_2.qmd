@@ -173,6 +173,7 @@ plot_both_fc <- function(
 }
 ```
 
+
 ```{r}
 gene_vec <- c("Gabbr2", "Adamts9","Tmem163","Itgal","Pmepa1","Cd63", "Fabp4","Tcaf1","Ly86", "Spp1", "Cd93", "Cd36", "Siglecf")
 
@@ -222,7 +223,6 @@ mean_tbl_half|> #filter(gene=="Spp1") |>
                  mean_diff_b=b_x-b_y ) |>
         fc_plot(mean_diff_a,mean_diff_b,gene)
 ```
-
 ```{r}
 #### functioanl
 markers_roc <- read_csv( "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_bal_alv_mac_markers_roc.csv")
@@ -286,6 +286,7 @@ bootstrap_mean_ddfc_all_cond_downsample_size_50_genes <- bootstrap_mean_ddfc_all
 write_rds(bootstrap_mean_ddfc_all_cond_downsample_size_50_genes,"C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\bootstrap_mean_ddfc_all_cond_downsample_size_50_genes.rds")
 
 ```
+
 
 ```{r for all viruses}
 
@@ -377,7 +378,6 @@ write_rds(bootstrap_mean_ddfc_all_cond_downsample_size,"C:\\Users\\danne\\R_proj
 
 
 ```
-
 ```{r}
 bal_alv_mac |>  dplyr::select(virus,sampletag_Ms4a3) |> ggplot(aes(virus,fill=sampletag_Ms4a3))+geom_bar()+theme_minimal()
 bal_alv_mac |> mutate(sampletag_Ms4a3="dings")
@@ -422,11 +422,9 @@ bal_alv_mac |> join_features("Spp1", slot="counts") |># select(.feature,.abundan
         ggplot(aes(nCount_RNA,.abundance_RNA))+geom_pointdensity()+
         geom_smooth(method = "glm.nb")+theme_minimal()+ylim(0,20)
 ```
-
 ```{r}
 bal_alv_mac |> mutate(sampletag_name=factor(sampletag_name, levels=sort(unique(sampletag_name))))|> ggplot(aes(nCount_RNA,sampletag_name, fill=sampletag_name))+geom_boxplot()
 ```
-
 if a diffenerce in the expression of Spp1 between Mo-Am and AM is only senn for cells with high gene content then it could confound the PR-Mock DiD
 
 ```{r}
@@ -494,7 +492,6 @@ tbl |> transmute(mean_diff_a=a_x-a_y,mean_diff_b=b_x-b_y ) |> mutate(contrast="n
 install.packages("zoo")
 
 ```
-
 ```{r}
 
 Epcam <- choose_values_virus_Ms4a3(bal_alv_mac,gene = "Epcam",virus_cond_1 = "PR8",virus_cond_2 = "Mock")

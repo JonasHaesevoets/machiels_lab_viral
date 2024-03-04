@@ -98,8 +98,8 @@ title_feature_umap_clus_4 <- ""
 caption_feature_umap_clus_4 <- ""
 
 clus_5_genes <- c("C1qb", "Apoe", "")
-title_feature_umap_clus_6 <- ""
-caption_feature_umap_clus_6 <- ""
+title_feature_umap_clus_5 <- ""
+caption_feature_umap_clus_5 <- ""
 
 clus_6_genes <- c("Cd79a", "Cd19", "Ms4a1")
 title_feature_umap_clus_6 <- "B lineage"
@@ -107,12 +107,12 @@ caption_feature_umap_clus_6 <- ""
 
 
 clus_7_genes <- c("Cd209a", "Flt3", "H2-Ab1", "H2-Aa")
-title_feature_umap_clus_6 <- "MHC-2 high"
-caption_feature_umap_clus_6 <- ""
+title_feature_umap_clus_7 <- "MHC-2 high"
+caption_feature_umap_clus_7 <- ""
 
 clus_8_genes <- c("Cd3e", "Cd8a")
-title_feature_umap_clus_7 <- "CD8 T cells"
-caption_feature_umap_clus_7 <- ""
+title_feature_umap_clus_8 <- "CD8 T cells"
+caption_feature_umap_clus_8 <- ""
 
 # clus_8_genes <- c("C1qb", "Cd81", "Apoe", "H2-Aa")
 # title_feature_umap_clus_8 <- "Apoe alveolar macrophages"

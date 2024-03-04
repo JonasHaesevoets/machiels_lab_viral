@@ -12,17 +12,19 @@ format:
 
 
 library("easypackages")
-libraries("Seurat", "tidyverse", "tidyseurat","ggExtra", "viridis", "ggridges","patchwork","Matrix", "ggpp","ggpubr","ggmosaic", "DT", "lemon"#, "gridExtra"
+libraries("Seurat", "tidyverse", "tidyseurat","ggExtra",
+          "viridis", "ggridges","patchwork","Matrix",
+          "ggpp","ggpubr","ggmosaic", "DT", "lemon"#, "gridExtra"
 )
 
 # EXPERIMENT 2
 #source(file="dataset_QC_setup_chunk_exp1_bal.R")
-source(file="dataset_QC_setup_chunk_exp1_lung.R")
+#source(file="dataset_QC_setup_chunk_exp1_lung.R")
 
 
 # EXPERIMENT 2
-##source(file="dataset_QC_setup_chunk_exp2_bal.R")
-##source(file="dataset_QC_setup_chunk_exp2_lung.R")
+#source(file="dataset_QC_setup_chunk_exp2_bal.R")
+source(file="dataset_QC_setup_chunk_exp2_lung.R")
 
 
 # seurat_obj[["RNA"]] <- JoinLayers(seurat_obj[["RNA"]])
@@ -118,6 +120,7 @@ grouping_table <-
                        orig_cluster_specification) |> as_tibble()
 
 
+#this should be RNA correct
 grouping_table <- grouping_table |>
   mutate(
     is_cell = ifelse(
@@ -151,7 +154,7 @@ grouping_table <- grouping_table |>
       "is_cell_and_RNAcorrect_lowMito",
       "not_cell_and_RNAcorrect_lowMito"
     )
-  ) #|> mutate(filter_step=3)
+  ) ##|> mutate(filter_step=3)
 
 grouping_table <- grouping_table |> 
   mutate(primary_filtered_clusters=ifelse(is_cell_and_RNAcorrect_lowMito == "is_cell_and_RNAcorrect_lowMito",
@@ -160,21 +163,81 @@ grouping_table <- grouping_table |>
                 )
     )
 
-
-filtered_1 <- grouping_table |>group_by(is_cell) |>  summarise(n=n()) |> mutate(filter_step=1)
+filtered_1 <- grouping_table |> group_by(is_cell) |> summarise(n=n()) |> mutate(filter_step=1)
 filtered_2 <-grouping_table |> filter(is_cell=="is_cell") |> group_by(is_cell_and_RNAcorrect) |>  summarise(n=n()) |> mutate(filter_step=2)
 gc()
+
 filtered_3 <-grouping_table|> filter(is_cell_and_RNAcorrect=="is_cell_and_RNAcorrect") |>group_by(is_cell_and_RNAcorrect_lowMito) |>  summarise(n=n()) |> mutate(filter_step=3)
+
 filtered_4 <-grouping_table|> filter(is_cell_and_RNAcorrect_lowMito=="is_cell_and_RNAcorrect_lowMito")  |>group_by(primary_filtered_clusters) |>  summarise(n=n()) |> mutate(filter_step=4)
-
-
 
 n_after_filtering <-
   bind_rows(filtered_1,filtered_2,filtered_3,filtered_4) |> relocate(n,filter_step) |>   pivot_longer(is_cell:primary_filtered_clusters) 
 
 
-
 filtered_seurat_obj@misc[[paste0(obj_identifier, "_n_after_filtering")]] <- n_after_filtering
+filtered_seurat_obj@misc[[paste0(obj_identifier, "_grouping_table")]] <- grouping_table
+
+
+write_rds(filtered_seurat_obj, file = file_path_output)
+```
+
+
+
+```{r include=FALSE}
+#| title: filtering_info_and_save_seurat_obj
+grouping_table <-
+  seurat_obj |> select(.cell,
+                       nCount_RNA,
+                       sampletag_multiplets,
+                       percent_mito,
+                       orig_cluster_specification, seurat_clusters) |> as_tibble() |> select(-(PC_1:PC_50))
+```
+
+```{r include=FALSE}
+
+#filter by hashtag for :is single hashtag
+grouping_table <- grouping_table |> 
+  mutate(
+    is_single_hashtag =
+      ifelse(
+          sampletag_multiplets == "single_hashtag",
+        "single_hashtag",
+        "not_single_hashtag"
+      ))
+
+#filter by RNA to exclude doublets and empty wells to cocnclude:is single cell
+grouping_table <- grouping_table |>
+  mutate(
+    is_single_cell = ifelse(
+      nCount_RNA < upper_nCount_RNA_thresh &
+        nCount_RNA > lower_nCount_RNA_thresh &
+        sampletag_multiplets == "single_hashtag",
+      "is_single_cell",
+      "not_single_cell"
+    )
+  ) 
+
+#are single cells -> add percent mitochondrial gene threshold
+
+grouping_table <- grouping_table |> 
+  mutate(
+    is_single_live_cell = ifelse(
+      is_single_cell == "is_single_cell" &
+        percent_mito < upper_mito_thresh,
+      "is_single_live_cell",
+      "not_single_live_cell"
+    )
+  )
+
+
+#for live viable cells are they macs??
+grouping_table <- grouping_table |> 
+  mutate(is_single_live_macrophage=ifelse(is_single_live_cell == "is_single_live_cell" &
+                !(seurat_clusters %in% deleted_clusters),"is_single_live_macrophage",
+                "not_single_live_macrophage" ))
+
+
 filtered_seurat_obj@misc[[paste0(obj_identifier, "_grouping_table")]] <- grouping_table
 
 
@@ -734,7 +797,8 @@ feature_umap(clus_13_genes,title_feature_umap_clus_13, caption=caption_feature_u
 feature_umap(clus_14_genes,title_feature_umap_clus_14, caption=caption_feature_umap_clus_14)
 ```
 
-```{r, cluster_15_feature_umap, eval= eval_15, include=eval_15}
+```{r, cluster_15_feature_umap, eval= 
+  , include=eval_15}
 #| title: cluster 15
 
 feature_umap(clus_15_genes,title_feature_umap_clus_15, caption=caption_feature_umap_clus_15)
@@ -751,7 +815,7 @@ feature_umap(clus_16_genes,title_feature_umap_clus_16, caption=caption_feature_u
 
 ```{r, cluster_16_extra, eval= eval_16_extra}
 #| title: cluster 16 expr
-#| 
+
 seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==16, "cluster 16", "other")) |> 
   join_features(clus_16_genes) |> mutate(.feature=factor(.feature, levels=clus_16_genes)) |> 
   ggplot(aes(cluster_highlight,.abundance_RNA), color=cluster_highlight) + 

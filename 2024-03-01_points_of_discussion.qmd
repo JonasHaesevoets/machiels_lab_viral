@@ -1,0 +1,384 @@
+---
+title: "2024-03-01_points_of_discussion"
+format: 
+  html:
+    code-fold: true
+    fig-height: 6
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+```{r message=FALSE, warning=FALSE}
+
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "ggpubr", "kableExtra", "janitor", "ggridges")
+
+library(googlesheets4)
+library(stringr) 
+library(readxl)
+obj.v5 <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_central.rds")
+DefaultAssay(obj.v5) <- "RNA"
+
+Idents(object = obj.v5) <- "harmony_cluster_8dims_rough"
+
+output_file_path <- "output/2024-03-01_points_of_discussion/"
+#helper plot name saving
+function_name_as_string <- function(v1) {
+  deparse(substitute(v1))
+}
+#helper for ggplot
+x_axis_text_90 <-  theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r}
+top_markers_named_list_maker <-
+  function(markers_tibble, #FindAllMarkers Output
+           n_ = 10,
+           grouping= cluster,
+           p_adj_thresh=0.01) {
+    #takes Seurat::FindAllMarkers output  (Wilcoxon test), returns list of top n_ markers by p_val_adj
+    marker_gene_list <- markers_tibble |>
+      filter(avg_log2FC > 0) |>
+      filter(p_val_adj<p_adj_thresh) |> 
+      group_by({{grouping}}) |>
+      slice_min(p_val_adj, n = n_) |> 
+      select({{grouping}}, gene) |>
+      summarise(gene = list(gene)) |>
+      as.list(gene)
+    names(marker_gene_list$gene) <-
+      as.character(marker_gene_list[[1]])
+    return(marker_gene_list$gene)
+  }
+
+
+dot_heatmap <- function(seurat_obj = ms4a3_pos,
+                        named_feature_list = ms4a3_pos_markers_list,
+                        limits = c(-2, 2),
+                        seurat_grouping = "sampletag_name") {
+  #takes a ORDERED named list of features, names are groups in "seurat_grouping", returns heatmap
+  named_feature_vec <-  named_feature_list |> unlist()
+  named_feature_vec <-
+    named_feature_vec[!duplicated(named_feature_vec)] # like "unique()" but without losing names
+  group_names_sorted <- names(named_feature_list)
+  
+  
+  tbl <-seurat_obj |> join_features(named_feature_vec, slot = "data", assay = "RNA") |>
+    group_by(.feature, .data[[seurat_grouping]]) |>
+    summarise(
+      mean_data = mean(.abundance_RNA),
+      percent_exp = mean(.abundance_RNA > 0)
+    ) |>
+    group_by(.feature) |>
+    mutate(z_score_mean_abundance_over_groups = (mean_data - mean(mean_data)) /
+             sd(mean_data)) |>
+          mutate(z_score_mean_abundance_over_groups=ifelse(z_score_mean_abundance_over_groups>2,2,z_score_mean_abundance_over_groups)) |>
+          mutate(z_score_mean_abundance_over_groups=ifelse(z_score_mean_abundance_over_groups<(-2),(-2),z_score_mean_abundance_over_groups)) |>
+    mutate(
+      gene = factor(.feature, levels = named_feature_vec),
+      "{seurat_grouping}" := factor(.data[[seurat_grouping]], levels = group_names_sorted)
+    ) |> 
+    arrange(gene)
+    
+  #browser()
+  plt <- tbl |>
+    ggplot(aes(gene, .data[[seurat_grouping]],
+               color = z_score_mean_abundance_over_groups,
+               size = percent_exp)) +
+    geom_point() +
+    ggplot2::geom_point() +
+    ggplot2::guides(
+      color = ggplot2::guide_colorbar(
+        barwidth  = 18,
+        barheight = 1,
+        ticks = FALSE,
+        frame.colour = "black",
+        title.position = "top",
+        title.hjust = 0.5
+      ),
+      size  = ggplot2::guide_legend(title.position = "top", title.hjust = 0.5)
+    ) +
+    ggplot2::labs(col  = "z-score of mean", size = "% expressed") +
+    ggplot2::theme_classic(base_size = 25) +
+    ggplot2::theme(
+      legend.position = "top",
+      axis.text.x     = ggplot2::element_text(
+        angle = 45,
+        hjust = 1,
+        vjust = 1,
+        face = "italic"
+      ),
+      axis.title      = ggplot2::element_blank()
+    ) +
+    ggplot2::scale_color_distiller(palette = "RdBu", limits = limits) +
+    ggplot2::scale_size_area(max_size = 10)
+  return(plt)
+  
+  
+}
+
+```
+
+## estimation of absolute numbers lung cell populations
+
+```{r}
+
+```
+
+## analysis of Sca+ cluster 10: Neutrophils or Macrophages?
+
+```{r}
+DimPlot(obj.v5, label = T, group.by = "harmony_cluster_8dims_rough",raster = TRUE, pt.size = 2)
+```
+
+#### Genespace distance
+
+```{r}
+#| fig-asp: 0.5
+#| 
+obj.v5 <- BuildClusterTree(object = obj.v5)
+PlotClusterTree(object = obj.v5)
+```
+
+Euclidian distance of cluster averages reveals cluster 10 as the furthest outlier.
+
+```{r}
+
+Idents(object = obj.v5) <- "harmony_cluster_8dims_rough"
+markers_clus_10 <- FindMarkers(obj.v5, ident.1 = "10", max.cells.per.ident = 200 ) |> as_tibble(rownames = "gene")
+```
+
+### Positive markers for cluster 10
+
+```{r}
+markers_clus_10 |> 
+        filter(avg_log2FC>0) |> 
+        slice_min(p_val_adj, n=50) |> 
+        kbl() |>
+        kable_styling()
+
+markers_clus_10 |> pull(gene) |> writeClipboard()
+```
+
+Aconitate Decarboxylase 1: mediates Itoconic acid production C-Type Lectin Domain Family 4 Member D (Dectin-3): PRR for alpha-mannans on C.albicans hyphea mycobacterial trehalose 6,6'-dimycolate (genecards) S100a9: Especially high in monocytes and neutrophils
+
+### Negative markers for cluster 10
+
+```{r}
+markers_clus_10 |> 
+        filter(avg_log2FC<0) |> 
+        slice_min(p_val_adj, n=50) |> 
+        kbl() |>
+        kable_styling()
+```
+
+Negative: H2-DMa, lot of ribosomal proteins
+
+## overview of data to decide upon which cells are alveolar macrophages
+
+### Ab-Seq
+
+```{r}
+#| fig-asp: 0.6
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="adt", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt))  |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=
+mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized and max scaled per batch protein expression")+ theme(legend.position="bottom")
+
+
+```
+
+```{r include=FALSE, eval=FALSE}
+all_markers <- FindAllMarkers(obj.v5, max.cells.per.ident = 300, logfc.threshold = 0.5)
+all_markers |> write_csv(paste0("output_file_path","all_rough_harmony_clusters_0to10.csv"))
+
+```
+
+### Top RNA markers
+
+```{r}
+#| fig-width: 5
+#| fig-height: 24
+all_markers<- read_csv(paste0("output_file_path","all_rough_harmony_clusters_0to10.csv"))
+cluster_markers_lst <- top_markers_named_list_maker(all_markers ,grouping = cluster)
+cluster_markers_plot <- dot_heatmap(seurat_obj = obj.v5,
+            named_feature_list = cluster_markers_lst,
+            seurat_grouping = "harmony_cluster_8dims_rough"
+                )
+
+
+cluster_markers_plot+coord_flip()
+```
+
+# Data sets from literature
+
+```{r include=FALSE, eval=FALSE}
+########### adds module scores to obj. and stores it seprately
+
+literature_table <- read_excel("C:/Users/danne/raw_data/machiels_lab/viral/2024-03-01_literature_genesets.xlsx")
+
+
+literature_genesets <- literature_table |> mutate(Geneset=str_remove_all(Geneset, " ")) |> 
+        mutate(Geneset=str_remove_all(Geneset,"\\s*\\([^\\)]+\\)") ) |>  
+        mutate(Geneset=str_split(Geneset,",")) #|>
+        #mutate(Geneset=str_to_title(Geneset)) |> pull(Geneset)
+
+
+literature_genesets <- literature_genesets |> filter(Organism=="Mouse") |> select(Source, clean_names, Geneset)
+#filter out allgene sets small than 1 gene, eg NA
+literature_genesets <- literature_genesets[map(literature_genesets$Geneset,length)>1,]
+
+#make unique names for module scores
+literature_genesets <- literature_genesets |> mutate(dataset=paste(clean_names, make_clean_names(Source), sep="__")) |> 
+filter(Source!="Ogawa, 2022")
+
+geneset_lst <- literature_genesets$Geneset 
+names(geneset_lst) <- literature_genesets |> pull(dataset)
+
+geneset_lst <- map(geneset_lst,str_to_title)#get rid of upper case spelling mistakes
+geneset_lst
+
+
+obj.v5 <- AddModuleScore(object = obj.v5,geneset_lst,
+                         name = names(geneset_lst) )
+
+#prepare long format for faceting and to remove the extraneous digits AddModuleScore added
+
+mod_score_names_w_numbers <- names(obj.v5@meta.data)[(ncol(obj.v5@meta.data)-length(geneset_lst)+1):ncol(obj.v5@meta.data)]
+
+long_mod_score_tbl <- obj.v5 |>
+  as_tibble()|>
+  select(.cell,
+         harmony_cluster_8dims_rough,
+         all_of(mod_score_names_w_numbers)) |>
+               names_to = "module_scores") |>  
+# Extract all characters except the last one
+  mutate(module_scores =
+           sub("\\d+$", "", module_scores))
+
+
+#change names pf module score meta data columns
+wide_mod_score_tbl <-  long_mod_score_tbl |> pivot_wider(names_from = module_scores)
+#remove mod scores with numbers
+obj.v5 <- obj.v5 |> select(!any_of(mod_score_names_w_numbers))
+just_mod_scores <- select(wide_mod_score_tbl,-.cell,-harmony_cluster_8dims_rough)
+long_mod_score_tbl |> write_rds("C:/Users/danne/raw_data/machiels_lab/viral/long_mod_score_tbl.rds")
+```
+
+```{r message=FALSE, warning=FALSE}
+#| fig-asp: 2
+
+#change names pf module score meta data columns
+long_mod_score_tbl <-  read_rds("C:/Users/danne/raw_data/machiels_lab/viral/long_mod_score_tbl.rds")
+wide_mod_score_tbl <-  long_mod_score_tbl |> pivot_wider(names_from = module_scores)
+just_mod_scores <- select(wide_mod_score_tbl,-.cell,-harmony_cluster_8dims_rough)
+
+
+
+#add
+obj.v5[[names(just_mod_scores)]] <- just_mod_scores |> as_vector()
+
+# plot whatever
+long_mod_score_tbl |> 
+  #change names so allow paragraph of facet titles
+  mutate(module_scores=str_replace_all(module_scores,"__"," \n ")) |>
+ggplot(aes(value,harmony_cluster_8dims_rough, fill=harmony_cluster_8dims_rough))+
+   
+  geom_density_ridges()+
+  theme(legend.position = "none")+
+  facet_wrap(~module_scores,
+             scales = "free", ncol = 4,
+             labeller = labeller(group = label_wrap_gen(width =5)))
+```
+
+## gene set module scores of published data sets
+
+```{r}
+
+###prepare data
+
+modul_score_means_tbl <- long_mod_score_tbl |>
+  group_by(harmony_cluster_8dims_rough, module_scores) |> 
+  summarise(mean_module_score=mean(value)) |>
+  group_by(module_scores) |> 
+  mutate(max_min_scaled_module_score=
+           (mean_module_score-min(mean_module_score))/(max(mean_module_score)-min(mean_module_score)),
+         z_score_module_score=
+           (mean_module_score-mean(mean_module_score))/sd(mean_module_score)) |> 
+  separate(module_scores, sep = "__",remove = FALSE, c("mod_score_child", "mod_score_parent")) |> 
+  #mutate(mod_score_child=fct_reorder(mod_score_child,as.numeric(as.factor(mod_score_parent)) )) |> 
+  mutate(mod_score_parent=as_factor(mod_score_parent )) |> 
+  arrange(mod_score_parent ) |> 
+  mutate(module_scores=fct_reorder(module_scores,as.numeric(mod_score_parent)))
+
+
+modul_score_means_tbl$module_scores <- fct_reorder(modul_score_means_tbl$module_scores,modul_score_means_tbl$mod_score_parent |> as.numeric())
+modul_score_means_tbl |> filter(module_scores=="MHCII_pos__chakarov_2019_") |> mean(mean_module_score)
+```
+
+
+```{r}
+#| fig-asp: 0.61
+
+module_score_heatmap_min_max<- modul_score_means_tbl |> 
+  ggplot(aes( x=module_scores,                                                                          harmony_cluster_8dims_rough,
+   fill=max_min_scaled_module_score))+
+  geom_tile()+
+  scale_fill_viridis() +
+  x_axis_text_90+
+  #guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") +
+  #facet_nested(~ mod_score_child + mod_score_parent, nest_line = element_line(linetype = 2), scales = "free_x", space="free")
+  guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Mean module score of all cells per cluster ", "min-max_scaled") +
+  #theme(axis.text.x = element_text(colour = a))+
+  theme(panel.spacing = unit(0.02, "cm", data = NULL),strip.background = element_blank()#, strip.text = element_blank()
+        )+ theme(legend.position="bottom")
+
+module_score_heatmap_min_max
+```
+
+```{r include=FALSE, eval=FALSE}
+######### save plots
+
+#module_score_heatmap_min_max
+path_temp=paste0(output_file_path,function_name_as_string(module_score_heatmap_min_max),".svg")
+ggsave(plot =module_score_heatmap_min_max, file=path_temp )
+```
+
+```{r}
+#| fig-asp: 0.61
+
+
+module_score_heatmap_zscore<- modul_score_means_tbl |>
+  ggplot(aes( x=module_scores,                                                                          harmony_cluster_8dims_rough,
+   fill=z_score_module_score))+
+  geom_#| fig-width: 17tile()+
+  scale_fill_viridis() +
+  x_axis_text_90+
+  #guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+ # ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") +
+  #facet_nested(~ mod_score_child + mod_score_parent, nest_line = element_line(linetype = 2), scales = "free_x", space="free")
+  guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Z score of mean module score ", "") +
+  #theme(axis.text.x = element_text(colour = a))+
+  theme(panel.spacing = unit(0.02, "cm", data = NULL),strip.background = element_blank()#, strip.text = element_blank()
+        )+ theme(legend.position="bottom")
+module_score_heatmap_zscore
+```
+
+```{r include=FALSE, eval=FALSE}
+######### save plots
+#module_score_heatmap_zscore
+
+path_temp=paste0(output_file_path,function_name_as_string(module_score_heatmap_zscore),".svg")
+ggsave(plot =module_score_heatmap_zscore, file=path_temp)
+```
+
+
+

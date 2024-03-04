@@ -1,0 +1,83 @@
+---
+title: "2024-02-27_lucias_questions"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+
+---
+
+
+```{r message=FALSE}
+seurat_obj_central <- readRDS("C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+easypackages::libraries("Seurat", "tidyverse", "tidyseurat"#,"ggExtra", "viridis", "ggridges","patchwork"
+)
+library(xlsx)
+```
+
+```{r}
+#| fig-asp: 0.45
+FeaturePlot(seurat_obj_central,c("Pparg", "Ccr2"))
+
+```
+
+```{r}
+#| fig-asp: 0.45
+#| 
+FeaturePlot(seurat_obj_central,c("Mafb", "C5ar1"))
+
+```
+```{r}
+#| fig-asp: 0.45
+#| 
+ VlnPlot(seurat_obj_central,c("Mafb", "C5ar1"), pt.size = 0)
+```
+
+```{r}
+FeaturePlot(seurat_obj_central,c("Gja1"))
+```
+
+```{r}
+DimPlot(seurat_obj_central, group.by = "harmony_cluster_8dims_rough",
+        label = T)
+```
+
+```{r}
+#| fig-asp: 0.45
+
+VlnPlot(seurat_obj_central,c("Gja1", "Ccr2"), pt.size = 0)
+```
+```{r}
+#| fig-asp: 0.45
+
+
+VlnPlot(seurat_obj_central,c("Marco"), pt.size = 0)
+```
+
+```{r}
+FeatureScatter(object = seurat_obj_central,"Pparg", "Ccr2", group.by = "seurat_clusters")
+```
+```{r}
+VlnPlot(seurat_obj_central,c("Rela", "Hinfp", "Egr1","Zeb1"), pt.size = 0)
+```
+
+```{r eval=FALSE}
+DefaultAssay(object =seurat_obj_central) <- "RNA"
+cluster_markers <- FindAllMarkers(seurat_obj_central, logfc.threshold = 0.5, max.cells.per.ident = 400)
+cluster_markers <- cluster_markers |> as_tibble(rownames = "gene")
+write_csv(cluster_markers, "output/2024-02-27_lucias_questions_cluster_markers.csv")
+library(openxlsx)
+
+write.xlsx(x = cluster_markers,file =  "intermediate_data/2020-02-27_lucias_questions_cluster_markers.xlsx")
+```
+```{r}
+
+VlnPlot(seurat_obj_central,c("Pparg", "Csf2ra", "Cxcl10", "Epcam") , pt.size = 0)
+        
+        
+```
+
