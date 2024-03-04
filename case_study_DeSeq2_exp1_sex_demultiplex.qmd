@@ -9,7 +9,6 @@ execute:
   warning: false
   message: false
 toc: true  
-
 ---
 
 ## controlled for virus, no Mock
@@ -159,11 +158,15 @@ bal_alv_mac_wide_sex |>
 
 
 ```
+
 ## Ddx3y Eif2s3y
+
 ```{r}
 p1+p2
 ```
+
 ## Kdm5d max_male_genes
+
 ```{r}
 p3+p4
 ```
@@ -474,8 +477,6 @@ plotDispEsts(res)
 results(res, name = "Ms4a3Ms4a3_pos.virusPR8")%>% as_tibble(rownames = "gene") %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 ```
 
-
-
 ```{r}
 
 expression_plotter<-function(x) {x |> as_tibble(rownames="name") |>  separate(name, into = c("Virus","x", "Ms4a3_status","sex"), remove = FALSE) |> 
@@ -499,7 +500,6 @@ plotlist[[5]] <-plotCounts(res, gene="Serpinb6a", intgroup="virus",
 ggarrange(plotlist = plotlist)
 ```
 
-
 ```{r}
 plt_lst <- list()
 for (dings in resultsNames(res)) {
@@ -512,18 +512,20 @@ ggarrange(plotlist =  plt_lst)
 Viral infection with influenza H1N1 (PR8 strain) is associated with an increase of the difference of Spp1 between monocyte-derived and resident macrophages compared to MAV1. Likely, because there are no replicates of the the PR8 samples there is a low amount of significant genes in this test.
 
 ## Ms4a3 Ms4a3_pos.virusMuHV4
+
 ### postive
+
 ```{r}
 res_tbl <- results(res, name = "Ms4a3Ms4a3_pos.virusMuHV4")%>% as_tibble(rownames = "gene")
 res_tbl%>% filter(log2FoldChange>0) |> slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 ```
 
 ### negative
+
 ```{r}
 res_tbl%>% filter(log2FoldChange<0) %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 
 ```
-
 
 ```{r}
 plotlist <- list()
@@ -538,7 +540,6 @@ plotlist[[3]] <- plotCounts(res, gene="Cd93", intgroup="virus",
 
 ggarrange(plotlist = plotlist)
 ```
-
 
 # Ms4a3_pos.virusPVM
 
@@ -562,12 +563,10 @@ plotlist[[3]] <- plotCounts(res, gene="Wfdc17", intgroup="virus",
 ggarrange(plotlist = plotlist)
 ```
 
-
 ```{r}
 results(res, name = "Ms4a3Ms4a3_pos.virusPVM")%>% as_tibble(rownames = "gene") %>%
   filter(log2FoldChange>0) %>% slice_min(pvalue, n=1000)|> arrange(pvalue) |> DT::datatable()
 ```
-
 
 ```{r}
 plotlist <- list()
@@ -592,8 +591,7 @@ ggarrange(plotlist = plotlist)
 
 ```
 
-# 1 to 1 comparisons Interaction effects virus1(Ms4a3+ vs Ms4a3) vs. virus1(Ms4a3+ vs Ms4a3) 
-
+# 1 to 1 comparisons Interaction effects virus1(Ms4a3+ vs Ms4a3) vs. virus1(Ms4a3+ vs Ms4a3)
 
 ```{r}
 #| fig-width: 13

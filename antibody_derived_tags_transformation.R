@@ -3,9 +3,139 @@ library(tidyverse)
 library(tidyseurat)
 library(Matrix)
 
+
+
+# read in all sequencing counts of all Rhapsody wells
+# this means also those wells that the rhapsody pipeline does not call as containing a cell
+
+## read in the empty
+unfiltered_csv_paths <- c("..\\..\\raw_data\\machiels_lab\\viral\\output_lung_d8\\BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "..\\..\\raw_data\\machiels_lab\\viral\\output_bal_d8\\BD-Analysis-BMachiels-BAL_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "..\\..\\raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "..\\..\\raw_data\\machiels_lab\\viral\\2023-10-02_output_bal\\Output_BAL\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz")
+
+exp_name <- c("lung_d8","bal_d8",
+              "lung_d60", "bal_d60")
+
+for (i in seq_along(unfiltered_csv_paths)) {
+  # we read only those proteins who were actually stained
+  counts_fread = fread(unfiltered_csv_paths[i], select = c("Cell_Index",
+                                                           "Siglec-F|Siglecf|AMM2013|pAbO",
+                                                           "I-A_I-E|H2-Ab_Ad_Aq_Ed_Ek|AMM2019|pAbO",
+                                                           "CD274|Cd274|AMM2038|pAbO",
+                                                           "CD11c:HL3|Itgax|AMM2008|pAbO",
+                                                           "Ly-6G|Ly6g|AMM2009|pAbO",
+                                                           "Ly-6A_Ly-6E|Ly6a_Ly6e|AMM2026|pAbO"), 
+                       showProgress = T)
+  #rename the proteins
+  colnames(counts_fread) <- c("cell_index","Siglecf_AbSeq","H2_ia_ie_AbSeq","Cd274_AbSeq","Cd11c","Ly_6g_AbSeq","Ly_6a_AbSeq")
+  write_csv(counts_fread,paste0(".\\intermediate_data\\",exp_name[i],"unfiltered_prot_counts_fread.csv") )
+}
+  
+###################
+
+
+
+setup_chunks <- c(
+  "dataset_QC_setup_chunk_exp1_bal.R",
+  "dataset_QC_setup_chunk_exp2_bal.R",
+  "dataset_QC_setup_chunk_exp1_lung.R",
+  "dataset_QC_setup_chunk_exp2_lung.R")
+
+unfiltered_prot_counts <- c(
+  "bal_d60unfiltered_prot_counts_fread.csv",
+  "bal_d8unfiltered_prot_counts_fread.csv",
+  "lung_d60unfiltered_prot_counts_fread.csv",
+  "lung_d8unfiltered_prot_counts_fread.csv")
+
+dataset_name <- c(
+  "bal_d60",
+  "bal_d8",
+  "lung_d60",
+  "lung_d8")
+
+unfiltered_prot_counts <- unfiltered_prot_counts |> map_vec(\(x) paste0(".\\intermediate_data\\", x))
+
+plot_list <- list()
+for (i in seq_along(unfiltered_prot_counts)) {
+  print(unfiltered_prot_counts[i])
+  all_BD_protein_counts <- read_csv(unfiltered_prot_counts[i])
+  
+  protein_counts_cell_is_col <- all_BD_protein_counts |>  tidyfst::t_dt() 
+  colnames(protein_counts_cell_is_col) <- protein_counts_cell_is_col[1,] 
+  protein_counts_cell_is_col <- protein_counts_cell_is_col[-1,]
+  protein_sum_tbl <- tibble(cell_sum=protein_counts_cell_is_col |>
+                              colSums(), cell=colnames(protein_counts_cell_is_col))
+  
+  cutoff <- 6000
+  protein_sum_tbl <- protein_sum_tbl 
+  
+  source(file=setup_chunks[i]) 
+  print("in memory: seurat")
+  seurat_obj <- seurat_obj |>
+    mutate( kept_cell= case_when(
+      (seurat_clusters %in% deleted_clusters) ~ "deleted_clusters",
+      nCount_RNA>upper_nCount_RNA_thresh~ "too_much_RNA",
+      nCount_RNA<lower_nCount_RNA_thresh~"too_little_RNA",
+      percent_mito>upper_mito_thresh~"too_much_mito",
+      sampletag_multiplets!="single_hashtag"~ "no_singlet",
+      TRUE ~"keep"))
+  
+  meta_data_protein_sum_tbl <- seurat_obj |>
+    as_tibble() |>
+    rename(cell=".cell") |>
+    full_join(protein_sum_tbl ) |>
+    mutate(kept_cell=if_else(
+      is.na(kept_cell),"empty_by_BD",kept_cell)
+    )
+  
+  
+  seurat_obj <- NULL
+  
+  
+  ######
+  #perform dsb normalization
+  
+
+  
+  cells <- meta_data_protein_sum_tbl |> filter(kept_cell=="keep")|> pull(cell)
+  cells_tbl <- all_BD_protein_counts |> filter(cell_index %in% cells) 
+  cells_matrix <- t(as.matrix(cells_tbl|> select(-cell_index)))
+  colnames(cells_matrix) <- cells_tbl |> pull(cell_index)
+  
+  empty_droplets <- meta_data_protein_sum_tbl |> filter(kept_cell=="empty_by_BD")|> pull(cell)
+  empty_droplets_tbl <- all_BD_protein_counts |> filter(cell_index %in% empty_droplets) 
+  empty_droplets_matrix <- t(as.matrix(empty_droplets_tbl|> select(-cell_index)))
+  colnames(empty_droplets_matrix) <- empty_droplets_tbl |> pull(cell_index)
+  
+  cells.dsb.norm = DSBNormalizeProtein(
+    cell_protein_matrix = cells_matrix, #
+    empty_drop_matrix = empty_droplets_matrix, 
+    denoise.counts = F, 
+    use.isotype.control = F
+  )
+  
+  write_rds(cells.dsb.norm,paste0(".\\intermediate_data\\dsb_matrix_",dataset_name[i],".rds"))
+  
+}
+
+
+# write_rds(plot_list,paste0(".\\intermediate_data\\protein_reads_QC_plot_list.rds"))
+
+
+
+
+
+
+
+##################
+
 #path_1 <- "C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_experiment_1_2_merged_v5_split_integrated.rds"
-path_1 <-"C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_integrated.rds"
+path_1 <-"..\\..\\R_projects\\machiels_lab_viral-main\\intermediate_data\\seurat_obj_experiment_1_2_integrated.rds"
 obj.v5 <- read_rds(path_1)
+
+
+
 
 exp_1_lung <- "intermediate_data/dsb_matrix_lung_d60.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_1_lung_",cell))
 exp_2_lung <- "intermediate_data/dsb_matrix_lung_d8.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_2_lung_",cell))
@@ -97,7 +227,7 @@ obj.v5[["protein"]] <- NULL
 
 
 write_rds(x = obj.v5,
-          file ="C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_central.rds" )
+          file ="..\\..\\R_projects\\machiels_lab_viral-main\\intermediate_data\\seurat_obj_central.rds" )
 
 
 

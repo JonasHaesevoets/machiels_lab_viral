@@ -1,3 +1,6 @@
+## for analaytical choices case_study_experiment_1_2_integration.r 
+
+
 library(tidyseurat)
 library(readr)
 library(Seurat)
@@ -29,9 +32,7 @@ gc()
 obj@misc <- list(misc_list_1,misc_list_2)
 obj <- JoinLayers(obj, assay = "RNA")
 obj <- JoinLayers(obj, assay = "protein")
-#something wrong here
-
-#obj <- JoinLayers(obj, assay = "sampletags")
+obj <- JoinLayers(obj, assay = "sampletags")
 #write_rds(obj,"C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged.rds")
 #obj <- read_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_merged.rds")
 
@@ -46,8 +47,8 @@ obj.v5 <- CreateSeuratObject(counts = obj[["RNA"]]$counts, meta.data = meta_data
 #obj.v5$orig.ident <- meta_data$orig.ident
 protein <- CreateAssay5Object(counts = obj[["protein"]]$counts)
 sampletags <- CreateAssay5Object(counts = obj[["sampletags"]]$counts)
-#obj.v5[["protein"]] <- protein
-#obj.v5[["sampletags"]] <- sampletags
+obj.v5[["protein"]] <- protein
+obj.v5[["sampletags"]] <- sampletags
 
 obj <- NULL
 gc()
@@ -60,7 +61,6 @@ obj.v5 <- NormalizeData(obj.v5) # individual size factors accoriding to Ahlmann-
 obj.v5 <- FindVariableFeatures(obj.v5)
 obj.v5 <- ScaleData(obj.v5)
 obj.v5 <- RunPCA(obj.v5)
-
 
 
 
@@ -78,9 +78,6 @@ obj.v5 <- RunUMAP(obj.v5, reduction = "integrated.harmony", dims = 1:8, reductio
 obj.v5 <- JoinLayers(obj.v5, assay= "RNA")
 #obj <- JoinLayers(obj, assay = "protein")
 #obj <- JoinLayers(obj, assay = "sampletags")
-
-obj.v5@misc <- list(misc_list_1,misc_list_2)
-list(misc_list_1,misc_list_2) |>  write_rds("intermediate_data/exp1_exp2_misc_list.rds")
 
 obj.v5 |>  write_rds("C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\seurat_obj_experiment_1_2_integrated.rds")
 

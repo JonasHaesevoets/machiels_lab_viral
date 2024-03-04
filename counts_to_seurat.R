@@ -1,15 +1,37 @@
-#this script loads rhapsody pipeline multimodal count data (tracripts, Abseq, cell hashtags)
+#this script loads rhapsody pipeline multimodal count data (transcripts, Abseq, cell hashtags)
 #into seprate Seurat files per library and also combines seurat files per experiment and stores them in
-#a "intermediate_data" file in the data analysis project folder as .rds
+#the "intermediate_data" file in the data analysis project folder as .rds
+# seurat object A corresponds to the lung data
+# seurat object B corresponds to the BAL data
 set.seed(2023)
 #####
-#load packeges
-library("easypackages")
-libraries("Seurat", "tidyverse", "janitor", "forcats","tidyseurat", "Matrix", "vroom", "tidyfst")
+#load packeages
+#install.packages("janitor")
+#library(janitor)
+#library("easypackages")
+
+#libraries("Seurat", "dplyr", "janitor", "forcats","tidyseurat", "Matrix", "vroom", "tidyfst", "readr")
+
+# List of packages to install
+packages_to_install <- c("easypackages","tidyverse", "Seurat", "dplyr", "janitor", "forcats","tidyseurat", "Matrix", "vroom", "tidyfst", "readr", "stringr", "tibble")
+
+# Function to install a package if not already installed
+install_if_not_installed <- function(package) {
+  if (!(package %in% installed.packages()[,"Package"])) {
+    install.packages(package, dependencies = TRUE)
+  }
+}
+
+# Loop through packages and install if not already installed
+for (pkg in packages_to_install) {
+  install_if_not_installed(pkg)
+}
+
+easypackages::libraries("Seurat", "dplyr", "janitor", "forcats","tidyseurat", "Matrix", "vroom", "tidyfst", "readr", "stringr", "tidyverse")
+
 ####
 #below file paths are to be specified
-
-raw_data_root <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\"
+## raw_data_root <- "..\\..\\raw_data\\machiels_lab\\viral\\"
 
 #name input and output file names
 #dont use "_" for exeriment names because Seurat can't deal with this
@@ -27,7 +49,7 @@ file_names_tbl <- tribble(
         
         #experiment 2
         "viral.experiment.2", #name_for_merged_seurat_file
-        "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\",#absolute path raw_data_root
+        "..\\..\\raw_data\\machiels_lab\\viral\\",#absolute path raw_data_root
         "lung", #cell_id_A
         "bal",#cell_id_B
         "output_lung_d8\\Combined_BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
@@ -36,10 +58,10 @@ file_names_tbl <- tribble(
         "seurat_obj_experiment_2_combined_bal_raw_dbec",#name_for_seurat_file_B
         "output_lung_d8\\BD-Analysis-BMachiels-Lung_Sample_Tag_ReadsPerCell.csv",#~sample_tag_reads_per_cell_A,
         "output_bal_d8\\BD-Analysis-BMachiels-Bal_Sample_Tag_ReadsPerCell.csv",#sample_tag_reads_per_cell_B,
-        
+
         #experiment 1
         "viral.experiment.1", #name_for_merged_seurat_file
-        "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\",#absolute path raw_data_root
+        "..\\..\\raw_data\\machiels_lab\\viral\\",#absolute path raw_data_root
         "lung", #cell_id_A
         "bal",#cell_id_B
         "2023-10-02_output_lung\\Output_Lung\\Combined_BD-Analysis-BMachiels_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
@@ -62,20 +84,19 @@ file_path$intermediate_data<- ".\\intermediate_data\\"
 
 ##reads in rhapsody mutltiassay  csv file into seurat object
 read_rhapsody_multi_assay_tibble_based <- function(dbec_counts_path, project_name, sample_tag_reads){
-        counts <- vroom(dbec_counts_path, skip = 7) 
-        barcodes <- counts |> pull(Cell_Index)
+        counts <- vroom(dbec_counts_path, skip = 7) # vroom to read in  the dbec corrected count data
+        barcodes <- counts |> pull(Cell_Index) 
         
-        #colnames(counts) <- features
-        #counts <- as(counts, "sparseMatrix")
+    
         print("count table loaded")
-
-        protein <- counts[grep(names(counts),pattern = "pAbO")] |>
+        #pAb0 denotes the antibody derived tags directed against "proteins" 
+        protein <- counts[grep(names(counts),pattern = "pAbO")] |> 
                 clean_names() |>  #get rid of special characters that would interfere with downstream functions in feature names
                 tidyfst::t_dt() #efficiently transposes dataframes 
-        colnames(protein) <- barcodes # reapply cell index
+        colnames(protein) <- barcodes # reapply cell index to put the column names back in the object
         
         
-        transcriptome <- counts[grep(names(counts),pattern = c("pAbO|Cell"), invert = T)] 
+        transcriptome <- counts[grep(names(counts),pattern = c("pAbO|Cell"), invert = T)] # transcriptome counts is everything besides the protein counts
         print("transposing transcriptome tibble")
         transcriptome <- transcriptome |> tidyfst::t_dt()
         colnames(transcriptome) <- barcodes
@@ -89,7 +110,7 @@ read_rhapsody_multi_assay_tibble_based <- function(dbec_counts_path, project_nam
         seurat[['protein']] <- CreateAssayObject(counts = protein)
         
         print("add sample tags")
-        sample_tag_reads <- read_csv(sample_tag_reads, skip = 7) |>
+        sample_tag_reads <- read_csv(sample_tag_reads, skip = 7) |> ## skip 7 because first 7 lines are not the data themselves
                 mutate(Cell_Index=as.character(Cell_Index)) |> clean_names()
         
         colnames(sample_tag_reads) <- str_remove_all(colnames(sample_tag_reads), "_mm_st_ab_o")
@@ -119,7 +140,7 @@ for (line in 1:nrow(file_names_tbl)) {
         sample_tag_reads_A <- paste0( file_names_tbl[[line,"raw_data_root"]],
                                       file_names_tbl[[line,"sample_tag_reads_per_cell_A"]])
         print("Seurat A")
-
+      
         seurat_A <-  read_rhapsody_multi_assay_tibble_based(dbec_counts_path= seurat_path_A_abolute,#absolute path
                                                             project_name = proj_name_A,
                                                             sample_tag_reads= sample_tag_reads_A)

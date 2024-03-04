@@ -5,7 +5,7 @@ libraries("tidyverse", "Seurat", "tidyseurat", "tibble")
 file_path <- vector("list") 
 file_path$output <- ".\\output\\" 
 file_path$intermediate_data<- ".\\intermediate_data\\" 
-file_path$raw_data_root <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\"
+file_path$raw_data_root <- "..\\..\\raw_data\\machiels_lab\\viral\\"
 
 #for read: seurat object path
 #for write processed seurt object path
@@ -58,9 +58,7 @@ path_raw_specific_dataset <- "2023-10-02_output_bal\\Output_BAL\\"
 
 
 seurat_basic_workflow <- function(seurat_obj, sample_tag_calls){
-    #future::plan(multisession, workers = 4)
-    #future::plan()
-    #seurat_obj <- seurat_obj |> separate(.cell, into=c("discard","origin"), remove = F, sep = "__")
+  
     seurat_obj <- seurat_obj |> PercentageFeatureSet("^Rp[sl]", col.name = "percent_ribo") # Check if all genes are included
     seurat_obj[["percent_mito"]] <- PercentageFeatureSet(seurat_obj, pattern = "^Mt")
     seurat_obj <- NormalizeData(seurat_obj, normalization.method = "LogNormalize", scale.factor = 10000)
@@ -72,6 +70,7 @@ seurat_basic_workflow <- function(seurat_obj, sample_tag_calls){
     seurat_obj <- FindClusters(seurat_obj, resolution = 0.5)
     seurat_obj <- RunUMAP(seurat_obj, dims = 1:10)
     
+    #renaming of the sampletag
     seurat_obj$sampletag_name <- sample_tag_calls  |>
         right_join(tibble(Cell_Index=colnames(seurat_obj))) |> 
         mutate(Sample_Name=str_replace(Sample_Name,pattern="\\-", replacement = "_")) |> 
@@ -85,7 +84,7 @@ seurat_basic_workflow <- function(seurat_obj, sample_tag_calls){
         TRUE ~ "single_hashtag")
     ) |> 
         mutate(sampletag_multiplets=factor(sampletag_multiplets, levels=c("undeterminded" , "multiplet"  ,   "single_hashtag"))) 
-    
+    #create separate groups based on Ms4a3
     seurat_obj <- seurat_obj |>  mutate(sampletag_Ms4a3=case_when(
         sampletag_name=="Multiplet" ~ "multiplet",
         sampletag_name=="Undetermined" ~"undeterminded",
@@ -145,25 +144,3 @@ write_csv(seurat_obj.markers, file = paste0(file_names_tibble[[line,"write_marke
 }
 
 
-
-# experiment_1.markers_top <- experiment_1.markers %>%
-#     group_by(cluster) %>%
-#     slice_max(n = 2, order_by = avg_log2FC)
-# 
-# write_rds(experiment_1.markers, file = paste0(file_path$intermediate_data, "experiment_1._QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds"))
-# 
-# 
-# 
-# experiment_1.markers_top <- read_rds(file = paste0(file_path$intermediate_data, "experiment_1._QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds")) %>%
-#         group_by(cluster) %>%
-#         slice_max(n = 2, order_by = avg_log2FC)
-# 
-# experiment_1.markers_top_4 <- read_rds(file = paste0(file_path$intermediate_data, "experiment_1._QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds")) %>%
-#         group_by(cluster) %>%
-#         slice_max(n = 4, order_by = avg_log2FC)
-# 
-# 
-# levels_diff_exp_features_4 <-   pull(experiment_1.markers_top_4, gene) |> unique()
-# experiment_1.markers_top_4 <- experiment_1.markers_top_4 |> mutate(gene=factor(gene, levels=levels_diff_exp_features_4))
-
-#write_rds(experiment_1.markers, file = paste0(file_path$intermediate_data, "experiment_1._QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds"))

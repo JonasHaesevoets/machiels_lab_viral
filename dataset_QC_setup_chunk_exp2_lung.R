@@ -4,27 +4,22 @@ set.seed(2023)
 file_path <- vector("list") 
 file_path$output <- ".\\output\\" 
 file_path$intermediate_data<- ".\\intermediate_data\\" 
-#file_path$raw_data <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_bal\\Output_bal\\BD-Analysis-BMachiels_Expression_Data_Unfiltered.st.gz"
 
 obj_identifier <- "experiment_2_lung"
 file_name_obj <- paste0("seurat_obj_", obj_identifier, "_workflowed.rds")
 #file_name_obj <- "seurat_obj_experiment_1_bal_workflowed.rds"
 
 
-seurat_obj <- read_rds(file = paste0(file_path$intermediate_data,file_name_obj)) |>
-        mutate(sampletag_multiplets=factor(sampletag_multiplets, levels=c("undeterminded" , "multiplet"  , "single_hashtag"))) #level change can be ommited later when intermediate data has been asjusted
-#seurat_obj <- subset(x = seurat_obj, downsample = 100)
+seurat_obj <- read_rds(file = paste0(file_path$intermediate_data,file_name_obj))
 
 
 
-#seurat_obj <-   read_rds(file = paste0(file_path$intermediate_data,"SAMPLED_2000cells_seurat_obj_experiment_1_combined_bal_raw_dbec_workflowed.rds") )
-
-#de_genes_tbl <- "C:\\Users\\danne\\R_projects\\machiels_lab_viral\\intermediate_data\\experiment_2._lung__QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.rds" |> read_rds() #|> select(cluster:gene)
 
 
-de_genes_tbl <- read_csv("intermediate_data/experiment_2.lung_QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.csv")|>
-        relocate(gene) 
 
+de_genes_tbl <- read_csv(
+  "intermediate_data/experiment_2_workflowed.Lung_QCmarkers_min.pct_0.4_logfc.threshold_0.25_max.cells.per.ident_300.csv")|>
+  relocate(gene) 
 file_path_output <- paste0(file_path$intermediate_data,"seurat_obj_experiment_2_lung_afterQCdashboard.rds")
 
 
