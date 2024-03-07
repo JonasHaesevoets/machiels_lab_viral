@@ -9,7 +9,7 @@ libraries("Seurat", "tidyverse", "janitor", "forcats","tidyseurat", "Matrix", "v
 ####
 #below file paths are to be specified
 
-raw_data_root <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\"
+raw_data_root <-  "../../Desktop/Analysis_Lucia/raw_data/machiels_lab/viral"
 
 #name input and output file names
 #dont use "_" for exeriment names because Seurat can't deal with this
@@ -27,7 +27,7 @@ file_names_tbl <- tribble(
         
         #experiment 2
         "viral.experiment.2", #name_for_merged_seurat_file
-        "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\",#absolute path raw_data_root
+        "../../Desktop/Analysis_Lucia/raw_data/machiels_lab/viral/",#absolute path raw_data_root
         "lung", #cell_id_A
         "bal",#cell_id_B
         "output_lung_d8\\Combined_BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
@@ -39,7 +39,7 @@ file_names_tbl <- tribble(
         
         #experiment 1
         "viral.experiment.1", #name_for_merged_seurat_file
-        "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\",#absolute path raw_data_root
+        "../../Desktop/Analysis_Lucia/raw_data/machiels_lab/viral/",#absolute path raw_data_root
         "lung", #cell_id_A
         "bal",#cell_id_B
         "2023-10-02_output_lung\\Output_Lung\\Combined_BD-Analysis-BMachiels_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
@@ -53,8 +53,8 @@ file_names_tbl <- tribble(
 
 ####set up file paths
 file_path <- vector("list") 
-file_path$output <- ".\\output\\" 
-file_path$intermediate_data<- ".\\intermediate_data\\" 
+file_path$output <- "../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/output/" 
+file_path$intermediate_data<- "../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/"
 #file_path$raw_data_root <- raw_data_root
 
 

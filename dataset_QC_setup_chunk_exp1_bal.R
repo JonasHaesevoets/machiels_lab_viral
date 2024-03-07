@@ -2,8 +2,8 @@
 set.seed(2023)
 #set up file paths
 file_path <- vector("list") 
-file_path$output <- ".\\output\\" 
-file_path$intermediate_data<- ".\\intermediate_data\\" 
+file_path$output <- "../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/output" 
+file_path$intermediate_data<- "../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/"
 #file_path$raw_data <- "C:\\Users\\danne\\raw_data\\machiels_lab\\viral\\2023-10-02_output_bal\\Output_bal\\BD-Analysis-BMachiels_Expression_Data_Unfiltered.st.gz"
 
 obj_identifier <- "experiment_1_bal"
