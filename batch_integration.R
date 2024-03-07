@@ -29,7 +29,7 @@ gc()
 obj@misc <- list(misc_list_1,misc_list_2)
 obj <- JoinLayers(obj, assay = "RNA")
 obj <- JoinLayers(obj, assay = "protein")
-obj <- JoinLayers(obj, assay = "sampletags")
+# obj <- JoinLayers(obj, assay = "sampletags")
 #write_rds(obj,"../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_1_2_merged.rds")
 #obj <- read_rds("../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_1_2_merged.rds")
 
