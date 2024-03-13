@@ -1,0 +1,136 @@
+---
+title: "Heatmaps_Abseq"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+SiglecF: expressed on surface of alveoloar macrophages where it works as a receptor for sialic acid
+
+CD11c: integrin expressed on alveolar macrophages and involved in complement pw as a complement receptor aka itgax
+
+CD274: constituvely expressed on alveolar macrophages =\> possessing a superior phagocytic ability and the capacity to repress cytotoxic T lymphocytes (CTLs) by cis- and trans-interacting with CD80 and PD-1)
+
+H2-IA-IE: aka H2-Ab1 These class II molecules are expressed on antigen presenting cells (including B cells) and a subset of T cells from H-2b,d,q,r bearing mice and are involved in antigen presentation to T cells expressing CD3/TCR and CD4 proteins.
+
+PPARg: transcription factor driving expression of many AM-specific genes
+
+Chil3: robustly expressed in mouse alveolar macrophage thought to function as a lectin and may be involved in inflammation and allergy.
+
+Fabp5: FABP5 programs lipid metabolism to regulate M2 polarization
+
+Flt1: VEGFR family member with antiangiogenic capacity
+
+Fabp4: expressed in resident alveolar macrophages FABP4+macrophages play an important role in infection. (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6988858/) https://link.springer.com/article/10.1007/s13402-023-00816-7
+
+EAR1: predominantly expressed in lungs of naive mice The expression of Ear genes in the mouse is confined to sites of known eosinophilopoiesis, with the exception of the lung. Two Ear genes, Ear1 and Ear2, are predominantly expressed in the lungs of naive mice. Total Ear gene expression and RNase activity in bronchoalveolar lavage fluid increases significantly upon the induction of pulmonary inflammation using an ovalbumin (OVA) model of allergic sensitization and challenge. Interestingly, pulmonary Ear11 transcripts, which are absent in naive mice, accumulate as a consequence of OVA-mediated T(H)2 inflammation in the lung.
+
+Krt79: robustly expressed in mouse alveolar macrophage
+
+load in the required packages and the central object the central object is the starting off point for all future analyses
+
+```{r Load in data and the required packages}
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat")
+obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+DefaultAssay(obj.v5) <- "adt"
+
+```
+
+dsb: denoised scaled by background normalization takes the raw expression matrix from the ab seq experiment as input identifies empty droplets or those with minimal protein content (background signal) normalizes the expression values in each cell by accounting fo technical variations and removing the afore mentioned background signal
+
+in this analysis the Z-score is used to denote protein expression, the Z-score describes a value's relation to the mean of the dataset by giving the amount of standard deviations the specific point (value) is removed from the average.
+
+The Z-score would be one of the appropriate metrics to denote expression of the marker genes
+
+In this case, it tells how many the average expression level of a particular gene is away from the overall mean expression of that gene across all samples.
+
+Positive Z score indicates that the average expression of that gene in that sample is higher than the overall average expression of that gene across all samples. Hence it can be said with a level of caution that the gene is relatively overexpressed in this sample compared to the overall mean exprression of it.
+
+Negative Z score indicates that the average expression of that gene in that sample is lowerthan the overall average expression of that gene across all samples. Hence it can be said with a level of caution that the gene is relatively underexpressed in this sample compared to the overall mean exprression of it.
+
+```{r}
+
+```
+
+\
+
+```{r}
+  ggsave(filename = "heatmap_markers_abseq_per_sample.png", width = 30, height = 45, units = "cm")
+```
+
+```{r}
+DimPlot(obj.v5, reduction = "umap.harmony_8dims", split.by = "day")
+```
+
+```{r}
+ggsave(filename = "umap_centralObject_splitByExperiment.png", path = "output/abseq")
+
+```
+
+```{r}
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="adt", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+```
+
+```{r}
+ggsave("heatmap_markersAbseq_cluster_zscore_clusteraverages.png", path = "output/abseq")
+```
+
+```{r}
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "H2-ia-ie-AbSeq", "Cd274-AbSeq", "Cd11c", "Ly-6g-AbSeq", "Ly-6a-AbSeq"
+                  ),assay="adt", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt))  |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=
+mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized and max scaled per batch protein expression")
+```
+
+```{r}
+ggsave("heatmap_markersAbseq_cluster.png", path = "output/abseq")
+```
+
+the more purple the more expression of the marker gene
+
+```{r}
+featureplot_siglecf = FeaturePlot(obj.v5, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, 
+                                  keep.scale = 'all')
+featureplot_siglecf
+
+```
+
+```{r}
+featureplot_H2_ia_ie = FeaturePlot(obj.v5, features = c( "H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, 
+                                  keep.scale = 'all')
+featureplot_H2_ia_ie
+```
+
+```{r}
+featureplot_CD274 = FeaturePlot(obj.v5, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, 
+                                  keep.scale = 'all')
+featureplot_CD274
+```
+
+```{}
+```
+
+```{r}
+featureplot_CD11c = FeaturePlot(obj.v5, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, 
+                                  keep.scale = 'all')
+featureplot_CD11c
+```
