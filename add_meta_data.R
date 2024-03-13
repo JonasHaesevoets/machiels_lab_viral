@@ -1,5 +1,5 @@
 easypackages::libraries("Seurat", "tidyverse", "tidyseurat", "scooter")
-obj.v5 <- read_rds("../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_central.rds")
+obj.v5 <- read_rds("intermediate_data/seurat_obj_central.rds")
 DefaultAssay(obj.v5) <- "RNA"
 
 
@@ -72,4 +72,4 @@ obj.v5$sample_tag_ms4a3_pos_gabbr2 <- pull(new_meta_data,sample_tag_ms4a3_pos_ga
 obj.v5$day_tissue_virus_ms4a3_gabbr2corrected_gender <- pull(new_meta_data, day_sample_type_cond_ms4a3_pos_gabbr2_gender)
 obj.v5$gender =  pull(new_meta_data, gender)
 
-obj.v5 |>  write_rds("../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_central.rds")
+obj.v5 |>  write_rds("intermediate_data/seurat_obj_central.rds")

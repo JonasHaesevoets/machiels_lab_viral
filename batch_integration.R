@@ -1,11 +1,14 @@
+## for analaytical choices case_study_experiment_1_2_integration.r 
+
+
 library(tidyseurat)
 library(readr)
 library(Seurat)
 set.seed(2023)
 
 # load and merge data files
-exp_2_lung <- "../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_2_lung_afterQCdashboard.rds" |> read_rds()
-exp_2_bal <- "../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_2_bal_afterQCdashboard.rds" |> read_rds()
+exp_2_lung <- "intermediate_data/seurat_obj_experiment_2_lung_afterQCdashboard.rds" |> read_rds()
+exp_2_bal <- "intermediate_data/seurat_obj_experiment_2_bal_afterQCdashboard.rds" |> read_rds()
 
 exp_2 <- merge(exp_2_lung, exp_2_bal,add.cell.ids = c("lung", "bal")) 
 misc_list_2 <- list(exp_2_lung@misc,exp_2_bal@misc)
@@ -13,8 +16,8 @@ exp_2_bal <- NULL
 exp_2_lung <- NULL
 gc()
 
-exp_1_lung <- "../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_1_lung_afterQCdashboard.rds" |> read_rds()
-exp_1_bal <- "../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_1_bal_afterQCdashboard.rds" |> read_rds()
+exp_1_lung <- "intermediate_data/seurat_obj_experiment_1_lung_afterQCdashboard.rds" |> read_rds()
+exp_1_bal <- "intermediate_data/seurat_obj_experiment_1_bal_afterQCdashboard.rds" |> read_rds()
 
 exp_1 <- merge(exp_1_lung, exp_1_bal,add.cell.ids = c("lung", "bal")) 
 misc_list_1 <- list(exp_1_lung@misc, exp_1_bal@misc)
@@ -30,8 +33,8 @@ obj@misc <- list(misc_list_1,misc_list_2)
 obj <- JoinLayers(obj, assay = "RNA")
 obj <- JoinLayers(obj, assay = "protein")
 # obj <- JoinLayers(obj, assay = "sampletags")
-#write_rds(obj,"../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_1_2_merged.rds")
-#obj <- read_rds("../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_1_2_merged.rds")
+#write_rds(obj," intermediate_data/seurat_obj_experiment_1_2_merged.rds")
+#obj <- read_rds(" intermediate_data/seurat_obj_experiment_1_2_merged.rds")
 
 ### convert object to v5 object
 
@@ -59,6 +62,8 @@ obj.v5 <- FindVariableFeatures(obj.v5)
 obj.v5 <- ScaleData(obj.v5)
 obj.v5 <- RunPCA(obj.v5)
 
+
+
 obj.v5 <- IntegrateLayers(
         object = obj.v5, method = HarmonyIntegration,
         orig.reduction = "pca", new.reduction = "integrated.harmony",
@@ -74,6 +79,6 @@ obj.v5 <- JoinLayers(obj.v5, assay= "RNA")
 #obj <- JoinLayers(obj, assay = "protein")
 #obj <- JoinLayers(obj, assay = "sampletags")
 
-obj.v5 |>  write_rds("../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/seurat_obj_experiment_1_2_integrated.rds")
+obj.v5 |>  write_rds("intermediate_data/seurat_obj_experiment_1_2_integrated.rds")
 
 

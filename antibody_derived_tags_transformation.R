@@ -2,17 +2,18 @@ library(Seurat)
 library(tidyverse)
 library(tidyseurat)
 library(Matrix)
-
+library(data.table)
+library(dsb)
 
 
 # read in all sequencing counts of all Rhapsody wells
 # this means also those wells that the rhapsody pipeline does not call as containing a cell
 
 ## read in the empty
-unfiltered_csv_paths <- c("..\\..\\Desktop/Analysis_Lucia/raw_data\\machiels_lab\\viral\\output_lung_d8\\BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell_Unfiltered.csv.gz",
-                          "..\\..\\Desktop/Analysis_Lucia/raw_data\\machiels_lab\\viral\\output_bal_d8\\BD-Analysis-BMachiels-BAL_DBEC_MolsPerCell_Unfiltered.csv.gz",
-                          "..\\..\\Desktop/Analysis_Lucia/raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz",
-                          "../../Desktop/Analysis_Lucia/raw_data\\machiels_lab\\viral\\2023-10-02_output_bal\\Output_BAL\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz")
+unfiltered_csv_paths <- c("raw_data\\machiels_lab\\viral\\output_lung_d8\\BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "raw_data\\machiels_lab\\viral\\output_bal_d8\\BD-Analysis-BMachiels-BAL_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "raw_data\\machiels_lab\\viral\\2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz",
+                          "raw_data\\machiels_lab\\viral\\2023-10-02_output_bal\\Output_BAL\\BD-Analysis-BMachiels_DBEC_MolsPerCell_Unfiltered.csv.gz")
 
 exp_name <- c("lung_d8","bal_d8",
               "lung_d60", "bal_d60")
@@ -29,7 +30,7 @@ for (i in seq_along(unfiltered_csv_paths)) {
                        showProgress = T)
   #rename the proteins
   colnames(counts_fread) <- c("cell_index","Siglecf_AbSeq","H2_ia_ie_AbSeq","Cd274_AbSeq","Cd11c","Ly_6g_AbSeq","Ly_6a_AbSeq")
-  write_csv(counts_fread,paste0("../../Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/intermediate_data/",exp_name[i],"unfiltered_prot_counts_fread.csv") )
+  write_csv(counts_fread,paste0(" intermediate_data/",exp_name[i],"unfiltered_prot_counts_fread.csv") )
 }
   
 ###################
@@ -44,10 +45,10 @@ setup_chunks <- c(
 
 # the counts also containing empty wells for the proteins
 unfiltered_prot_counts <- c(
-  "bal_d60unfiltered_prot_counts_fread.csv",
-  "bal_d8unfiltered_prot_counts_fread.csv",
-  "lung_d60unfiltered_prot_counts_fread.csv",
-  "lung_d8unfiltered_prot_counts_fread.csv")
+  "intermediate_data/bal_d60unfiltered_prot_counts_fread.csv",
+  "intermediate_data/bal_d8unfiltered_prot_counts_fread.csv",
+  "intermediate_data/lung_d60unfiltered_prot_counts_fread.csv",
+  "intermediate_data/lung_d8unfiltered_prot_counts_fread.csv")
 
 dataset_name <- c(
   "bal_d60",
@@ -55,13 +56,13 @@ dataset_name <- c(
   "lung_d60",
   "lung_d8")
 
-unfiltered_prot_counts <- unfiltered_prot_counts |> map_vec(\(x) paste0(".\\intermediate_data\\", x))
+# unfiltered_prot_counts <- unfiltered_prot_counts |> map_vec(\(x) paste0(" intermediate_data/", x))
+
 
 plot_list <- list()
 for (i in seq_along(unfiltered_prot_counts)) {
   print(unfiltered_prot_counts[i])
   all_BD_protein_counts <- read_csv(unfiltered_prot_counts[i])
-  
   protein_counts_cell_is_col <- all_BD_protein_counts |>  tidyfst::t_dt() 
   colnames(protein_counts_cell_is_col) <- protein_counts_cell_is_col[1,] 
   protein_counts_cell_is_col <- protein_counts_cell_is_col[-1,]
@@ -116,7 +117,7 @@ for (i in seq_along(unfiltered_prot_counts)) {
     use.isotype.control = F
   )
   
-  write_rds(cells.dsb.norm,paste0(".\\intermediate_data\\dsb_matrix_",dataset_name[i],".rds"))
+  write_rds(cells.dsb.norm,paste0(" intermediate_data/dsb_matrix_",dataset_name[i],".rds"))
   
 }
 
@@ -131,8 +132,7 @@ for (i in seq_along(unfiltered_prot_counts)) {
 
 ##################
 
-#path_1 <- "C:/Users/danne/R_projects/machiels_lab_viral/intermediate_data/seurat_obj_experiment_1_2_merged_v5_split_integrated.rds"
-path_1 <-"..\\..\\R_projects\\machiels_lab_viral-main\\intermediate_data\\seurat_obj_experiment_1_2_integrated.rds"
+path_1 <-"intermediate_data/seurat_obj_experiment_1_2_integrated.rds"
 obj.v5 <- read_rds(path_1)
 
 
@@ -141,7 +141,7 @@ obj.v5 <- read_rds(path_1)
 exp_1_lung <- "intermediate_data/dsb_matrix_lung_d60.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_1_lung_",cell))
 exp_2_lung <- "intermediate_data/dsb_matrix_lung_d8.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_2_lung_",cell))
 exp_1_bal <-  "intermediate_data/dsb_matrix_bal_d60.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_1_bal_",cell))
-exp_2_bal <-"intermediate_data/dsb_matrix_bal_d8.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_2_bal_",cell))
+exp_2_bal <-  "intermediate_data/dsb_matrix_bal_d8.rds" |> read_rds() |> t() |> as_tibble(rownames="cell") |> mutate(cell=paste0("exp_2_bal_",cell))
 
 dsb_all <- bind_rows(exp_1_lung,
                      exp_2_lung,
@@ -228,7 +228,7 @@ obj.v5[["protein"]] <- NULL
 
 
 write_rds(x = obj.v5,
-          file ="../../Desktop/Analysis_Lucia/R_projects\\machiels_lab_viral-main\\intermediate_data\\seurat_obj_central.rds" )
+          file ="intermediate_data\\seurat_obj_central.rds" )
 
 
 
