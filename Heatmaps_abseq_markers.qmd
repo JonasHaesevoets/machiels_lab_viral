@@ -10,6 +10,8 @@ execute:
   message: false
 ---
 
+## Info on the marker genes
+
 SiglecF: expressed on surface of alveoloar macrophages where it works as a receptor for sialic acid
 
 CD11c: integrin expressed on alveolar macrophages and involved in complement pw as a complement receptor aka itgax
@@ -25,6 +27,8 @@ Chil3: robustly expressed in mouse alveolar macrophage thought to function as a 
 Fabp5: FABP5 programs lipid metabolism to regulate M2 polarization
 
 Flt1: VEGFR family member with antiangiogenic capacity
+
+labels subset of macrophages in breast cancer (human and mouse) enriched in metastatic sites
 
 Fabp4: expressed in resident alveolar macrophages FABP4+macrophages play an important role in infection. (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6988858/) https://link.springer.com/article/10.1007/s13402-023-00816-7
 
@@ -127,23 +131,21 @@ ggsave("heatmap_markersAbseq_cluster.png", path = "output/abseq")
 ## General UMAP plots
 
 ```{r}
-featureplot_siglecf = FeaturePlot(obj.v5, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, 
-                                  keep.scale = 'all')
+featureplot_siglecf = FeaturePlot(obj.v5, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_siglecf
-ggsave(filename = "featureplot_cd274.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_siglecf.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
 
 ```
 
 ```{r}
-featureplot_H2_ia_ie = FeaturePlot(obj.v5, features = c( "H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, 
-                                  keep.scale = 'all')
+featureplot_H2_ia_ie = FeaturePlot(obj.v5, features = c( "H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_H2_ia_ie
 ggsave(filename = "featureplot_h2.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
 ```
 
 ```{r}
 featureplot_CD274 = FeaturePlot(obj.v5, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, 
-                                  keep.scale = 'all')
+                                  cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_CD274
 ggsave(filename = "featureplot_cd274.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
 ```
@@ -153,7 +155,7 @@ ggsave(filename = "featureplot_cd274.png", width = 45, height = 45, units = "cm"
 
 ```{r}
 featureplot_CD11c = FeaturePlot(obj.v5, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, 
-                                  keep.scale = 'all')
+                                  cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_CD11c
 ggsave(filename = "featureplot_cd11c.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
 ```
@@ -166,21 +168,21 @@ seurat_onlyd8 <- seurat_onlyd8 %>%filter(!str_detect(condition, "Mock"))
 seurat_onlyd8 %>% write_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_d8") 
 clustersAlveolar = c(0, 2, 4, 6, 7, 8)
 # seurat_onlyd8_alveolarClusters <- seurat_onlyd8 %>% subset(seurat_onlyd8$harmony_cluster_8dims, subset = c(0, 2, 4, 6, 7, 8)) 
-featureplot_d8_tissue_cd274 = FeaturePlot(seurat_onlyd8, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , keep.scale = 'all', split.by = "sample_type") 
+featureplot_d8_tissue_cd274 = FeaturePlot(seurat_onlyd8, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, split.by = "day_mock", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d8_tissue_cd274
-ggsave(filename = "featureplot_d8_tissue_cd274.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_d8_tissue_cd274.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d8/tissue")
 ```
 
 ```{r}
-featureplot_d8_tissue_cd11c = FeaturePlot(seurat_onlyd8, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , keep.scale = 'all', split.by = "sample_type")
+featureplot_d8_tissue_cd11c = FeaturePlot(seurat_onlyd8, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d8_tissue_cd11c
-ggsave(filename = "featureplot_d8_tissue_cd11c.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_d8_tissue_cd11c.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d8/tissue")
 ```
 
 ```{r}
-featureplot_d8_tissue_h2 = FeaturePlot(seurat_onlyd8, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , keep.scale = 'all', split.by = "sample_type") 
+featureplot_d8_tissue_h2 = FeaturePlot(seurat_onlyd8, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d8_tissue_h2
-ggsave(filename = "featureplot_d8_tissue_h2.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_d8_tissue_h2.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d8/tissue")
 ```
 
 ```{r}
@@ -188,86 +190,386 @@ ggsave(filename = "featureplot_d8_tissue_h2.png", width = 45, height = 45, units
 ```
 
 ```{r}
-featureplot_d8_tissue_SiglecF = FeaturePlot(seurat_onlyd8, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , keep.scale = 'all', split.by = "sample_type") 
+featureplot_d8_tissue_SiglecF = FeaturePlot(seurat_onlyd8, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d8_tissue_SiglecF
-ggsave(filename = "featureplot_d8_tissue_SiglecF.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_d8_tissue_SiglecF.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d8/tissue")
 ```
 
 ## UMAP plots d8: effect of virus
 
 ```{r}
-featureplot_d8_virus_SiglecF = FeaturePlot(seurat_onlyd8, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8, keep.scale = 'all', split.by = "virus") 
+featureplot_d8_virus_SiglecF = FeaturePlot(seurat_onlyd8, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "virus", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d8_virus_SiglecF
-ggsave(filename = "featureplot_d8_virus_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/") 
+ggsave(filename = "featureplot_d8_virus_siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d8/virus") 
 ```
 
 ```{r}
-
-```
-
-```{r}
-featureplot_d8_virus_cd274 = FeaturePlot(seurat_onlyd8, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8, keep.scale = 'all', split.by = "virus") 
+featureplot_d8_virus_cd274 = FeaturePlot(seurat_onlyd8, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "virus", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d8_virus_cd274
-ggsave(filename = "featureplot_d8_virus_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/") 
+ggsave(filename = "featureplot_d8_virus_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d8/virus") 
 ```
 
 ```{r}
-featureplot_d8_virus_h2 = FeaturePlot(seurat_onlyd8, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8, keep.scale = 'all', split.by = "virus") 
+featureplot_d8_virus_h2 = FeaturePlot(seurat_onlyd8, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "virus", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d8_virus_h2
-ggsave(filename = "featureplot_d8_virus_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/") 
+ggsave(filename = "featureplot_d8_virus_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d8/virus") 
 ```
 
 ```{r}
-featureplot_d8_virus_cd11c = FeaturePlot(seurat_onlyd8, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = 8, keep.scale = 'all', split.by = "virus") 
+featureplot_d8_virus_cd11c = FeaturePlot(seurat_onlyd8, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "virus", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d8_virus_cd11c
-ggsave(filename = "featureplot_d8_virus_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/") 
+ggsave(filename = "featureplot_d8_virus_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d8/virus") 
 ```
 
 ## UMAP plots d60: effect of tissue
 
 ```{r}
 seurat_onlyd60 <- obj.v5 %>% filter(str_detect(day_factor, "d60")) 
-seurat_onlyd60 <- seurat_onlyd8 %>%filter(!str_detect(condition, "Mock"))
+seurat_onlyd60 <- seurat_onlyd60 %>%filter(!str_detect(condition, "Mock"))
 seurat_onlyd60 %>% write_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_d8") 
 clustersAlveolar = c(0, 2, 4, 6, 7, 8)
 # seurat_onlyd8_alveolarClusters <- seurat_onlyd8 %>% subset(seurat_onlyd8$harmony_cluster_8dims, subset = c(0, 2, 4, 6, 7, 8)) 
-featureplot_d60_tissue_cd274 = FeaturePlot(seurat_onlyd60, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , keep.scale = 'all', split.by = "sample_type") 
+featureplot_d60_tissue_cd274 = FeaturePlot(seurat_onlyd60, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d60_tissue_cd274
-ggsave(filename = "featureplot_d60_tissue_cd274.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_d60_tissue_cd274.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d60/tissue")
 ```
 
 ```{r}
-featureplot_d60_tissue_cd11c = FeaturePlot(seurat_onlyd60, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , keep.scale = 'all', split.by = "sample_type")
+featureplot_d60_tissue_cd11c = FeaturePlot(seurat_onlyd60, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d60_tissue_cd11c
-ggsave(filename = "featureplot_d60_tissue_cd11c.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_d60_tissue_cd11c.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d60/tissue")
 ```
 
 ```{r}
-featureplot_d60_tissue_h2 = FeaturePlot(seurat_onlyd60, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , keep.scale = 'all', split.by = "sample_type") 
+featureplot_d60_tissue_h2 = FeaturePlot(seurat_onlyd60, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right") 
 featureplot_d60_tissue_h2
-ggsave(filename = "featureplot_d60_tissue_h2.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_d60_tissue_h2.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d60/tissue")
 ```
 
 ```{r}
-featureplot_d60_tissue_SiglecF = FeaturePlot(seurat_onlyd60, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , keep.scale = 'all', split.by = "sample_type") 
+featureplot_d60_tissue_SiglecF = FeaturePlot(seurat_onlyd60, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d60_tissue_SiglecF
-ggsave(filename = "featureplot_d60_tissue_SiglecF.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/")
+ggsave(filename = "featureplot_d60_tissue_SiglecF.png", width = 45, height = 45, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d60/tissue")
 ```
 
 ## UMAP plots d60: effect of virus
 
 ```{r}
-featureplot_d60_virus_SiglecF = FeaturePlot(seurat_onlyd60, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8, keep.scale = 'all', split.by = "virus") 
+featureplot_d60_virus_SiglecF = FeaturePlot(seurat_onlyd60, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "virus", cols = c("green", "red"))& theme(legend.position = "right")
 featureplot_d60_virus_SiglecF
-ggsave(filename = "featureplot_d60_virus_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/") 
+ggsave(filename = "featureplot_d60_virus_siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d60/virus") 
 ```
 
 ```{r}
-featureplot_d60_virus_cd274 = FeaturePlot(seurat_onlyd60, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8, keep.scale = 'all', split.by = "virus") 
+featureplot_d60_virus_cd274 = FeaturePlot(seurat_onlyd60, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "virus", cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_d60_virus_cd274
-ggsave(filename = "featureplot_d60_virus_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/") 
+ggsave(filename = "featureplot_d60_virus_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d60/virus") 
 ```
 
 ```{r}
+featureplot_d60_virus_h2 = FeaturePlot(seurat_onlyd60, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "virus", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_d60_virus_h2
+ggsave(filename = "featureplot_d60_virus_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d60/virus") 
+```
 
+```{r}
+featureplot_d60_virus_cd11c = FeaturePlot(seurat_onlyd60, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "virus", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_d60_virus_cd11c
+ggsave(filename = "featureplot_d60_virus_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/d60/virus") 
+```
+
+## UMAP plots different days
+
+```{r}
+seurat_noMock <- obj.v5 %>%filter(!str_detect(condition, "Mock"))
+featureplot_days_cd11c = FeaturePlot(seurat_noMock,features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "day_factor", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_days_cd11c
+ggsave(filename = "featureplot_d60_virus_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/mock/days") 
+```
+
+```{r}
+featureplot_days_h2 = FeaturePlot(seurat_noMock,features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "day_factor", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_days_h2
+ggsave(filename = "featureplot_d60_virus_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/mock/days") 
+```
+
+```{r}
+featureplot_days_Cd274 = FeaturePlot(seurat_noMock,features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "day_factor", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_days_Cd274
+ggsave(filename = "featureplot_d60_virus_Cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/mock/days") 
+```
+
+```{r}
+featureplot_days_siglecf = FeaturePlot(seurat_noMock,features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "day_factor", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_days_siglecf
+ggsave(filename = "featureplot_d60_virus_siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/mock/days") 
+```
+
+## UMAP plots mock tissue
+
+```{r}
+seurat_Mock <- obj.v5 %>%filter(str_detect(condition, "Mock"))
+featureplot_mock_tissue_cd11c = FeaturePlot(seurat_noMock,features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_mock_tissue_cd11c
+ggsave(filename = "featureplot_mock_tissue_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/mock/tissue") 
+```
+
+```{r}
+featureplot_mock_tissue_cd274 = FeaturePlot(seurat_noMock,features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_mock_tissue_cd274
+ggsave(filename = "featureplot_mock_tissue_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/mock/tissue") 
+```
+
+```{r}
+featureplot_mock_tissue_Siglecf = FeaturePlot(seurat_noMock,features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_mock_tissue_Siglecf
+ggsave(filename = "featureplot_mock_tissue_Siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/mock/tissue") 
+```
+
+```{r}
+featureplot_mock_tissue_h2 = FeaturePlot(seurat_noMock,features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = 8 , split.by = "sample_type", cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_mock_tissue_h2
+ggsave(filename = "featureplot_mock_tissue_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/mock/tissue") 
+```
+
+## UMAP plots mock d8 d60
+
+day_mock reflects the original day information but assigns `"Mock"` for rows where the experimental condition was actually a mock.
+
+```{r}
+featureplot_all_times_cd11c = FeaturePlot(obj.v5, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_cd11c
+ggsave(filename = "featureplot_all_times_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes")
+```
+
+```{r}
+featureplot_all_times_h2 = FeaturePlot(obj.v5, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_h2
+ggsave(filename = "featureplot_all_times_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes")
+```
+
+```{r}
+featureplot_all_times_siglecf = FeaturePlot(obj.v5, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_siglecf
+ggsave(filename = "featureplot_all_times_siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes")
+```
+
+```{r}
+featureplot_all_times_cd274 = FeaturePlot(obj.v5, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size =  , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_cd274
+ggsave(filename = "featureplot_all_times_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes")
+```
+
+```{r}
+featureplot_all_times_pparg = FeaturePlot(obj.v5, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_pparg
+ggsave(filename = "featureplot_all_times_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes")
+```
+
+## UMAP plots mock d8 d60 lung
+
+```{r}
+seurat_onlyLung <- obj.v5 %>% filter(str_detect(sample_type, "lung")) 
+featureplot_all_times_lung_pparg = FeaturePlot(seurat_onlyLung, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_lung_pparg
+ggsave(filename = "featureplot_all_times_lung_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/lung")
+```
+
+```{r}
+featureplot_all_times_lung_Cd11c = FeaturePlot(seurat_onlyLung, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_lung_Cd11c 
+ggsave(filename = "featureplot_all_times_lung_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/lung")
+```
+
+```{r}
+featureplot_all_times_lung_siglecf = FeaturePlot(seurat_onlyLung, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_lung_siglecf
+ggsave(filename = "featureplot_all_times_lung_siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/lung")
+```
+
+```{r}
+featureplot_all_times_lung_h2 = FeaturePlot(seurat_onlyLung, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_lung_h2
+ggsave(filename = "featureplot_all_times_lung_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/lung")
+```
+
+```{r}
+featureplot_all_times_lung_cd274 = FeaturePlot(seurat_onlyLung, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_lung_cd274
+ggsave(filename = "featureplot_all_times_lung_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/lung")
+```
+
+## UMAP plots mock d8 d60 bal 
+
+```{r}
+seurat_onlyBAL <- obj.v5 %>% filter(str_detect(sample_type, "bal")) 
+featureplot_all_times_bal_pparg = FeaturePlot(seurat_onlyBAL, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_bal_pparg
+ggsave(filename = "featureplot_all_times_bal_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/bal")
+```
+
+```{r}
+featureplot_all_times_bal_cd11c = FeaturePlot(seurat_onlyBAL, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_bal_cd11c
+ggsave(filename = "featureplot_all_times_bal_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/bal")
+```
+
+```{r}
+featureplot_all_times_bal_h2 = FeaturePlot(seurat_onlyBAL, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_bal_h2
+ggsave(filename = "featureplot_all_times_bal_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/bal")
+```
+
+```{r}
+featureplot_all_times_bal_siglec = FeaturePlot(seurat_onlyBAL, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_bal_siglec
+ggsave(filename = "featureplot_all_times_bal_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/bal")
+```
+
+```{r}
+featureplot_all_times_bal_cd274 = FeaturePlot(seurat_onlyBAL, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_bal_cd274
+ggsave(filename = "featureplot_all_times_bal_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/bal")
+```
+
+## UMAP plots mock d8 d60 muhv4
+
+```{r}
+seurat_onlymuhv4 <- obj.v5 %>% filter(str_detect(condition, "MuHV4")) 
+seurat_onlymuhv4 <- seurat_onlymuhv4 %>%filter(!str_detect(condition, "Mock"))
+featureplot_all_times_muhv4_h2 = FeaturePlot(seurat_onlymuhv4, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_muhv4_h2
+ggsave(filename = "featureplot_all_times_muhv4_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/muhv4")
+```
+
+```{r}
+featureplot_all_times_muhv4_siglec = FeaturePlot(seurat_onlymuhv4, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_muhv4_siglec
+ggsave(filename = "featureplot_all_times_muhv4_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/muhv4")
+```
+
+```{r}
+featureplot_all_times_muhv4_cd274 = FeaturePlot(seurat_onlymuhv4, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_muhv4_cd274
+ggsave(filename = "featureplot_all_times_muhv4_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/muhv4")
+```
+
+```{r}
+featureplot_all_times_muhv4_cd11c = FeaturePlot(seurat_onlymuhv4, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_muhv4_cd11c
+ggsave(filename = "featureplot_all_times_muhv4_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/muhv4")
+```
+
+```{r}
+featureplot_all_times_muhv4_pparg = FeaturePlot(seurat_onlymuhv4, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_muhv4_pparg
+ggsave(filename = "featureplot_all_times_muhv4_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/muhv4")
+```
+
+## UMAP plots mock d8 d60 MAV1
+
+```{r}
+seurat_onlyMAV1 <- obj.v5 %>% filter(str_detect(condition, "MAV1")) 
+seurat_onlyMAV1 <- seurat_onlyMAV1 %>%filter(!str_detect(condition, "Mock"))
+featureplot_all_times_MAV1_h2 = FeaturePlot(seurat_onlyMAV1, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_MAV1_h2
+ggsave(filename = "featureplot_all_times_MAV1_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MAV1")
+```
+
+```{r}
+featureplot_all_times_MAV1_siglec = FeaturePlot(seurat_onlyMAV1, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_MAV1_siglec
+ggsave(filename = "featureplot_all_times_MAV1_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MAV1")
+```
+
+```{r}
+featureplot_all_times_MAV1_cd274 = FeaturePlot(seurat_onlyMAV1, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_MAV1_cd274
+ggsave(filename = "featureplot_all_times_MAV1_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MAV1")
+```
+
+```{r}
+featureplot_all_times_MAV1_cd11c = FeaturePlot(seurat_onlyMAV1, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_MAV1_cd11c
+ggsave(filename = "featureplot_all_times_MAV1_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MAV1")
+```
+
+```{r}
+featureplot_all_times_MAV1_pparg = FeaturePlot(seurat_onlyMAV1, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_MAV1_pparg
+ggsave(filename = "featureplot_all_times_MAV1_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MAV1")
+```
+
+## UMAP plots mock d8 d60 PVM
+
+```{r}
+seurat_onlyPVM <- obj.v5 %>% filter(str_detect(condition, "PVM")) 
+seurat_onlyPVM <- seurat_onlyPVM %>%filter(!str_detect(condition, "Mock"))
+featureplot_all_times_PVM_h2 = FeaturePlot(seurat_onlyPVM, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PVM_h2
+ggsave(filename = "featureplot_all_times_PVM_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PVM")
+```
+
+```{r}
+featureplot_all_times_PVM_siglec = FeaturePlot(seurat_onlyPVM, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PVM_siglec
+ggsave(filename = "featureplot_all_times_PVM_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PVM")
+```
+
+```{r}
+featureplot_all_times_PVM_cd274 = FeaturePlot(seurat_onlyPVM, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PVM_cd274
+ggsave(filename = "featureplot_all_times_PVM_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PVM")
+```
+
+```{r}
+featureplot_all_times_PVM_cd11c = FeaturePlot(seurat_onlyPVM, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PVM_cd11c
+ggsave(filename = "featureplot_all_times_PVM_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PVM")
+```
+
+```{r}
+featureplot_all_times_PVM_pparg = FeaturePlot(seurat_onlyPVM, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PVM_pparg
+ggsave(filename = "featureplot_all_times_PVM_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PVM")
+```
+
+## UMAP plots mock d8 d60 PR8
+
+```{r}
+seurat_onlyPR8 <- obj.v5 %>% filter(str_detect(condition, "PR8")) 
+seurat_onlyPR8 <- seurat_onlyPR8 %>%filter(!str_detect(condition, "Mock"))
+featureplot_all_times_PR8_h2 = FeaturePlot(seurat_onlyPR8, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PR8_h2
+ggsave(filename = "featureplot_all_times_PR8_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PR8")
+```
+
+```{r}
+featureplot_all_times_PR8_siglec = FeaturePlot(seurat_onlyPR8, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PR8_siglec
+ggsave(filename = "featureplot_all_times_PR8_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PR8")
+```
+
+```{r}
+featureplot_all_times_PR8_cd274 = FeaturePlot(seurat_onlyPR8, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PR8_cd274
+ggsave(filename = "featureplot_all_times_PR8_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PR8")
+```
+
+```{r}
+featureplot_all_times_PR8_cd274 = FeaturePlot(seurat_onlyPR8, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PR8_cd274
+ggsave(filename = "featureplot_all_times_PR8_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PR8")
+```
+
+```{r}
+featureplot_all_times_PR8_cd11c = FeaturePlot(seurat_onlyPR8, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PR8_cd11c
+ggsave(filename = "featureplot_all_times_PR8_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PR8")
+```
+
+```{r}
+featureplot_all_times_PR8_pparg = FeaturePlot(seurat_onlyPR8, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_all_times_PR8_pparg
+ggsave(filename = "featureplot_all_times_PR8_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PR8")
 ```
