@@ -1,0 +1,252 @@
+---
+title: "Questions_ Prof_Machiels_18/03/2024"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+```{r}
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat")
+obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+```
+
+## select only clusters 0 1 6 7
+
+```{r}
+alveolar_clusters = c(0,1,6,7)
+seurat_alveolar = subset(obj.v5, idents = c(0,1,6,7))
+```
+
+## remove day 8 since we only want to compare between mock PVM and MuHV4 in MS4A3+ and MS4A3- in lung and bal
+
+```{r}
+seurat_alveolar = seurat_alveolar %>%filter(!str_detect(day_mock, "d8"))
+```
+
+## create seurat objects specific for Ms4a3 condition
+
+```{r}
+seurat_alveolar_ms4a3pos = seurat_alveolar %>%filter(!str_detect(sampletag_Ms4a3, "Ms4a3_neg"))
+seurat_alveolar_ms4a3pos_noPR8 = seurat_alveolar %>%filter(!str_detect(virus, "PR8"))
+seurat_alveolar_ms4a3pos = seurat_alveolar_ms4a3pos_noPR8 %>%filter(!str_detect(virus, "MAV1"))
+
+
+seurat_alveolar_ms4a3neg = seurat_alveolar %>%filter(!str_detect(sampletag_Ms4a3, "Ms4a3_pos"))
+seurat_alveolar_ms4a3neg_noPR8 = seurat_alveolar %>%filter(!str_detect(virus, "PR8"))
+seurat_alveolar_ms4a3neg = seurat_alveolar_ms4a3neg_noPR8 %>%filter(!str_detect(virus, "MAV1"))
+```
+
+## create plots for MS4A3 +
+
+```{r}
+featureplot_alveolar_pparg_pos = FeaturePlot(seurat_alveolar_ms4a3pos, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos
+ggsave(filename = "featureplot_alveolar_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/")
+```
+
+```{r}
+featureplot_alveolar_cd11c_pos = FeaturePlot(seurat_alveolar_ms4a3pos, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos
+ggsave(filename = "featureplot_alveolar_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/")
+```
+
+```{r}
+featureplot_alveolar_h2_pos = FeaturePlot(seurat_alveolar_ms4a3pos, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_h2_pos
+ggsave(filename = "featureplot_alveolar_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/")
+```
+
+```{r}
+featureplot_alveolar_siglec_pos = FeaturePlot(seurat_alveolar_ms4a3pos, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_siglec_pos
+ggsave(filename = "featureplot_alveolar_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/")
+```
+
+```{r}
+featureplot_alveolar_cd274_pos = FeaturePlot(seurat_alveolar_ms4a3pos, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_cd274_pos
+ggsave(filename = "featureplot_alveolar_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/")
+```
+
+## create plots for MS4A3 -
+
+```{r}
+featureplot_alveolar_pparg_neg = FeaturePlot(seurat_alveolar_ms4a3neg, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_neg
+ggsave(filename = "featureplot_alveolar_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/")
+```
+
+```{r}
+featureplot_alveolar_cd11c_neg = FeaturePlot(seurat_alveolar_ms4a3neg, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_neg
+ggsave(filename = "featureplot_alveolar_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/")
+```
+
+```{r}
+featureplot_alveolar_h2_neg = FeaturePlot(seurat_alveolar_ms4a3neg, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_h2_neg
+ggsave(filename = "featureplot_alveolar_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/")
+```
+
+```{r}
+featureplot_alveolar_siglec_neg = FeaturePlot(seurat_alveolar_ms4a3neg, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_siglec_neg
+ggsave(filename = "featureplot_alveolar_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/")
+```
+
+```{r}
+featureplot_alveolar_cd274_neg = FeaturePlot(seurat_alveolar_ms4a3neg, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_cd274_neg
+ggsave(filename = "featureplot_alveolar_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/")
+```
+
+## Create plots for Ms4a3 + bal
+
+```{r}
+seurat_alveolar_ms4a3pos_bal <- seurat_alveolar_ms4a3pos %>%filter(str_detect(sample_type, "bal"))
+
+```
+
+```{r}
+featureplot_alveolar_pparg_pos_bal = FeaturePlot(seurat_alveolar_ms4a3pos_bal, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos_bal
+ggsave(filename = "featureplot_alveolar_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/bal/")
+```
+
+```{r}
+featureplot_alveolar_cd11c_pos_bal = FeaturePlot(seurat_alveolar_ms4a3pos_bal, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos_bal
+ggsave(filename = "featureplot_alveolar_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/bal/")
+```
+
+```{r}
+featureplot_alveolar_h2_pos_bal = FeaturePlot(seurat_alveolar_ms4a3pos_bal, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_h2_pos_bal
+ggsave(filename = "featureplot_alveolar_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/bal/")
+```
+
+```{r}
+featureplot_alveolar_siglec_pos_bal = FeaturePlot(seurat_alveolar_ms4a3pos_bal, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_siglec_pos_bal
+ggsave(filename = "featureplot_alveolar_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/bal/")
+```
+
+```{r}
+featureplot_alveolar_cd274_pos_bal = FeaturePlot(seurat_alveolar_ms4a3pos_bal, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_cd274_pos_bal
+ggsave(filename = "featureplot_alveolar_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/bal/")
+```
+
+## Create plots for Ms4a3 + lung
+
+```{r}
+seurat_alveolar_ms4a3pos_lung <- seurat_alveolar_ms4a3pos %>%filter(str_detect(sample_type, "lung"))
+```
+
+```{r}
+featureplot_alveolar_pparg_pos_lung = FeaturePlot(seurat_alveolar_ms4a3pos_lung, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos_lung
+ggsave(filename = "featureplot_alveolar_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/lung/")
+```
+
+```{r}
+featureplot_alveolar_cd11c_pos_lung = FeaturePlot(seurat_alveolar_ms4a3pos_lung, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos_lung
+ggsave(filename = "featureplot_alveolar_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/lung/")
+```
+
+```{r}
+featureplot_alveolar_h2_pos_lung = FeaturePlot(seurat_alveolar_ms4a3pos_lung, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_h2_pos_lung
+ggsave(filename = "featureplot_alveolar_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/lung/")
+```
+
+```{r}
+featureplot_alveolar_siglec_pos_lung = FeaturePlot(seurat_alveolar_ms4a3pos_lung, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_siglec_pos_lung
+ggsave(filename = "featureplot_alveolar_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/lung/")
+```
+
+```{r}
+featureplot_alveolar_cd274_pos_lung = FeaturePlot(seurat_alveolar_ms4a3pos_lung, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_cd274_pos_lung
+ggsave(filename = "featureplot_alveolar_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3pos/lung/")
+```
+
+## Create plots for Ms4a3 - bal
+
+```{r}
+seurat_alveolar_ms4a3neg_bal <- seurat_alveolar_ms4a3neg %>%filter(str_detect(sample_type, "bal"))
+```
+
+```{r}
+featureplot_alveolar_pparg_neg_bal = FeaturePlot(seurat_alveolar_ms4a3neg_bal, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos_bal
+ggsave(filename = "featureplot_alveolar_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/bal/")
+```
+
+```{r}
+featureplot_alveolar_cd11c_neg_bal = FeaturePlot(seurat_alveolar_ms4a3neg_bal, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos_bal
+ggsave(filename = "featureplot_alveolar_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/bal/")
+```
+
+```{r}
+featureplot_alveolar_h2_neg_bal = FeaturePlot(seurat_alveolar_ms4a3neg_bal, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_h2_pos_bal
+ggsave(filename = "featureplot_alveolar_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/bal/")
+```
+
+```{r}
+featureplot_alveolar_siglec_neg_bal = FeaturePlot(seurat_alveolar_ms4a3neg_bal, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_siglec_pos_bal
+ggsave(filename = "featureplot_alveolar_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/bal/")
+```
+
+```{r}
+featureplot_alveolar_cd274_neg_bal = FeaturePlot(seurat_alveolar_ms4a3neg_bal, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_cd274_pos_bal
+ggsave(filename = "featureplot_alveolar_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/bal/")
+```
+
+## Create plots for Ms4a3 - lung
+
+```{r}
+seurat_alveolar_ms4a3neg_lung <- seurat_alveolar_ms4a3neg %>%filter(str_detect(sample_type, "lung"))
+```
+
+```{r}
+featureplot_alveolar_pparg_neg_lung = FeaturePlot(seurat_alveolar_ms4a3neg_lung, features = c("Pparg"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos_lung
+ggsave(filename = "featureplot_alveolar_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/lung/")
+```
+
+```{r}
+featureplot_alveolar_cd11c_neg_lung = FeaturePlot(seurat_alveolar_ms4a3neg_lung, features = c("Cd11c"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_pparg_pos_lung
+ggsave(filename = "featureplot_alveolar_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/lung/")
+```
+
+```{r}
+featureplot_alveolar_h2_neg_lung = FeaturePlot(seurat_alveolar_ms4a3neg_lung, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_h2_pos_lung
+ggsave(filename = "featureplot_alveolar_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/lung/")
+```
+
+```{r}
+featureplot_alveolar_siglec_neg_lung = FeaturePlot(seurat_alveolar_ms4a3neg_lung, features = c("Siglecf-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_siglec_pos_lung
+ggsave(filename = "featureplot_alveolar_siglec.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/lung/")
+```
+
+```{r}
+featureplot_alveolar_cd274_neg_lung = FeaturePlot(seurat_alveolar_ms4a3neg_lung, features = c("Cd274-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("virus"), cols = c("green", "red")) & theme(legend.position = "right")
+featureplot_alveolar_cd274_pos_lung
+ggsave(filename = "featureplot_alveolar_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/lung/")
+
+```
