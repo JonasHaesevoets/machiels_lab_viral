@@ -38,6 +38,10 @@ Krt79: robustly expressed in mouse alveolar macrophage
 
 load in the required packages and the central object the central object is the starting off point for all future analyses
 
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat")
+
+obj.v5 \<- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+
 ```{r Load in data and the required packages}
 easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat")
 obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
@@ -583,7 +587,7 @@ ggsave(filename = "featureplot_all_times_PR8_pparg.png", width = 45, height = 20
 ## UMAP plots mock d8 d60 PR8 lung
 
 ```{r}
-seurat_onlyPR8_lung <- seurat_onlyPR8 %>%filter(!str_detect(sample_type, "lung"))
+seurat_onlyPR8_lung <- seurat_onlyPR8 %>%filter(str_detect(sample_type, "lung"))
 featureplot_all_times_PR8_lung_h2 = FeaturePlot(seurat_onlyPR8, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_all_times_PR8_lung_h2
 ggsave(filename = "featureplot_all_times_PR8_lung_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PR8/lung")
@@ -616,7 +620,7 @@ ggsave(filename = "featureplot_all_times_PR8_lung_pparg.png", width = 45, height
 ## UMAP plots mock d8 d60 PR8 bal
 
 ```{r}
-seurat_onlyPR8_bal <- seurat_onlyPR8 %>%filter(!str_detect(sample_type, "bal"))
+seurat_onlyPR8_bal <- seurat_onlyPR8 %>%filter(str_detect(sample_type, "bal"))
 featureplot_all_times_PR8_bal_h2 = FeaturePlot(seurat_onlyPR8, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_all_times_PR8_bal_h2
 ggsave(filename = "featureplot_all_times_PR8_bal_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PR8/bal")
@@ -649,7 +653,7 @@ ggsave(filename = "featureplot_all_times_PR8_bal_pparg.png", width = 45, height 
 ## UMAP plots mock d8 d60 MuHv4 bal
 
 ```{r}
-seurat_onlymuhv4_bal <- seurat_onlymuhv4 %>%filter(!str_detect(sample_type, "bal"))
+seurat_onlymuhv4_bal <- seurat_onlymuhv4 %>%filter(str_detect(sample_type, "bal"))
 featureplot_all_times_muhv4_bal_h2 = FeaturePlot(seurat_onlymuhv4_bal, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_all_times_muhv4_bal_h2
 ggsave(filename = "featureplot_all_times_MuHV4_bal_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MuHV4/bal")
@@ -682,7 +686,7 @@ ggsave(filename = "featureplot_all_times_MuHV4_bal_pparg.png", width = 45, heigh
 ## UMAP plots mock d8 d60 MuHv4 lung
 
 ```{r}
-seurat_onlymuhv4_lung <- seurat_onlymuhv4 %>%filter(!str_detect(sample_type, "lung"))
+seurat_onlymuhv4_lung <- seurat_onlymuhv4 %>%filter(str_detect(sample_type, "lung"))
 featureplot_all_times_muhv4_lung_h2 = FeaturePlot(seurat_onlymuhv4_lung, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_all_times_muhv4_lung_h2
 ggsave(filename = "featureplot_all_times_MuHV4_lung_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MuHV4/lung")
@@ -715,7 +719,7 @@ ggsave(filename = "featureplot_all_times_MuHV4_lung_pparg.png", width = 45, heig
 ## UMAP plots mock d8 d60 MAV1 lung
 
 ```{r}
-seurat_onlyMAV1_lung <- seurat_onlyMAV1 %>%filter(!str_detect(sample_type, "lung"))
+seurat_onlyMAV1_lung <- seurat_onlyMAV1 %>%filter(str_detect(sample_type, "lung"))
 featureplot_all_times_MAV1_lung_h2 = FeaturePlot(seurat_onlyMAV1_lung, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_all_times_MAV1_lung_h2
 ggsave(filename = "featureplot_all_times_MAV1_lung_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MAV1/lung")
@@ -748,7 +752,7 @@ ggsave(filename = "featureplot_all_times_MAV1_lung_pparg.png", width = 45, heigh
 ## UMAP plots mock d8 d60 MAV1 bal
 
 ```{r}
-seurat_onlyMAV1_bal <- seurat_onlyMAV1 %>%filter(!str_detect(sample_type, "bal"))
+seurat_onlyMAV1_bal <- seurat_onlyMAV1 %>%filter(str_detect(sample_type, "bal"))
 featureplot_all_times_MAV1_bal_h2 = FeaturePlot(seurat_onlyMAV1_bal, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_all_times_MAV1_bal_h2
 ggsave(filename = "featureplot_all_times_MAV1_bal_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/MAV1/bal")
@@ -781,7 +785,7 @@ ggsave(filename = "featureplot_all_times_MAV1_bal_pparg.png", width = 45, height
 ## UMAP plots mock d8 d60 PVM bal
 
 ```{r}
-seurat_onlyPVM_bal <- seurat_onlyPVM %>%filter(!str_detect(sample_type, "bal"))
+seurat_onlyPVM_bal <- seurat_onlyPVM %>%filter(str_detect(sample_type, "bal"))
 featureplot_all_times_PVM_bal_h2 = FeaturePlot(seurat_onlyPVM_bal, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_all_times_PVM_bal_h2
 ggsave(filename = "featureplot_all_times_PVM_bal_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PVM/bal")
@@ -811,10 +815,10 @@ featureplot_all_times_PVM_bal_pparg
 ggsave(filename = "featureplot_all_times_PVM_bal_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PVM/bal")
 ```
 
-## 1UMAP plots mock d8 d60 PVM lung
+## UMAP plots mock d8 d60 PVM lung
 
 ```{r}
-seurat_onlyPVM_lung <- seurat_onlyPVM %>%filter(!str_detect(sample_type, "lung"))
+seurat_onlyPVM_lung <- seurat_onlyPVM %>%filter(str_detect(sample_type, "lung"))
 featureplot_all_times_PVM_lung_h2 = FeaturePlot(seurat_onlyPVM_lung, features = c("H2-ia-ie-AbSeq"), reduction = "umap.harmony_8dims", label = T, label.size = , split.by = c("day_mock"), cols = c("green", "red")) & theme(legend.position = "right")
 featureplot_all_times_PVM_lung_h2
 ggsave(filename = "featureplot_all_times_PVM_lung_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/alltimes/PVM/lung")
