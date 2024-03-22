@@ -11,7 +11,7 @@ execute:
 ---
 
 ```{r}
-easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat")
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "DESeq2", "ggrepel")
 obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
 ```
 
@@ -25,7 +25,16 @@ seurat_alveolar = subset(obj.v5, idents = c(0,1,6,7))
 ## remove day 8 since we only want to compare between mock PVM and MuHV4 in MS4A3+ and MS4A3- in lung and bal
 
 ```{r}
-seurat_alveolar = seurat_alveolar %>%filter(!str_detect(day_mock, "d8"))
+seurat_nod8 = obj.v5 %>%filter(!str_detect(day_mock, "d8"))
+#d60
+seurat_d60 <- seurat_nod8 %>%filter(str_detect(day_mock, "d60"))
+seurat_onlyMuHV4_d60 <- seurat_d60 %>% filter(str_detect(condition, "MuHV4"))
+seurat_onlyMuHV4_d60_bal <- seurat_onlyMuHV4_d60 %>%  filter(str_detect(sample_type, "bal"))
+
+#mock
+seurat_mock <- seurat_nod8 %>%filter(str_detect(day_mock, "Mock"))
+seurat_mock_onlyMuHV4 = seurat_mock %>%  filter(str_detect(condition, "MuHV4"))
+seurat_mock_onlyMuHV4_bal = seurat_mock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
 ```
 
 ## create seurat objects specific for Ms4a3 condition
@@ -249,4 +258,406 @@ featureplot_alveolar_cd274_neg_lung = FeaturePlot(seurat_alveolar_ms4a3neg_lung,
 featureplot_alveolar_cd274_pos_lung
 ggsave(filename = "featureplot_alveolar_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/ms4a3neg/lung/")
 
+```
+
+## CD11c bal d60
+
+```{r}
+featureplot_d60_cd11c = FeaturePlot(seurat_onlyMuHV4_d60_bal, reduction = "umap.harmony_8dims", label = T, split.by = c("sampletag_Ms4a3"), features = "Cd11c", repel = TRUE)
+
+
+featureplot_d60_cd11c 
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d60_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/d60/")
+```
+
+```{r}
+featureplot_mock_cd11c = FeaturePlot(seurat_mock_onlyMuHV4_bal, reduction = "umap.harmony_8dims", label = T,label.size = 5, split.by = c("sampletag_Ms4a3"), features = "Cd11c")
+featureplot_mock_cd11c
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 0 (mock) between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(filename = "featureplot_mock_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/mock/")
+```
+
+## PPARy bal d60
+
+```{r}
+featureplot_d60_ppary = FeaturePlot(seurat_onlyMuHV4_d60_bal, reduction = "umap.harmony_8dims", label = T, split.by = c("sampletag_Ms4a3"), features = "Pparg", repel = TRUE)
+
+
+featureplot_d60_ppary 
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d60_ppary.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/d60/")
+```
+
+```{r}
+featureplot_mock_pparg = FeaturePlot(seurat_mock_onlyMuHV4_bal, reduction = "umap.harmony_8dims", label = T,label.size = 5, split.by = c("sampletag_Ms4a3"), features = "Pparg")
+featureplot_mock_pparg
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 0 (mock) between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(filename = "featureplot_mock_pparg.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/mock/")
+```
+
+## SiglecF bal d60
+
+```{r}
+featureplot_d60_siglecf = FeaturePlot(seurat_onlyMuHV4_d60_bal, reduction = "umap.harmony_8dims", label = T, split.by = c("sampletag_Ms4a3"), features = "Siglecf-AbSeq", repel = TRUE)
+
+
+featureplot_d60_siglecf
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d60_siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/d60/")
+```
+
+```{r}
+featureplot_mock_siglecf = FeaturePlot(seurat_mock_onlyMuHV4_bal, reduction = "umap.harmony_8dims", label = T,label.size = 5, split.by = c("sampletag_Ms4a3"), features = "Siglecf-AbSeq")
+featureplot_mock_siglecf
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 0 (mock) between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+ggsave(filename = "featureplot_mock_siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/mock/")
+```
+
+## H2-ia-ie bal d60
+
+```{r}
+featureplot_d60_h2 = FeaturePlot(seurat_onlyMuHV4_d60_bal, reduction = "umap.harmony_8dims", label = T, split.by = c("sampletag_Ms4a3"), features = "H2-ia-ie-AbSeq", repel = TRUE)
+
+
+featureplot_d60_h2
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d60_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/d60/")
+```
+
+```{r}
+featureplot_mock_h2 = FeaturePlot(seurat_mock_onlyMuHV4_bal, reduction = "umap.harmony_8dims", label = T, split.by = c("sampletag_Ms4a3"), features = "H2-ia-ie-AbSeq", repel = TRUE)
+
+
+featureplot_mock_h2
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_mock_h2.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/mock/")
+```
+
+## CD274 d60
+
+```{r}
+featureplot_d60_cd274 = FeaturePlot(seurat_onlyMuHV4_d60_bal, reduction = "umap.harmony_8dims", label = T, split.by = c("sampletag_Ms4a3"), features = "Cd274-AbSeq", repel = TRUE)
+
+
+featureplot_d60_cd274
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d60_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/d60/")
+```
+
+```{r}
+featureplot_mock_cd274 = FeaturePlot(seurat_mock_onlyMuHV4_bal, reduction = "umap.harmony_8dims", label = T, split.by = c("sampletag_Ms4a3"), features = "Cd274-AbSeq", repel = TRUE)
+
+
+featureplot_mock_cd274
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_mock_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/mock/")
+```
+
+## identify idendity of cluster 7
+
+```{r}
+# identify markers distinguising cluster 7 from clusters 0 1 6
+Idents(object = obj.v5) <- "harmony_cluster_8dims"
+DefaultAssay(obj.v5) <- "RNA"
+# identifies markers for cluster 7 distinguishing themselves from the clusters we are more certain off they are alv macro
+# a gene is considered a marker if at least 20% of cells expressing the gene in either of the two groups of cells 
+# a gene is considered a marker if there is at least a 20% difference of expression between that gene between the groups
+# DESeq2 test is used to estimate the differentially expressed genes between cluster 7 and 0,1,6
+
+markersCluster7 = FindMarkers(obj.v5, ident.1 = 7, ident.2 = c(0,1,6),
+                              min.diff.pct = 0.20, test.use = "DESeq2", min.pct = 0.2)
+write.csv(markersCluster7, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_cluster7.csv")
+# filter results, find those genes with a big difference between pct1 and pc2 who also have a high log fold change
+markersCluster7$pct_difference = markersCluster7$pct.1 - markersCluster7$pct.2
+markersCluster7_filtered = markersCluster7[markersCluster7$pct_difference > 0.25,]
+markersCluster7_filtered = markersCluster7_filtered[markersCluster7_filtered$avg_log2FC > 1,]
+markersCluster7_filtered = cbind(rownames(markersCluster7_filtered), markersCluster7_filtered)
+
+write.csv(markersCluster7_filtered, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_cluster7_filtered.csv")
+
+markersCluster7_filtered_genes = markersCluster7_filtered$gene
+markersCluster7_filtered_genes
+write.table(markersCluster7_filtered_genes,  "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_cluster7_genes.txt")
+```
+
+## UMAPs showing **RNA data** (not Abseq expression)  for the bal cells at day60 and mock, for **PVM** (not MuHV-4) in the clusters corresponding to the alveolar macrophages
+
+```{r}
+seurat_onlyPVM =seurat_nod8 %>% filter(str_detect(condition, "PVM"))
+seurat_onlyPVM_bal =seurat_nod8 %>% filter(str_detect(sample_type, "bal"))
+seurat_onlyPVM_bal_alveolar = subset(seurat_onlyPVM_bal, idents = c(0,1,6,7))
+DefaultAssay(seurat_onlyPVM_bal_alveolar) <- "RNA"
+
+```
+
+```{r}
+featureplot_pvm_alveolar_pparg =  FeaturePlot(seurat_onlyPVM_bal_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Pparg")
+featureplot_pvm_alveolar_pparg
+ggsave(filename = "featureplot_alveolar_pvm_ppag.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/alveolar/")
+```
+
+```{r}
+featureplot_pvm_alveolar_siglec =  FeaturePlot(seurat_onlyPVM_bal_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Siglecf")
+featureplot_pvm_alveolar_siglec
+ggsave(filename = "featureplot_alveolar_pvm_siglecf.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/alveolar/")
+```
+
+```{r}
+featureplot_pvm_alveolar_cd274 =  FeaturePlot(seurat_onlyPVM_bal_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Cd274")
+featureplot_pvm_alveolar_cd274
+ggsave(filename = "featureplot_alveolar_pvm_cd274.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/alveolar/")
+```
+
+```{r}
+featureplot_pvm_alveolar_cd11c =  FeaturePlot(seurat_onlyPVM_bal_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Itgax")
+featureplot_pvm_alveolar_cd11c
+ggsave(filename = "featureplot_alveolar_pvm_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/alveolar/")
+```
+
+## Identify DE genes between MS4A3 + and MS4A3 - in cluster1 of d60 BAL PVM mice
+
+significantly differentially expressed genes
+
+```{r}
+seurat_cluster1 = subset(seurat_onlyPVM_bal_alveolar, idents = 1)
+DefaultAssay(seurat_cluster1) <- "RNA"
+Idents(seurat_cluster1) <- "sampletag_Ms4a3"
+# a gene is considered a marker if at least 20% of cells expressing the gene in either of the two groups of cells 
+# a gene is considered a marker if there is at least a 20% difference of expression between that gene between the groups
+# DESeq2 test is used to estimate the differentially expressed genes between cluster 7 and 0,1,6
+markersCluster1_Ms4a3neg = FindMarkers(seurat_cluster1, ident.1 = "Ms4a3_neg" , 
+                                       ident.2 = "Ms4a3_pos",
+                                       min.diff.pct = 0.20, test.use = "DESeq2", 
+                                       min.pct = 0.2)
+markersCluster1_Ms4a3pos = FindMarkers(seurat_cluster1, ident.1 = "Ms4a3_pos" , 
+                                       ident.2 = "Ms4a3_neg",
+                                       min.diff.pct = 0.20, test.use = "DESeq2", 
+                                       min.pct = 0.2)
+```
+
+### the differentially expressed genes have an average log2 fold change over 1 and are in 10% of the cells of Ms4a3 negative group more expressed compared to the Ms4a3 positive group
+
+```{r}
+markersCluster1_Ms4a3neg = cbind(rownames(markersCluster1_Ms4a3neg), markersCluster1_Ms4a3neg)
+markersCluster1_Ms4a3neg$pct_difference = markersCluster1_Ms4a3neg$pct.1 - markersCluster1_Ms4a3neg$pct.2
+markersCluster1_Ms4a3neg_filtered = markersCluster1_Ms4a3neg[markersCluster1_Ms4a3neg$pct_difference > 0.1,]
+markersCluster1_Ms4a3neg_filtered = markersCluster1_Ms4a3neg_filtered[markersCluster1_Ms4a3neg_filtered$avg_log2FC > 1,]
+markersCluster1_Ms4a3neg_filtered = cbind(rownames(markersCluster1_Ms4a3neg_filtered), markersCluster1_Ms4a3neg_filtered)
+
+write.csv(markersCluster1_Ms4a3neg, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Ms4a3neg.csv")
+
+write.csv(markersCluster1_Ms4a3neg_filtered, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Ms4a3neg_filtered.csv")
+
+markersCluster1_Ms4a3neg_filtered_genes = markersCluster1_Ms4a3neg_filtered$`rownames(markersCluster1_Ms4a3neg_filtered)`
+markersCluster1_Ms4a3neg_filtered_genes
+write.table(markersCluster1_Ms4a3neg_filtered_genes,  "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Ms4a3neg_genes.txt")
+```
+
+### the differentially expressed genes have an average log2 fold change over 1 and are in 10% of the cells of Ms4a3 positive group more expressed compared to the Ms4a3 negative group
+
+```{r}
+markersCluster1_Ms4a3pos = cbind(rownames(markersCluster1_Ms4a3pos), markersCluster1_Ms4a3pos)
+markersCluster1_Ms4a3pos$pct_difference = markersCluster1_Ms4a3pos$pct.1 - markersCluster1_Ms4a3pos$pct.2
+markersCluster1_Ms4a3pos_filtered = markersCluster1_Ms4a3pos[markersCluster1_Ms4a3pos$pct_difference > 0.1,]
+markersCluster1_Ms4a3pos_filtered = markersCluster1_Ms4a3pos_filtered[markersCluster1_Ms4a3pos_filtered$avg_log2FC > 1,]
+markersCluster1_Ms4a3pos_filtered = cbind(rownames(markersCluster1_Ms4a3pos_filtered), markersCluster1_Ms4a3pos_filtered)
+
+write.csv(markersCluster1_Ms4a3pos, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Ms4a3pos.csv")
+write.csv(markersCluster1_Ms4a3pos_filtered, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Ms4a3pos_filtered.csv")
+
+markersCluster1_Ms4a3pos_filtered_genes = markersCluster1_Ms4a3pos_filtered$`rownames(markersCluster1_Ms4a3pos_filtered)`
+markersCluster1_Ms4a3pos_filtered_genes
+write.table(markersCluster1_Ms4a3pos_filtered_genes,  "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Ms4a3pos_genes.txt")
+```
+
+```{r}
+markersCluster1_Ms4a3neg$diffexpressed <- "NO"
+markersCluster1_Ms4a3neg$diffexpressed[markersCluster1_Ms4a3neg$avg_log2FC > 1 & markersCluster1_Ms4a3neg$pct_difference > 0.1] <- "UP"
+
+markersCluster1_Ms4a3neg$diffexpressed[markersCluster1_Ms4a3neg$avg_log2FC < -1 & markersCluster1_Ms4a3neg$pct_difference < -0.1] <- "DOWN"
+
+markersCluster1_Ms4a3neg$delabel <- NA
+
+markersCluster1_Ms4a3neg$delabel[markersCluster1_Ms4a3neg$diffexpressed != "NO"] <- markersCluster1_Ms4a3neg$`rownames(markersCluster1_Ms4a3neg)`[markersCluster1_Ms4a3neg$diffexpressed != "NO"]
+
+
+
+volcano_Ms4a3neg <- ggplot(data=markersCluster1_Ms4a3neg,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           theme(panel.grid = element_blank()) +
+                           scale_x_continuous(breaks = seq(floor(min(markersCluster1_Ms4a3neg$avg_log2FC)), 
+                                            ceiling(max(markersCluster1_Ms4a3neg$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_Ms4a3neg
+ggsave("volcano_Ms4a3neg.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/volcano")
+```
+
+```{r}
+markersCluster1_Ms4a3pos$diffexpressed <- "NO"
+markersCluster1_Ms4a3pos$diffexpressed[markersCluster1_Ms4a3pos$avg_log2FC > 1 & markersCluster1_Ms4a3pos$pct_difference > 0.1] <- "UP"
+
+markersCluster1_Ms4a3pos$diffexpressed[markersCluster1_Ms4a3pos$avg_log2FC < -1 & markersCluster1_Ms4a3pos$pct_difference < -0.1] <- "DOWN"
+
+markersCluster1_Ms4a3pos$delabel <- NA
+
+markersCluster1_Ms4a3pos$delabel[markersCluster1_Ms4a3pos$diffexpressed != "NO"] <- markersCluster1_Ms4a3pos$`rownames(markersCluster1_Ms4a3pos)`[markersCluster1_Ms4a3pos$diffexpressed != "NO"]
+
+
+
+volcano_Ms4a3pos <- ggplot(data=markersCluster1_Ms4a3pos,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           theme(panel.grid = element_blank()) +
+                           scale_x_continuous(breaks = seq(floor(min(markersCluster1_Ms4a3pos$avg_log2FC)), 
+                                            ceiling(max(markersCluster1_Ms4a3pos$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_Ms4a3pos
+ggsave("volcano_Ms4a3pos.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/volcano")
+```
+
+## Identify DE genes between mock and PVM in cluster1 of d60 BAL PVM mice
+
+### 
+
+```{r}
+
+seurat_nod8_PVMMock = seurat_nod8 %>% filter(!str_detect(condition, "MuHV4"))
+seurat_nod8_PVMMock = seurat_nod8_PVMMock %>% filter(!str_detect(condition, "PR8"))
+seurat_nod8_PVMMock = seurat_nod8_PVMMock %>% filter(!str_detect(condition, "MAV1"))
+seurat_nod8_PVMMock_bal = seurat_nod8_PVMMock %>% filter(str_detect(sample_type, "bal"))
+seurat_nod8_PVMMock_bal =  seurat_nod8_PVMMock_bal %>% filter(str_detect(day_mock, "d60"))
+seurat_nod8_PVMMock_bal_cluster1 = subset(seurat_nod8_PVMMock_bal, idents = 1)
+DefaultAssay(seurat_nod8_PVMMock_bal_cluster1) <- "RNA"
+
+Idents(seurat_nod8_PVMMock_bal_cluster1) <- "condition"
+
+# a gene is considered a marker if at least 20% of cells expressing the gene in either of the two groups of cells 
+# a gene is considered a marker if there is at least a 20% difference of expression between that gene between the groups
+# DESeq2 test is used to estimate the differentially expressed genes between cluster 7 and 0,1,6
+markersCluster1_Mock = FindMarkers(seurat_nod8_PVMMock_bal_cluster1, ident.1 = "Mock",
+                                       ident.2 = "PVM",
+                                       min.diff.pct = 0.20, test.use = "DESeq2", 
+                                       min.pct = 0.2)
+markersCluster1_PVM = FindMarkers(seurat_nod8_PVMMock_bal_cluster1, ident.1 = "PVM" , 
+                                       ident.2 = "Mock",
+                                       min.diff.pct = 0.20, test.use = "DESeq2", 
+                                       min.pct = 0.2)
+
+```
+
+### the differentially expressed genes have an average log2 fold change over 1 and are in 10% of the cells of Mock group more expressed compared to the PVM group
+
+```{r}
+markersCluster1_Mock = cbind(rownames(markersCluster1_Mock), markersCluster1_Mock)
+markersCluster1_Mock$pct_difference = markersCluster1_Mock$pct.1 - markersCluster1_Mock$pct.2
+markersCluster1_Mock_filtered = markersCluster1_Mock[markersCluster1_Mock$pct_difference > 0.1,]
+markersCluster1_Mock_filtered = markersCluster1_Mock_filtered[markersCluster1_Mock_filtered$avg_log2FC > 1,]
+markersCluster1_Mock_filtered = cbind(rownames(markersCluster1_Mock_filtered), markersCluster1_Mock_filtered)
+write.csv(markersCluster1_Mock, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Mock.csv")
+write.csv(markersCluster1_Mock_filtered, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Mock_filtered.csv")
+
+markersCluster1_Mock_filtered_genes = markersCluster1_Mock_filtered$`rownames(markersCluster1_Mock_filtered)`
+markersCluster1_Mock_filtered_genes
+write.table(markersCluster1_Mock_filtered_genes,  "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_Mock_genes.txt")
+```
+
+### the differentially expressed genes have an average log2 fold change over 1 and are in 10% of the cells of PVM group more expressed compared to the Mock group
+
+```{r}
+markersCluster1_PVM = cbind(rownames(markersCluster1_PVM), markersCluster1_PVM)
+markersCluster1_PVM <- markersCluster1_PVM[, -c(2)]
+markersCluster1_PVM$pct_difference = markersCluster1_PVM$pct.1 - markersCluster1_PVM$pct.2
+markersCluster1_PVM_filtered = markersCluster1_PVM[markersCluster1_PVM$pct_difference > 0.1,]
+markersCluster1_PVM_filtered = markersCluster1_PVM_filtered[markersCluster1_PVM_filtered$avg_log2FC > 1,]
+markersCluster1_PVM_filtered = cbind(rownames(markersCluster1_PVM_filtered), markersCluster1_PVM_filtered)
+write.csv(markersCluster1_PVM, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_PVM.csv")
+write.csv(markersCluster1_PVM_filtered, "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_PVM_filtered.csv")
+
+markersCluster1_PVM_filtered_genes = markersCluster1_PVM_filtered$`rownames(markersCluster1_PVM_filtered)`
+markersCluster1_PVM_filtered_genes
+write.table(markersCluster1_PVM_filtered_genes,  "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/markers_Cluster1_PVM_genes.txt")
+```
+
+for visualization purposes are only those genes marked who are 20% or more expressed in the PVM or mock condition
+
+```{r}
+markersCluster1_Mock$diffexpressed <- "NO"
+markersCluster1_Mock$diffexpressed[markersCluster1_Mock$avg_log2FC > 1 & markersCluster1_Mock$pct_difference > 0.2] <- "UP"
+
+markersCluster1_Mock$diffexpressed[markersCluster1_Mock$avg_log2FC < -1 & markersCluster1_Mock$pct_difference < -0.2] <- "DOWN"
+
+markersCluster1_Mock$delabel <- NA
+
+markersCluster1_Mock$delabel[markersCluster1_Mock$diffexpressed != "NO"] <- markersCluster1_Mock$`rownames(markersCluster1_Mock)`[markersCluster1_Mock$diffexpressed != "NO"]
+
+
+
+volcano_mock <- ggplot(data=markersCluster1_Mock,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           theme(panel.grid = element_blank()) +
+                           scale_x_continuous(breaks = seq(floor(min(markersCluster1_Mock$avg_log2FC)), 
+                                            ceiling(max(markersCluster1_Mock$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_mock
+ggsave("volcano_mock.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/volcano")
+```
+
+```{r}
+markersCluster1_PVM$diffexpressed <- "NO"
+markersCluster1_PVM$diffexpressed[markersCluster1_PVM$avg_log2FC > 1 & markersCluster1_PVM$pct_difference > 0.2] <- "UP"
+
+markersCluster1_PVM$diffexpressed[markersCluster1_PVM$avg_log2FC < -1 & markersCluster1_PVM$pct_difference < -0.2] <- "DOWN"
+
+markersCluster1_PVM$delabel <- NA
+
+markersCluster1_PVM$delabel[markersCluster1_PVM$diffexpressed != "NO"] <- markersCluster1_PVM$`rownames(markersCluster1_PVM)`[markersCluster1_PVM$diffexpressed != "NO"]
+
+
+
+volcano_PVM <- ggplot(data=markersCluster1_PVM,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           theme(panel.grid = element_blank()) +
+                           scale_x_continuous(breaks = seq(floor(min(markersCluster1_PVM$avg_log2FC)), 
+                                            ceiling(max(markersCluster1_PVM$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_PVM
+ggsave("volcano_PVM.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/questionsBene19March/volcano")
 ```

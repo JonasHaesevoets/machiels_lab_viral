@@ -1,0 +1,385 @@
+---
+title: "differential expression between clusters"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+# differential expression between clusters
+
+In this notebook we will assess if there are differentially expressed genes between d8 and d60 between individual conditions
+
+As a test we will start of with comparing d8 MuHV44 vs d60 MuHV4 and d8 PR8 vs d60 PR8
+
+## load in the data and the required packages
+
+```{r}
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "DESeq2", "ggrepel")
+obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+
+```
+
+## data manipulations
+
+```{r}
+seurat_nod8 <- obj.v5 %>%filter(!str_detect(day_mock, "d8"))
+seurat_nomock <- obj.v5 %>% filter(!str_detect(day_mock, "Mock"))
+seurat_nomock = seurat_nomock %>% filter(!str_detect(condition, "Mock"))
+#d60
+seurat_d60 <- seurat_nod8 %>%filter(str_detect(day_mock, "d60"))
+seurat_onlyMuHV4_d60 <- seurat_d60 %>% filter(str_detect(condition, "MuHV4"))
+seurat_onlyMuHV4_d60_bal <- seurat_onlyMuHV4_d60 %>%  filter(str_detect(sample_type, "bal"))
+
+#mock
+seurat_mock <- seurat_nod8 %>%filter(str_detect(day_mock, "Mock"))
+seurat_mock_onlyMuHV4 = seurat_mock %>%  filter(str_detect(condition, "MuHV4"))
+seurat_mock_onlyMuHV4_bal = seurat_mock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
+
+
+seurat_nomock_onlyMuHV4 = seurat_nomock %>% filter(str_detect(condition, "MuHV4"))
+seurat_nomock_onlyMuHV4_bal = seurat_nomock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
+seurat_nomock_onlyMuHV4_lung = seurat_nomock_onlyMuHV4 %>% filter(str_detect(sample_type, "lung"))
+
+seurat_nomock_onlyPR8 = seurat_nomock %>% filter(str_detect(condition, "PR8"))
+seurat_nomock_onlyPR8_bal = seurat_nomock_onlyPR8 %>% filter(str_detect(sample_type, "bal"))
+seurat_nomock_onlyPR8_lung = seurat_nomock_onlyPR8 %>% filter(str_detect(sample_type, "lung"))
+DefaultAssay(seurat_nomock_onlyMuHV4 )= "RNA"
+DefaultAssay(seurat_nomock_onlyPR8 )= "RNA"
+
+```
+
+## 1) Exploratory analysis d8 vs d60 MuHV4
+
+### CD11c
+
+```{r}
+featureplot_d8d60_MuHV4_cd11c = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Itgax", repel = TRUE)
+
+
+featureplot_d8d60_MuHV4_cd11c 
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d8d60_MuHV4_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### PPARg
+
+```{r}
+featureplot_d8d60_MuHV4_pparg = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Pparg", repel = TRUE)
+
+featureplot_d8d60_MuHV4_pparg 
+
+ggsave(filename = "featureplot_d8d60_MuHV4_pparg.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### SiglecF
+
+```{r}
+featureplot_d8d60_MuHV4_siglecf = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Siglecf", repel = TRUE)
+
+
+featureplot_d8d60_MuHV4_siglecf
+
+
+ggsave(filename = "featureplot_d8d60_MuHV4_siglecf.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+
+```
+
+### H2-ia-ie
+
+```{r}
+featureplot_d8d60_MuHV4_h2 = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "H2-ia-ie-AbSeq", repel = TRUE)
+
+
+featureplot_d8d60_MuHV4_h2
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d8d60_MuHV4_h2.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### CD274
+
+```{r}
+featureplot_d8d60_MuHV4_CD274 = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Cd274", repel = TRUE)
+
+
+featureplot_d8d60_MuHV4_CD274
+
+
+
+ggsave(filename = "featureplot_d8d60_MuHV4_cd274.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+## 1 A) Differential expression analysis MuHV4 d8 vs d60
+
+```{r}
+Idents(seurat_nomock_onlyMuHV4) <- "day_mock"
+#  every gene in your dataset has a zero count in at least one sample.
+
+markers_MuHV4_d60 <- FindMarkers(seurat_nomock_onlyMuHV4 ,
+                                 ident.1 =  "d60",
+                                 ident.2 =  "d8",
+                                 test.use = "wilcox_limma", 
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_MuHV4_d8 <- FindMarkers(seurat_nomock_onlyMuHV4 ,
+                                 ident.1 =  "d8",
+                                 ident.2 =  "d60",
+                                 test.use = "wilcox_limma", 
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+                                 
+
+```
+
+### export the raw and filtered 
+
+```{r}
+markers_MuHV4_d60_filtered = markers_MuHV4_d60[markers_MuHV4_d60$avg_log2FC > 1,]
+nonsignficant_p_adj_d60MuHV4 <- which(markers_MuHV4_d60_filtered$p_val_adj <= 0.05)
+markers_MuHV4_d60_filtered <- markers_MuHV4_d60_filtered[nonsignficant_p_adj_d60MuHV4, ]
+
+write.csv(markers_MuHV4_d60, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d60.csv")
+write.csv(markers_MuHV4_d60_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d60_filtered.csv")
+
+markers_MuHV4_d8_filtered = markers_MuHV4_d8[markers_MuHV4_d8$avg_log2FC > 1,]
+nonsignficant_p_adj_d8MuHV4 <- which(markers_MuHV4_d8_filtered$p_val_adj <= 0.05)
+markers_MuHV4_d8_filtered <- markers_MuHV4_d8_filtered[nonsignficant_p_adj_d8MuHV4, ]
+
+write.csv(markers_MuHV4_d8, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d8.csv")
+write.csv(markers_MuHV4_d8_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d8_filtered.csv")
+
+```
+
+### volcano plot Muhv4 d60
+
+```{r}
+markers_MuHV4_d60$diffexpressed <- "NO"
+markers_MuHV4_d60$diffexpressed[markers_MuHV4_d60$avg_log2FC > 1] <- "UP"
+
+markers_MuHV4_d60$diffexpressed[markers_MuHV4_d60$avg_log2FC < -1] <- "DOWN"
+
+markers_MuHV4_d60$delabel <- NA
+
+markers_MuHV4_d60$delabel[markers_MuHV4_d60$diffexpressed != "NO"]<-markers_MuHV4_d60$gene[markers_MuHV4_d60$diffexpressed != "NO"]
+
+
+
+volcano_muhv4_d60 <- ggplot(data=markers_MuHV4_d60,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_MuHV4_d60$avg_log2FC)), 
+                           ceiling(max(markers_MuHV4_d60$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_muhv4_d60
+ggsave("volcano_MuHV4_d60.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
+
+```
+
+### volcano plot Muhv4 d8
+
+```{r}
+markers_MuHV4_d8$diffexpressed <- "NO"
+markers_MuHV4_d8$diffexpressed[markers_MuHV4_d8$avg_log2FC > 1] <- "UP"
+
+markers_MuHV4_d8$diffexpressed[markers_MuHV4_d8$avg_log2FC < -1] <- "DOWN"
+
+markers_MuHV4_d8$delabel <- NA
+
+markers_MuHV4_d8$delabel[markers_MuHV4_d8$diffexpressed != "NO"]<-markers_MuHV4_d8$gene[markers_MuHV4_d8$diffexpressed != "NO"]
+
+
+
+volcano_muhv4_d8 <- ggplot(data=markers_MuHV4_d8,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_MuHV4_d8$avg_log2FC)), 
+                           ceiling(max(markers_MuHV4_d8$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_muhv4_d8
+ggsave("volcano_MuHV4_d8.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
+```
+
+## 1 B) Functional enrichment + pathway analysis of marker genes of Muhv4 d60 vs Muhv4 d8
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+## 2) Exploratory analysis d8 vs d60 PR8
+
+### CD11C
+
+```{r}
+featureplot_d8d60_PR8_cd11c = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Itgax", repel = TRUE)
+
+
+featureplot_d8d60_PR8_cd11c 
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d8d60_PR8_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### PRARg
+
+```{r}
+featureplot_d8d60_PR8_pparg = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Pparg", repel = TRUE)
+
+featureplot_d8d60_PR8_pparg 
+
+ggsave(filename = "featureplot_d8d60_PR8_pparg.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### SiglecF
+
+```{r}
+featureplot_d8d60_PR8_siglecf = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Siglecf", repel = TRUE)
+
+
+featureplot_d8d60_PR8_siglecf
+
+
+ggsave(filename = "featureplot_d8d60_PR8_siglecf.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### H2-ia-ie
+
+```{r}
+featureplot_d8d60_PR8_h2 = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "H2-ia-ie-AbSeq", repel = TRUE)
+
+
+featureplot_d8d60_PR8_h2
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d8d60_PR8_h2.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### CD274
+
+```{r}
+featureplot_d8d60_PR8_CD274 = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Cd274", repel = TRUE)
+
+
+featureplot_d8d60_PR8_CD274
+
+
+
+ggsave(filename = "featureplot_d8d60_PR8_cd274.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+## 2 A) Differential expression analysis PR8 d8 vs d60
+
+```{r}
+Idents(seurat_nomock_onlyPR8) <- "day_mock"
+#  every gene in your dataset has a zero count in at least one sample.
+
+markers_PR8_d60 <- FindMarkers(seurat_nomock_onlyPR8 ,
+                                 ident.1 =  "d60",
+                                 ident.2 =  "d8",
+                                 test.use = "wilcox_limma", 
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_PR8_d8 <- FindMarkers(seurat_nomock_onlyPR8 ,
+                                 ident.1 =  "d8",
+                                 ident.2 =  "d60",
+                                 test.use = "wilcox_limma", 
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+### export the raw and filtered 
+
+```{r}
+markers_PR8_d60_filtered = markers_PR8_d60[markers_PR8_d60$avg_log2FC > 1,]
+nonsignficant_p_adj_d60PR8 <- which(markers_PR8_d60_filtered$p_val_adj <= 0.05)
+markers_PR8_d60_filtered <- markers_PR8_d60_filtered[nonsignficant_p_adj_d60PR8, ]
+
+write.csv(markers_PR8_d60, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d60.csv")
+write.csv(markers_PR8_d60_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d60_filtered.csv")
+
+markers_PR8_d8_filtered = markers_PR8_d8[markers_PR8_d8$avg_log2FC > 1,]
+nonsignficant_p_adj_d8PR8 <- which(markers_PR8_d8_filtered$p_val_adj <= 0.05)
+markers_PR8_d8_filtered <- markers_PR8_d8_filtered[nonsignficant_p_adj_d8PR8, ]
+
+write.csv(markers_PR8_d8, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d8.csv")
+write.csv(markers_PR8_d8_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d8_filtered.csv")
+```
+
+### volcano plot PR8 d60
+
+```{r}
+markers_PR8_d60$diffexpressed <- "NO"
+markers_PR8_d60$diffexpressed[markers_PR8_d60$avg_log2FC > 1] <- "UP"
+
+markers_PR8_d60$diffexpressed[markers_PR8_d60$avg_log2FC < -1] <- "DOWN"
+
+markers_PR8_d60$delabel <- NA
+
+markers_PR8_d60$delabel[markers_PR8_d60$diffexpressed != "NO"]<-markers_PR8_d60$gene[markers_PR8_d60$diffexpressed != "NO"]
+
+
+
+volcano_PR8_d60 <- ggplot(data=markers_PR8_d60,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_PR8_d60$avg_log2FC)), 
+                           ceiling(max(markers_PR8_d60$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_PR8_d60
+ggsave("volcano_PR8_d60.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
+```
+
+### volcano plot PR8 d8
+
+```{r}
+markers_PR8_d8$diffexpressed <- "NO"
+markers_PR8_d8$diffexpressed[markers_PR8_d8$avg_log2FC > 1] <- "UP"
+
+markers_PR8_d8$diffexpressed[markers_PR8_d8$avg_log2FC < -1] <- "DOWN"
+
+markers_PR8_d8$delabel <- NA
+
+markers_PR8_d8$delabel[markers_PR8_d8$diffexpressed != "NO"]<-markers_PR8_d8$gene[markers_PR8_d8$diffexpressed != "NO"]
+
+
+
+volcano_PR8_d8 <- ggplot(data=markers_PR8_d8,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_PR8_d8$avg_log2FC)), 
+                           ceiling(max(markers_PR8_d8$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_PR8_d8
+ggsave("volcano_PR8_d8.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
+```
+
+## 2 B) Functional enrichment + pathway analysis of marker genes of PR8 d60 vs PR8 d8
