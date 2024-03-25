@@ -19,7 +19,8 @@ As a test we will start of with comparing d8 MuHV44 vs d60 MuHV4 and d8 PR8 vs d
 ## load in the data and the required packages
 
 ```{r}
-easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "DESeq2", "ggrepel")
+
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "DESeq2", "ggrepel", "writexl", "clusterProfiler", "DOSE", "pathview", "biomaRt", "org.Mm.eg.db", "enrichplot")
 obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
 
 ```
@@ -141,22 +142,22 @@ markers_MuHV4_d8 <- FindMarkers(seurat_nomock_onlyMuHV4 ,
 
 ```
 
-### export the raw and filtered 
+### export the raw and filtered
 
 ```{r}
 markers_MuHV4_d60_filtered = markers_MuHV4_d60[markers_MuHV4_d60$avg_log2FC > 1,]
 nonsignficant_p_adj_d60MuHV4 <- which(markers_MuHV4_d60_filtered$p_val_adj <= 0.05)
 markers_MuHV4_d60_filtered <- markers_MuHV4_d60_filtered[nonsignficant_p_adj_d60MuHV4, ]
 
-write.csv(markers_MuHV4_d60, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d60.csv")
-write.csv(markers_MuHV4_d60_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d60_filtered.csv")
+write_xlsx(markers_MuHV4_d60, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d60.xlsx")
+write_xlsx(markers_MuHV4_d60_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d60_filtered.xlsx")
 
 markers_MuHV4_d8_filtered = markers_MuHV4_d8[markers_MuHV4_d8$avg_log2FC > 1,]
 nonsignficant_p_adj_d8MuHV4 <- which(markers_MuHV4_d8_filtered$p_val_adj <= 0.05)
 markers_MuHV4_d8_filtered <- markers_MuHV4_d8_filtered[nonsignficant_p_adj_d8MuHV4, ]
 
-write.csv(markers_MuHV4_d8, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d8.csv")
-write.csv(markers_MuHV4_d8_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d8_filtered.csv")
+write_xlsx(markers_MuHV4_d8, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d8.xlsx")
+write_xlsx(markers_MuHV4_d8_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d8_filtered.xlsx")
 
 ```
 
@@ -209,26 +210,115 @@ volcano_muhv4_d8
 ggsave("volcano_MuHV4_d8.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
 ```
 
-## 1 B) Functional enrichment + pathway analysis of marker genes of Muhv4 d60 vs Muhv4 d8
+## 1 B) Functional enrichment + pathway analysis of marker genes of Muhv4 d60
 
 ```{r}
+genes_MuHV4_d60 = markers_MuHV4_d60_filtered$gene
+entrezids_MuHV4_d60_markers = select(org.Mm.eg.db, keys=genes_MuHV4_d60, keytype="SYMBOL", columns="ENTREZID")
+entrezids_MuHV4_d60_markers = na.omit(entrezids_MuHV4_d60_markers)
+```
+
+```{r}
+all_MuHV4_d60_genes = as.character(markers_MuHV4_d60$gene)
+entrezids_MuHV4_d60_all = select(org.Mm.eg.db, keys=all_MuHV4_d60_genes, keytype="SYMBOL", columns="ENTREZID")
+entrezids_MuHV4_d60_all = na.omit(entrezids_MuHV4_d60_all)
+```
+
+```{r}
+GO_enrichment_MuHV4_d60 = enrichGO(gene = entrezids_MuHV4_d60_markers$ENTREZID,
+                                   universe = entrezids_MuHV4_d60_all$ENTREZID,
+                                   OrgDb = org.Mm.eg.db, 
+                                   ont = "BP", 
+                                   qvalueCutoff = 0.05, 
+                                   readable = TRUE)
+```
+
+```{r}
+cluster_summary_enrichment_MuHV4_d60 = data.frame(GO_enrichment_MuHV4_d60)
+write.csv(cluster_summary_enrichment_MuHV4_d60, "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/results_clusterProfiler_MuHV4_d60.csv")
 
 ```
 
 ```{r}
-
+dotplot_goEnrichment_MuHV4_d60 = dotplot(GO_enrichment_MuHV4_d60, showCategory=50)
+ggsave(filename = "dotplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/")
 ```
 
 ```{r}
+emapplot_goEnrichment_MuHV4_d60 = pairwise_termsim(GO_enrichment_MuHV4_d60)
+emapplot_goEnrichment_MuHV4_d60 = emapplot(emapplot_goEnrichment_MuHV4_d60)
 
+
+ggsave(filename = "emapplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/")
 ```
 
 ```{r}
+muhv4_d60_logfold = markers_MuHV4_d60_filtered$avg_log2FC
+names(muhv4_d60_logfold) = markers_MuHV4_d60_filtered$gene
 
+cnetplot(GO_enrichment_MuHV4_d60,
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=muhv4_d60_logfold, 
+         vertex.label.font=6)
+
+ggsave(filename = "cnetplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/")
+```
+
+## 1 C) Functional enrichment + pathway analysis of marker genes of Muhv4 d8
+
+```{r}
+genes_MuHV4_d8 = markers_MuHV4_d8_filtered$gene
+entrezids_MuHV4_d8_markers = select(org.Mm.eg.db, keys=genes_MuHV4_d8, keytype="SYMBOL", columns="ENTREZID")
+entrezids_MuHV4_d8_markers = na.omit(entrezids_MuHV4_d8_markers)
 ```
 
 ```{r}
+all_MuHV4_d8_genes = as.character(markers_MuHV4_d8$gene)
+entrezids_MuHV4_d8_all = select(org.Mm.eg.db, keys=all_MuHV4_d8_genes, keytype="SYMBOL", columns="ENTREZID")
+entrezids_MuHV4_d8_all = na.omit(entrezids_MuHV4_d8_all)
+```
 
+```{r}
+GO_enrichment_MuHV4_d8 = enrichGO(gene = entrezids_MuHV4_d8_markers$ENTREZID,
+                                   universe = entrezids_MuHV4_d8_all$ENTREZID,
+                                   OrgDb = org.Mm.eg.db, 
+                                   ont = "BP", 
+                                   qvalueCutoff = 0.05, 
+                                   readable = TRUE)
+```
+
+```{r}
+cluster_summary_enrichment_MuHV4_d8 = data.frame(GO_enrichment_MuHV4_d8)
+write.csv(cluster_summary_enrichment_MuHV4_d8, "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d8/results_clusterProfiler_MuHV4_d8.csv")
+```
+
+```{r}
+dotplot_goEnrichment_MuHV4_d8 = dotplot(GO_enrichment_MuHV4_d8, showCategory=50)
+ggsave(filename = "dotplot_goEnrichment_MuHV4_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d8/")
+```
+
+shows the relationship between the top 50 most significantly enriched GO terms (padj.), by grouping similar terms together. The color represents the p-values relative to the other displayed terms (brighter red is more significant) and the size of the terms represents the number of genes that are significant from our list.
+
+```{r}
+emapplot_goEnrichment_MuHV4_d8 = pairwise_termsim(GO_enrichment_MuHV4_d8)
+emapplot_goEnrichment_MuHV4_d8 = emapplot(emapplot_goEnrichment_MuHV4_d8)
+
+
+ggsave(filename = "emapplot_goEnrichment_MuHV4_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d8/")
+```
+
+```{r}
+muhv4_d8_logfold = markers_MuHV4_d8_filtered$avg_log2FC
+names(muhv4_d8_logfold) = markers_MuHV4_d8_filtered$gene
+
+cnetplot(GO_enrichment_MuHV4_d8,
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=muhv4_d8_logfold, 
+         vertex.label.font=6)
+
+ggsave(filename = "cnetplot_goEnrichment_MuHV4_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d8/")
 ```
 
 ## 2) Exploratory analysis d8 vs d60 PR8
@@ -245,7 +335,7 @@ featureplot_d8d60_PR8_cd11c
 
 
 
-ggsave(filename = "featureplot_d8d60_PR8_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+ggsave(filename = "featureplot_d8d60_PR8_cd11c.png", width = 45, height = 50, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
 ```
 
 ### PRARg
@@ -316,22 +406,22 @@ markers_PR8_d8 <- FindMarkers(seurat_nomock_onlyPR8 ,
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
 ```
 
-### export the raw and filtered 
+### export the raw and filtered
 
 ```{r}
 markers_PR8_d60_filtered = markers_PR8_d60[markers_PR8_d60$avg_log2FC > 1,]
 nonsignficant_p_adj_d60PR8 <- which(markers_PR8_d60_filtered$p_val_adj <= 0.05)
 markers_PR8_d60_filtered <- markers_PR8_d60_filtered[nonsignficant_p_adj_d60PR8, ]
 
-write.csv(markers_PR8_d60, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d60.csv")
-write.csv(markers_PR8_d60_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d60_filtered.csv")
+write_xlsx(markers_PR8_d60, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d60.xlsx")
+write_xlsx(markers_PR8_d60_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d60_filtered.xlsx")
 
 markers_PR8_d8_filtered = markers_PR8_d8[markers_PR8_d8$avg_log2FC > 1,]
 nonsignficant_p_adj_d8PR8 <- which(markers_PR8_d8_filtered$p_val_adj <= 0.05)
 markers_PR8_d8_filtered <- markers_PR8_d8_filtered[nonsignficant_p_adj_d8PR8, ]
 
-write.csv(markers_PR8_d8, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d8.csv")
-write.csv(markers_PR8_d8_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d8_filtered.csv")
+write_xlsx(markers_PR8_d8, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d8.xlsx")
+write_xlsx(markers_PR8_d8_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d8_filtered.xlsx")
 ```
 
 ### volcano plot PR8 d60
@@ -382,4 +472,112 @@ volcano_PR8_d8
 ggsave("volcano_PR8_d8.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
 ```
 
-## 2 B) Functional enrichment + pathway analysis of marker genes of PR8 d60 vs PR8 d8
+## 2 B) Functional enrichment + pathway analysis of marker genes of PR8 d60 
+
+```{r}
+genes_PR8_d60 = markers_PR8_d60_filtered$gene
+entrezids_PR8_d60_markers = select(org.Mm.eg.db, keys=genes_PR8_d60, keytype="SYMBOL", columns="ENTREZID")
+entrezids_PR8_d60_markers = na.omit(entrezids_PR8_d60_markers)
+```
+
+```{r}
+all_PR8_d60_genes = as.character(markers_PR8_d60$gene)
+entrezids_PR8_d60_all = select(org.Mm.eg.db, keys=all_PR8_d60_genes, keytype="SYMBOL", columns="ENTREZID")
+entrezids_PR8_d60_all = na.omit(entrezids_PR8_d60_all)
+```
+
+```{r}
+GO_enrichment_PR8_d60 = enrichGO(gene = entrezids_PR8_d60_markers$ENTREZID,
+                                   universe = entrezids_PR8_d60_all$ENTREZID,
+                                   OrgDb = org.Mm.eg.db, 
+                                   ont = "BP", 
+                                   qvalueCutoff = 0.05, 
+                                   readable = TRUE)
+```
+
+```{r}
+cluster_summary_enrichment_PR8_d60 = data.frame(GO_enrichment_PR8_d60)
+write.csv(cluster_summary_enrichment_PR8_d60, "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/results_clusterProfiler_PR8_d60.csv")
+```
+
+```{r}
+dotplot_goEnrichment_PR8_d60 = dotplot(GO_enrichment_PR8_d60, showCategory=50)
+ggsave(filename = "dotplot_goEnrichment_PR8_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/")
+```
+
+```{r}
+emapplot_goEnrichment_PR8_d60 = pairwise_termsim(GO_enrichment_PR8_d60)
+emapplot_goEnrichment_PR8_d60 = emapplot(emapplot_goEnrichment_PR8_d60)
+
+
+ggsave(filename = "emapplot_goEnrichment_PR8_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/")
+```
+
+```{r}
+PR8_d60_logfold = markers_PR8_d60_filtered$avg_log2FC
+names(PR8_d60_logfold) = markers_PR8_d60_filtered$gene
+
+cnetplot(GO_enrichment_PR8_d60,
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=PR8_d60_logfold, 
+         vertex.label.font=6)
+
+ggsave(filename = "cnetplot_goEnrichment_PR8_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/")
+```
+
+## 2 C) Functional enrichment + pathway analysis of marker genes of PR8 d8 
+
+```{r}
+genes_PR8_d8 = markers_PR8_d8_filtered$gene
+entrezids_PR8_d8_markers = select(org.Mm.eg.db, keys=genes_PR8_d8, keytype="SYMBOL", columns="ENTREZID")
+entrezids_PR8_d8_markers = na.omit(entrezids_PR8_d8_markers)
+```
+
+```{r}
+all_PR8_d8_genes = as.character(markers_PR8_d8$gene)
+entrezids_PR8_d8_all = select(org.Mm.eg.db, keys=all_PR8_d8_genes, keytype="SYMBOL", columns="ENTREZID")
+entrezids_PR8_d8_all = na.omit(entrezids_PR8_d8_all)
+```
+
+shows the relationship between the top 50 most significantly enriched GO terms (padj.), by grouping similar terms together. The color represents the p-values relative to the other displayed terms (brighter red is more significant) and the size of the terms represents the number of genes that are significant from our list.
+
+```{r}
+GO_enrichment_PR8_d8 = enrichGO(gene = entrezids_PR8_d8_markers$ENTREZID,
+                                   universe = entrezids_PR8_d8_all$ENTREZID,
+                                   OrgDb = org.Mm.eg.db, 
+                                   ont = "BP", 
+                                   qvalueCutoff = 0.05, 
+                                   readable = TRUE)
+```
+
+```{r}
+cluster_summary_enrichment_PR8_d8 = data.frame(GO_enrichment_PR8_d8)
+write.csv(cluster_summary_enrichment_PR8_d8, "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d8/results_clusterProfiler_PR8_d8.csv")
+```
+
+```{r}
+dotplot_goEnrichment_PR8_d8 = dotplot(GO_enrichment_PR8_d8, showCategory=50)
+ggsave(filename = "dotplot_goEnrichment_PR8_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d8/")
+```
+
+```{r}
+emapplot_goEnrichment_PR8_d8 = pairwise_termsim(GO_enrichment_PR8_d8)
+emapplot_goEnrichment_PR8_d8 = emapplot(emapplot_goEnrichment_PR8_d8)
+
+
+ggsave(filename = "emapplot_goEnrichment_PR8_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d8/")
+```
+
+```{r}
+PR8_d8_logfold = markers_PR8_d8_filtered$avg_log2FC
+names(PR8_d8_logfold) = markers_PR8_d8_filtered$gene
+
+cnetplot(GO_enrichment_PR8_d8,
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=PR8_d8_logfold, 
+         vertex.label.font=6)
+
+ggsave(filename = "cnetplot_goEnrichment_PR8_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d8/")
+```
