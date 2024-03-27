@@ -11,6 +11,7 @@
 #   install.packages("BiocManager")
 # 
 # BiocManager::install("scran")
+
 easypackages::libraries(
   "Seurat","tidyseurat","dplyr","ggplot2","readr","forcats","ragg","ggpubr","stringr","Matrix","textTinyR","tidyverse","ggrepel","scran","pheatmap","DESeq2","patchwork","ggridges", "scran", "textTinyR", "withr", "htmltools","pheatmap", "viridis", "ggExtra", "scales")
 
@@ -135,6 +136,7 @@ p2_experiment1 <- obj_sex_experiment1 |> ggplot(aes(Eif2s3y))+ geom_histogram(bi
 p3_experiment1 <- obj_sex_experiment1 |> ggplot(aes(Kdm5d))+ geom_histogram(binwidth = 0.1)+facet_wrap( ~day_sample_type_cond_ms4a3, ncol = 1)+theme_x1
 p4_experiment1 <- obj_sex_experiment1 |> ggplot(aes(max_male_genes))+ geom_histogram(binwidth = 0.1)+facet_wrap( ~day_sample_type_cond_ms4a3, ncol = 1)+theme_x1
 
+library(dplyr)
 obj_sex_experiment1 |>
   select(.cell,day_sample_type_cond_ms4a3,sex_classifier ) |>
   mutate(paste0(day_sample_type_cond_ms4a3,sex_classifier, sep="_"))
@@ -276,7 +278,7 @@ histogram_experiment1_exploration_deseq_tissue
 
 
 
-#################################################### 4A) Differential Expression Analysis: 
+#################################################### 4A) Differential Expression Analysis: based on the full model with tissue
 
 dds_full_experiment1_tissue = DESeqDataSetFromMatrix(expression_matrix_experiment1,
                                    colData=design_no_small_experiment1,
@@ -290,6 +292,8 @@ dds_full_experiment1_tissue = DESeqDataSetFromMatrix(expression_matrix_experimen
 ## reduces variance => variance across genes become more stable => imporves stat reliability of tests downstream
 ## blind parameter: set it to false if interested in DEA because allows the transformation to incorporate the design information, potentially leading to more accurate results
 dds_full_experiment1_tissue_rlogtransformation <- rlog(dds_full_experiment1_tissue, blind=FALSE)
+
+
 
 
 
@@ -340,40 +344,28 @@ conds <- (names(obj_sex_corrected_experiment1)[-1]) ## extracts column names fro
 
 design_no_small_experiment1 <- design_no_small_experiment1 |> mutate(name=paste(virus,Ms4a3, sep="_")) 
 # adds a new column named "name" by applying the previously created string  creates a combined factor based on the existing "virus" and "Ms4a3" factors.
-# Plot heatmap
+#+ Plot heatmap
 plot_corrHeatMap_full_experiment1 = pheatmap(dds_full_rlogtransformation_expressionmatrix_corrmatrix_experiment1)
-
+print(plot_corrHeatMap_full_experiment1)
 
 
 ##### run the deseq analysis
 dds_full_experiment1_tissue_deseq = DESeq(dds_full_experiment1_tissue)
-
+# return the available comparisons
+resultsNames(dds_full_experiment1_tissue_deseq)
 # test_no_gender <- as_tibble(results(DESeq(dds_full_experiment1_tissue_deseq, test="LRT", reduced= ~tissue + virus + Ms4a3)))
 # test_no_gender <- as_tibble(results(DESeq(dds_full_experiment1_tissue_deseq, test="LRT", reduced= ~tissue + virus + Ms4a3)))
 
-summary(test_no_gender) # based from this we can say th
 
 
-
+#+
 #### export the normalized counts
 dds_full_experiment1_tissue_deseq_normalized = counts(dds_full_experiment1_tissue_deseq, normalized = T)
 write.csv(dds_full_experiment1_tissue_deseq_normalized, "C:/Users/Jonas/Desktop/Analysis_Lucia/R_Projects/machiels_lab_viral-main/output/deseq/normalizedCountsExperiment1.csv")
 
 
-##### Deseq results
-
-# returns results from output showing the differentially expressed genes
-# alpha was set to 0.05 meaning the adjusted p value will be 0.05
-# only those genes with an adjusted p value below 0.05 are termed as differentially expressed genes
-dds_full_experiment1_tissue_results = results(dds_full_experiment1_tissue_deseq, alpha = 0.05) 
-summary(dds_full_experiment1_tissue_results) 
-# expression for 13801 genes were measured
-# LFC < 0 => downregulated genes => 1351 genes were downregulated
-# LFC > 0 => upregulated genes => 1254 genes were upregulated
-
-
-
--#### size factors
+#+
+#### size factors
 #### higher numbers tend to correlate with higher sequencing depths (depth = average number of times a given position in the genetic sequence is sequenced)
 sizeFactors(dds_full_experiment1_tissue_deseq)
 
@@ -392,37 +384,83 @@ plot_dispersion_full_experiment1 = plotDispEsts(dds_full_experiment1_tissue_dese
 #                         decrease in dispersion with increasing mean expression
 
 
-#### create a MA plot
-#### displays a log ratio (M) vs an average (A) in order to visualize the differences between two groups
-#### Visualize the relationship between gene expression and fold change between two conditions or groups being compared.
-#### Identify potential DEGs based on their location on the plot
-#### x-axis(A): Represents the average expression level (mean) of a gene across samples in both conditions being compared. 
-####            This indicates the overall expression level of the gene.
-#### y-axis(M): Represents the log2 fold change (M) in gene expression between the two conditions. + => upreg -=> downreg
-#### ideally majority genes near origin, genes far from origin on y axis are potential deg's
 
-plot_MA_full_experiment1 = plotMA(dds_full_experiment1_tissue_deseq)
+
+#+
+##### Deseq results
+
+# returns results from output showing the differentially expressed genes
+# alpha was set to 0.05 meaning the adjusted p value will be 0.05
+# only those genes with an adjusted p value below 0.05 are termed as differentially expressed genes
+# contains results of every stat test for every single row (gene)
+# wald test performed to obtain the output comparing bal vs lung tissue 
+dds_full_experiment1_tissue_results_contrastTissue = results(dds_full_experiment1_tissue_deseq, alpha = 0.01, contrast = c("tissue", "lung", "bal"))
+# baseMean is mean expression of a gene across all samples
+# p value is obtained using the wald test using H0 saying there is no differential between the groups 
+# if the p value is below .01 the H0 gets rejected because only a 1% chance that H0 is true
+# however in cases like this when 13801 genes are tested
+# by chance there is a 1% chance that genes are not differentially expressed but obtained significant p values => false positives
+# hence why the adjusted p value is used over the ordinary p value
+# log2foldchange (log2FC) refers to the magnitude and direction of gene expression differences between groups being compared
+# A positive log2FC indicates that a gene is upregulated in one group compared to the other. The higher the value, the greater the upregulation.
+# Conversely, a negative value signifies downregulation, with a more negative value indicating stronger downregulation.
+# in this case a positive log2fc score indicates biased expression towards the lung
+# in this case a negative log2fc score indicates biased expression towards the bal
+summary(dds_full_experiment1_tissue_results_contrastTissue)
+# we obtain a very high amount of genes with significant p adjusted values for both cases
+# 5059 genes are upregulated in the lung 
+# 3860 genes are upregulated in the bal
+# this is a very high amount and will be filtered upon to further refine the results to obtain the differentially expressed genes in lung and bal
+
+
+#+
+# #### create a MA plot
+# #### displays a log ratio (M) vs an average (A) in order to visualize the differences between two groups
+# #### Visualize the relationship between gene expression and fold change between two conditions or groups being compared.
+# #### Identify potential DEGs based on their location on the plot
+# #### x-axis(A): Represents the average expression level (mean) of a gene across samples in both conditions being compared. 
+# ####            This indicates the overall expression level of the gene.
+# #### y-axis(M): Represents the log2 fold change (M) in gene expression between the two conditions. + => upreg -=> downreg
+# #### ideally majority genes near origin, genes far from origin on y axis are potential deg's
+# 
+plot_MA_full_experiment1 = plotMA(dds_full_experiment1_tissue_results_contrastTissue)
+plot_MA_full_experiment1
+
+#+
 #### make the MA better
 # Coerce to a data frame
-# dds_full_experiment1_tissue_deseq_df = results(dds_full_experiment1_tissue_deseq)
-# df_full_experiment1 <- as.data.frame(dds_full_experiment1_tissue_deseq_df)
-# 
-# # Examine this data frame
-# head(df_full_experiment1)
-# 
-# # Set a boolean column for significance
-#   df_full_experiment1$significant <- ifelse(df_full_experiment1$padj < .1, "Significant", NA)
-  
+dds_full_experiment1_tissue_deseq_contrastTissue_df <- as.data.frame(dds_full_experiment1_tissue_results_contrastTissue)
+
+#Examine this data frame
+head(dds_full_experiment1_tissue_deseq_contrastTissue_df)
+#
+# Set a boolean column for significance based on the adjusted p value and log2foldChange
+dds_full_experiment1_tissue_deseq_contrastTissue_df$significant <- ifelse(dds_full_experiment1_tissue_deseq_contrastTissue_df$padj < 0.1 & abs(dds_full_experiment1_tissue_deseq_contrastTissue_df$log2FoldChange) > 1,"Significant", NA)
 # Plot the results similar to DEseq2
-ggplot(df_full_experiment1, aes(baseMean, log2FoldChange, colour=significant)) + 
-    geom_point(size=1) + scale_y_continuous(limits=c(-3, 3), oob=squish) + scale_x_log10()+ 
+ggplot(dds_full_experiment1_tissue_deseq_contrastTissue_df, aes(baseMean, log2FoldChange, colour=significant)) +
+    geom_point(size=1) + scale_y_continuous(limits=c(-3, 3), oob=squish) + scale_x_log10()+
     geom_hline(yintercept = 0, colour="tomato1", size=2) + labs(x="mean of normalized counts", y="log fold change") +
     scale_colour_manual(name="q-value", values=("Significant"="red"), na.value="grey50") + theme_bw()
-  
+
 # Let's add some more detail
-plot_MA_full_experiment1 = ggplot(df_full_experiment1, aes(baseMean, log2FoldChange, colour=padj)) + 
-    geom_point(size=1) + scale_y_continuous(limits=c(-3, 3), oob=squish) + scale_x_log10() + 
+plot_MA_full_experiment1_detail = ggplot(dds_full_experiment1_tissue_deseq_contrastTissue_df, aes(baseMean, log2FoldChange, colour=padj)) +
+    geom_point(size=1) + scale_y_continuous(limits=c(-3, 5), oob=squish) + scale_x_log10() +
     geom_hline(yintercept = 0, colour="darkorchid4", size=1, linetype="longdash")+
-    labs(x="mean of normalized counts", y="log fold change") + 
-    scale_colour_viridis(direction=-1, trans='sqrt') + theme_bw() + geom_density_2d(colour="black", size=2)
-plot_MA_full_experiment1
+    labs(x="mean of normalized counts", y="log fold change")
+plot_MA_full_experiment1_detail
+
+#+ create a volcano plot
+library(EnhancedVolcano)
+
+plot_volcano_full_experiment1_tissue_contrastTissue = EnhancedVolcano(dds_full_experiment1_tissue_results_contrastTissue,
+                                                                      lab = rownames(dds_full_experiment1_tissue_results_contrastTissue),
+                                                                      x = 'log2FoldChange',
+                                                                      y = 'pvalue',
+                                                                      title = 'lung vs ball using full model')
+plot_volcano_full_experiment1_tissue_contrastTissue
+
+
+
+
+
+
