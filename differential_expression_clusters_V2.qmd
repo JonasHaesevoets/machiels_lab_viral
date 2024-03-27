@@ -1,0 +1,828 @@
+---
+title: "differential expression between clusters"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+# differential expression between clusters
+
+In this notebook we will assess if there are differentially expressed genes between d8 and d60 between individual conditions
+
+As a test we will start of with comparing d8 MuHV44 vs d60 MuHV4 and d8 PR8 vs d60 PR8
+
+## load in the data and the required packages
+
+```{r, echo=FALSE}
+
+
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "DESeq2", "ggrepel", "writexl", "clusterProfiler", "DOSE", "pathview", "biomaRt", "org.Mm.eg.db", "enrichplot", "DGCA")
+library(tidyverse)
+library(cowplot)
+library(edgeR)
+library(Matrix)
+library(reshape2)
+library(S4Vectors)
+library(SingleCellExperiment)
+library(pheatmap)
+library(apeglm)
+library(png)
+library(DESeq2)
+library(RColorBrewer)
+library(data.table)
+library(textTinyR)
+obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+
+```
+
+## data manipulations
+
+```{r}
+seurat_d8 <- obj.v5 %>%filter(str_detect(day_mock, "d8"))
+seurat_nod8 <- obj.v5 %>%filter(!str_detect(day_mock, "d8"))
+seurat_nomock <- obj.v5 %>% filter(!str_detect(day_mock, "Mock"))
+seurat_nomock = seurat_nomock %>% filter(!str_detect(condition, "Mock"))
+#d60
+seurat_d60 <- seurat_nod8 %>%filter(str_detect(day_mock, "d60"))
+seurat_onlyMuHV4_d60 <- seurat_d60 %>% filter(str_detect(condition, "MuHV4"))
+seurat_onlyMuHV4_d8 <- seurat_d8 %>% filter(str_detect(condition, "MuHV4"))
+seurat_onlyPR8_d60 <- seurat_d60 %>% filter(str_detect(condition, "PR8"))
+seurat_onlyPR8_d8 <- seurat_d8 %>% filter(str_detect(condition, "PR8"))
+seurat_onlyMuHV4_d60_bal <- seurat_onlyMuHV4_d60 %>%  filter(str_detect(sample_type, "bal"))
+
+#mock
+seurat_mock <- seurat_nod8 %>%filter(str_detect(day_mock, "Mock"))
+seurat_mock_onlyMuHV4 = seurat_mock %>%  filter(str_detect(condition, "MuHV4"))
+seurat_mock_onlyMuHV4_bal = seurat_mock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
+
+
+seurat_nomock_onlyMuHV4 = seurat_nomock %>% filter(str_detect(condition, "MuHV4"))
+seurat_nomock_onlyMuHV4 = subset(seurat_nomock_onlyMuHV4 , idents = c(0,1,5,6,7))
+seurat_nomock_onlyMuHV4_bal = seurat_nomock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
+seurat_nomock_onlyMuHV4_lung = seurat_nomock_onlyMuHV4 %>% filter(str_detect(sample_type, "lung"))
+
+seurat_nomock_onlyPR8 = seurat_nomock %>% filter(str_detect(condition, "PR8"))
+seurat_nomock_onlyPR8 = subset(seurat_nomock_onlyPR8, idents = c(0,1,5,6,7))
+seurat_nomock_onlyPR8_bal = seurat_nomock_onlyPR8 %>% filter(str_detect(sample_type, "bal"))
+seurat_nomock_onlyPR8_lung = seurat_nomock_onlyPR8 %>% filter(str_detect(sample_type, "lung"))
+DefaultAssay(seurat_nomock_onlyMuHV4 )= "RNA"
+DefaultAssay(seurat_nomock_onlyPR8 )= "RNA"
+
+num_cells_d60_MuHv4 <- ncol(seurat_onlyMuHV4_d60)
+num_cells_d8_MuHv4 <- ncol(seurat_onlyMuHV4_d8)
+num_cells_d60_PR8 <- ncol(seurat_onlyPR8_d60)
+num_cells_d8_PR8 = ncol(seurat_onlyPR8_d8)
+
+seurat_nomock_onlyMuHV4@meta.data[["day_sample_type_cond_ms4a3_pos_gabbr2"]]
+
+
+```
+
+### something wrong with the data manipulations!!!
+
+```{r}
+contains_d8 <- grepl("d8", seurat_nomock_onlyMuHV4$day_sample_type_cond_ms4a3_pos_gabbr2)
+contains_true <- sum(contains_d8)
+```
+
+### different way to create filtered seurat objects based on the metadata column for MuHV4
+
+```{r}
+seurat_nomock_0 <- obj.v5 %>%filter(!str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "Mock"))
+seurat_nomock_onlyMuHV4_1 = seurat_nomock_0 %>% filter(str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "MuHV4"))
+seurat_nomock_onlyMuHV4_2 = seurat_nomock_onlyMuHV4_1 %>% filter(str_detect(virus, "MuHV4"))
+seurat_nomock_onlyMuHV4_3 = seurat_nomock_onlyMuHV4_2%>% filter(str_detect(condition, "MuHV4"))
+seurat_nomock_onlyMuHV4_4 = seurat_nomock_onlyMuHV4_3 %>% filter(!str_detect(day_mock, "Mock"))
+
+seurat_nomock_onlyMuHV4_4_alveolar = subset(seurat_nomock_onlyMuHV4_4,
+                                            idents = c(0,1,5,6,7))
+
+
+
+
+```
+
+### different way to create filtered seurat objects based on the metadata column for PR8
+
+```{r}
+seurat_nomock_onlyPR8_1 = seurat_nomock_0 %>% filter(str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "PR8"))
+seurat_nomock_onlyPR8_2 = seurat_nomock_onlyPR8_1 %>% filter(str_detect(virus, "PR8"))
+seurat_nomock_onlyPR8_3 = seurat_nomock_onlyPR8_2%>% filter(str_detect(condition, "PR8"))
+seurat_nomock_onlyPR8_4 = seurat_nomock_onlyPR8_3 %>% filter(!str_detect(day_mock, "Mock"))
+seurat_nomock_onlyPR8_4_alveolar = subset(seurat_nomock_onlyPR8_4,
+                                            idents = c(0,1,5,6,7))
+```
+
+## 1) Exploratory analysis d8 vs d60 MuHV4
+
+### CD11c
+
+```{r, fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_cd11c = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "Itgax", repel = TRUE)
+
+
+featureplot_d8d60_MuHV4_cd11c 
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d8d60_MuHV4_cd11c.png", width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### PPARg
+
+```{r,fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_pparg = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "Pparg", repel = TRUE)
+
+featureplot_d8d60_MuHV4_pparg 
+
+ggsave(filename = "featureplot_d8d60_MuHV4_pparg.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### SiglecF
+
+```{r,fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_siglecf = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "Siglecf", repel = TRUE)
+
+
+featureplot_d8d60_MuHV4_siglecf
+
+
+ggsave(filename = "featureplot_d8d60_MuHV4_siglecf.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+
+```
+
+### H2-ia-ie
+
+```{r,fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_h2 = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "H2-ia-ie-AbSeq", repel = TRUE)
+
+
+featureplot_d8d60_MuHV4_h2
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+ggsave(filename = "featureplot_d8d60_MuHV4_h2.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### CD274
+
+```{r,fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_CD274 = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "Cd274", repel = TRUE)
+
+
+featureplot_d8d60_MuHV4_CD274
+
+
+
+ggsave(filename = "featureplot_d8d60_MuHV4_cd274.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+## 1 A) Differential expression analysis MuHV4 d8 vs d60
+
+#### function to create a filtered count matrix that can be used as input for DESeq2
+
+```{r, echo=FALSE}
+#' This function extracts and analyzes expression data for specific cell identities (groups) 
+#' from a single cell RNA-seq dataset. 
+#' @param ds: A Seurat object containing the single-cell RNA-seq data.
+#' @param idents_choose: The name of the column in 'ds' containing cell identity labels (defaults to "seurat_clusters").
+#' @param assay: The name of the assay in 'ds' containing the expression counts (defaults to "RNA").
+#' @param min_cell_num: The minimum number of cells required in a group for analysis (defaults to 200).
+#' @param keep: A vector of specific group names to analyze (if NULL, all groups are analyzed).
+#' @param perc_expressed: The minimum percentage of cells in a group that must express a gene for it to be kept (defaults to 1).
+
+#' @return A tibble containing gene names and expression counts for each analyzed group.
+
+
+make_idents_count_MuHV4 <- function(
+    ds,
+    idents_choose="seurat_clusters",
+    assay_="RNA",
+    min_cell_num=200,
+    keep=NULL,
+    perc_expressed=1){
+  slot_ <- "counts"
+  Idents(ds) <- idents_choose
+  group_names <- unique(Idents(ds))
+  if (!is.null(keep)) {group_names <- keep}
+  reads <- LayerData(object = seurat_nomock_onlyMuHV4_4_alveolar ,"counts")
+  #get rid of false genes / . in there name
+  reads <- reads[rownames(reads) %>% str_subset(pattern = "[.]",negate = T),]
+  #cut out genes with less then perc_expressed percent of cells that eypress the gene
+  i_cells <- WhichCells(ds, idents = keep)
+  reads_group <- reads[,i_cells]
+  
+  reads <- reads[(((reads_group > 1) %>% rowSums())> (length(i_cells)/100*perc_expressed)),]
+  print(paste0(as.character(nrow(reads))," genes kept"))  
+  # Extracts the expression matrix from the specified assay and filters genes based on     perc_expressed
+  sum_counts_ds <- tibble(.rows =  nrow(reads))
+  #z=1
+  for (i in seq_along(group_names)) { 
+    #Loops through the unique cell identities (groups) in ds
+    print(i)
+    #print(colnames(sum_counts_ds))
+    print(group_names[i])
+    i_cells <- WhichCells(object =ds,idents = group_names[i]) 
+    #Selects cells belonging to the current group using WhichCells.
+    
+    if (length(i_cells)<min_cell_num) { 
+      # the group has fewer cells than min_cell_num, add a column with zero counts and         a descriptive name to the results frame and skip to the next group.
+      sum_counts_ds <- sum_counts_ds %>%
+        add_column(dings=0)
+      colnames(sum_counts_ds)[i] <- paste0(as.character(group_names[i]),"_smaller" , as.character(min_cell_num)) 
+      #Adds a column to the results frame containing the counts for the current group        and assigns the group name as the column name.
+      
+      next}
+    #i_cells <- WhichCells(object =ds,idents = "hla_d_rlo_s100a_monocytes_C19-CB-0003")
+    reads_group <- reads[,i_cells] %>%  sparse_Sums(rowSums=T)
+    # selects part of the expression matrix (reads), keeping only those genes               expressed in cells beloning to the current group
+    
+    sum_counts_ds <- sum_counts_ds %>%
+      add_column(dings=reads_group) 
+    #ads a column called dings whose values are filled with the calculated group-wise      gene expression sums stored in reads_group
+    colnames(sum_counts_ds)[i] <- as.character(group_names[i]) 
+    # renames the newly added "dings" column to the actual group name corresponding to       the current iteration (i) in the loo
+    print(as.character(colnames(sum_counts_ds)[i]))
+    
+  }
+  
+  sum_counts_ds <- sum_counts_ds %>%  mutate(gene=rownames(reads)) %>% relocate(gene) #: Adds a column with gene names to the results frame 
+  return(sum_counts_ds)
+}
+```
+
+#### create a filtered count matrix for MuHV4
+
+```{r, echo=FALSE}
+obj_deseq_noMock_MuHV4 = make_idents_count_MuHV4(ds = seurat_nomock_onlyMuHV4_4_alveolar,
+                                            idents_choose = "day_sample_type_cond_ms4a3_pos_gabbr2",
+                                            perc_expressed = 0.2)
+```
+
+#### create a design matrix
+
+```{r}
+expression_matrix_MuHV4 = as.matrix(obj_deseq_noMock_MuHV4 %>% dplyr::select(-gene))
+## converts to expression matrix storing expression values for each sample
+rownames(expression_matrix_MuHV4) = obj_deseq_noMock_MuHV4 %>% pull(gene)
+## because we the amount of columns in the expression matrix has to be equal to the amount of rows in the design matrix 
+## need to filter the columns where the rowSums are 0 in the expression matrix to have it correctly
+keep_cols_MuHV4 <- colSums(abs(expression_matrix_MuHV4)) > 0
+# keeps those cells where the sums are not 0
+expression_matrix_MuHV4 = expression_matrix_MuHV4[, keep_cols_MuHV4]
+#only retain those
+design_MuHV4 = tibble(sampletag=colnames(expression_matrix_MuHV4)) |> separate(col=sampletag, into =c("days","x"),remove = F, extra="merge") |> 
+  separate(col=x, into=c("tissue","virus", "Ms4a3"), remove = F, extra = "merge")
+
+```
+
+#### create a DESeq2 object
+
+```{r}
+dds_MuHV4 <- DESeqDataSetFromMatrix(countData = expression_matrix_MuHV4,
+                              colData = design_MuHV4,
+                              design= ~ Ms4a3)
+dds_MuHV4_deseq <- DESeq(dds_MuHV4)
+
+```
+
+#### export the raw and filtered
+
+```{r}
+markers_MuHV4_d60_filtered = markers_MuHV4_d60[markers_MuHV4_d60$avg_log2FC > 1,]
+nonsignficant_p_adj_d60MuHV4 <- which(markers_MuHV4_d60_filtered$p_val_adj <= 0.05)
+markers_MuHV4_d60_filtered <- markers_MuHV4_d60_filtered[nonsignficant_p_adj_d60MuHV4, ]
+
+write_xlsx(markers_MuHV4_d60, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d60.xlsx")
+write_xlsx(markers_MuHV4_d60_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d60_filtered.xlsx")
+
+markers_MuHV4_d8_filtered = markers_MuHV4_d8[markers_MuHV4_d8$avg_log2FC > 1,]
+nonsignficant_p_adj_d8MuHV4 <- which(markers_MuHV4_d8_filtered$p_val_adj <= 0.05)
+markers_MuHV4_d8_filtered <- markers_MuHV4_d8_filtered[nonsignficant_p_adj_d8MuHV4, ]
+
+write_xlsx(markers_MuHV4_d8, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d8.xlsx")
+write_xlsx(markers_MuHV4_d8_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_MuHV4_d8_filtered.xlsx")
+
+```
+
+### volcano plot Muhv4 d60
+
+```{r,fig.height= 20, fig.width= 30}
+markers_MuHV4_d60$diffexpressed <- "NO"
+markers_MuHV4_d60$diffexpressed[markers_MuHV4_d60$avg_log2FC > 1] <- "UP"
+
+markers_MuHV4_d60$diffexpressed[markers_MuHV4_d60$avg_log2FC < -1] <- "DOWN"
+
+markers_MuHV4_d60$delabel <- NA
+
+markers_MuHV4_d60$delabel[markers_MuHV4_d60$diffexpressed != "NO"]<-markers_MuHV4_d60$gene[markers_MuHV4_d60$diffexpressed != "NO"]
+
+
+
+volcano_muhv4_d60 <- ggplot(data=markers_MuHV4_d60,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_MuHV4_d60$avg_log2FC)), 
+                           ceiling(max(markers_MuHV4_d60$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_muhv4_d60
+ggsave("volcano_MuHV4_d60.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
+
+```
+
+### volcano plot Muhv4 d8
+
+```{r}
+markers_MuHV4_d8$diffexpressed <- "NO"
+markers_MuHV4_d8$diffexpressed[markers_MuHV4_d8$avg_log2FC > 1] <- "UP"
+
+markers_MuHV4_d8$diffexpressed[markers_MuHV4_d8$avg_log2FC < -1] <- "DOWN"
+
+markers_MuHV4_d8$delabel <- NA
+
+markers_MuHV4_d8$delabel[markers_MuHV4_d8$diffexpressed != "NO"]<-markers_MuHV4_d8$gene[markers_MuHV4_d8$diffexpressed != "NO"]
+
+
+
+volcano_muhv4_d8 <- ggplot(data=markers_MuHV4_d8,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_MuHV4_d8$avg_log2FC)), 
+                           ceiling(max(markers_MuHV4_d8$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_muhv4_d8
+ggsave("volcano_MuHV4_d8.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
+```
+
+## 1 B) Functional enrichment + pathway analysis of marker genes of Muhv4 d60
+
+```{r}
+genes_MuHV4_d60 = markers_MuHV4_d60_filtered$gene
+entrezids_MuHV4_d60_markers = select(org.Mm.eg.db, keys=genes_MuHV4_d60, keytype="SYMBOL", columns="ENTREZID")
+entrezids_MuHV4_d60_markers = na.omit(entrezids_MuHV4_d60_markers)
+```
+
+```{r}
+all_MuHV4_d60_genes = as.character(markers_MuHV4_d60$gene)
+entrezids_MuHV4_d60_all = select(org.Mm.eg.db, keys=all_MuHV4_d60_genes, keytype="SYMBOL", columns="ENTREZID")
+entrezids_MuHV4_d60_all = na.omit(entrezids_MuHV4_d60_all)
+```
+
+```{r}
+GO_enrichment_MuHV4_d60 = enrichGO(gene = entrezids_MuHV4_d60_markers$ENTREZID,
+                                   universe = entrezids_MuHV4_d60_all$ENTREZID,
+                                   OrgDb = org.Mm.eg.db, 
+                                   ont = "BP", 
+                                   qvalueCutoff = 0.05, 
+                                   readable = TRUE)
+```
+
+```{r}
+cluster_summary_enrichment_MuHV4_d60 = data.frame(GO_enrichment_MuHV4_d60)
+write.csv(cluster_summary_enrichment_MuHV4_d60, "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/results_clusterProfiler_MuHV4_d60.csv")
+
+```
+
+```{r,fig.height= 40, fig.width= 30}
+dotplot_goEnrichment_MuHV4_d60 = dotplot(GO_enrichment_MuHV4_d60, showCategory=50)
+dotplot_goEnrichment_MuHV4_d60
+ggsave(filename = "dotplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/")
+```
+
+```{r,fig.height= 20, fig.width= 30}
+emapplot_goEnrichment_MuHV4_d60 = pairwise_termsim(GO_enrichment_MuHV4_d60)
+emapplot_goEnrichment_MuHV4_d60 = emapplot(emapplot_goEnrichment_MuHV4_d60)
+
+emapplot_goEnrichment_MuHV4_d60
+
+ggsave(filename = "emapplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/")
+```
+
+```{r,fig.height= 20, fig.width= 30}
+muhv4_d60_logfold = markers_MuHV4_d60_filtered$avg_log2FC
+names(muhv4_d60_logfold) = markers_MuHV4_d60_filtered$gene
+
+cnetplot(GO_enrichment_MuHV4_d60,
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=muhv4_d60_logfold, 
+         vertex.label.font=6)
+
+ggsave(filename = "cnetplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/")
+```
+
+## 1 C) Functional enrichment + pathway analysis of marker genes of Muhv4 d8
+
+no genes were significantly expressed according to the criteria of log2FC \> 1 && padj \< 0.05
+
+```{r}
+genes_MuHV4_d8 = markers_MuHV4_d8_filtered$gene
+entrezids_MuHV4_d8_markers = select(org.Mm.eg.db, keys=genes_MuHV4_d8, keytype="SYMBOL", columns="ENTREZID")
+entrezids_MuHV4_d8_markers = na.omit(entrezids_MuHV4_d8_markers)
+```
+
+```{r}
+all_MuHV4_d8_genes = as.character(markers_MuHV4_d8$gene)
+entrezids_MuHV4_d8_all = select(org.Mm.eg.db, keys=all_MuHV4_d8_genes, keytype="SYMBOL", columns="ENTREZID")
+entrezids_MuHV4_d8_all = na.omit(entrezids_MuHV4_d8_all)
+```
+
+```{r}
+GO_enrichment_MuHV4_d8 = enrichGO(gene = entrezids_MuHV4_d8_markers$ENTREZID,
+                                   universe = entrezids_MuHV4_d8_all$ENTREZID,
+                                   OrgDb = org.Mm.eg.db, 
+                                   ont = "BP", 
+                                   qvalueCutoff = 0.05, 
+                                   readable = TRUE)
+```
+
+```{r}
+cluster_summary_enrichment_MuHV4_d8 = data.frame(GO_enrichment_MuHV4_d8)
+write.csv(cluster_summary_enrichment_MuHV4_d8, "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d8/results_clusterProfiler_MuHV4_d8.csv")
+```
+
+```{r}
+dotplot_goEnrichment_MuHV4_d8 = dotplot(GO_enrichment_MuHV4_d8, showCategory=50)
+ggsave(filename = "dotplot_goEnrichment_MuHV4_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d8/")
+```
+
+shows the relationship between the top 50 most significantly enriched GO terms (padj.), by grouping similar terms together. The color represents the p-values relative to the other displayed terms (brighter red is more significant) and the size of the terms represents the number of genes that are significant from our list.
+
+```{r}
+emapplot_goEnrichment_MuHV4_d8 = pairwise_termsim(GO_enrichment_MuHV4_d8)
+emapplot_goEnrichment_MuHV4_d8 = emapplot(emapplot_goEnrichment_MuHV4_d8)
+
+
+ggsave(filename = "emapplot_goEnrichment_MuHV4_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d8/")
+```
+
+```{r}
+muhv4_d8_logfold = markers_MuHV4_d8_filtered$avg_log2FC
+names(muhv4_d8_logfold) = markers_MuHV4_d8_filtered$gene
+
+cnetplot(GO_enrichment_MuHV4_d8,
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=muhv4_d8_logfold, 
+         vertex.label.font=6)
+
+ggsave(filename = "cnetplot_goEnrichment_MuHV4_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d8/")
+```
+
+## 2) Exploratory analysis d8 vs d60 PR8
+
+### CD11C
+
+```{r}
+featureplot_d8d60_PR8_cd11c = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Itgax", repel = TRUE)
+
+
+featureplot_d8d60_PR8_cd11c 
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d8d60_PR8_cd11c.png", width = 45, height = 50, units = "cm", path = "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### PRARg
+
+```{r}
+featureplot_d8d60_PR8_pparg = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Pparg", repel = TRUE)
+
+featureplot_d8d60_PR8_pparg 
+
+ggsave(filename = "featureplot_d8d60_PR8_pparg.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### SiglecF
+
+```{r}
+featureplot_d8d60_PR8_siglecf = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Siglecf", repel = TRUE)
+
+
+featureplot_d8d60_PR8_siglecf
+
+
+ggsave(filename = "featureplot_d8d60_PR8_siglecf.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### H2-ia-ie
+
+```{r}
+featureplot_d8d60_PR8_h2 = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "H2-ia-ie-AbSeq", repel = TRUE)
+
+
+featureplot_d8d60_PR8_h2
+
+# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+ggsave(filename = "featureplot_d8d60_PR8_h2.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+### CD274
+
+```{r}
+featureplot_d8d60_PR8_CD274 = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Cd274", repel = TRUE)
+
+
+featureplot_d8d60_PR8_CD274
+
+
+
+ggsave(filename = "featureplot_d8d60_PR8_cd274.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
+```
+
+## 2 A) Differential expression analysis PR8 d8 vs d60
+
+#### function to create a filtered count matrix that can be used as input for DESeq2
+
+```{r, echo=FALSE}
+#' This function extracts and analyzes expression data for specific cell identities (groups) 
+#' from a single cell RNA-seq dataset. 
+#' @param ds: A Seurat object containing the single-cell RNA-seq data.
+#' @param idents_choose: The name of the column in 'ds' containing cell identity labels (defaults to "seurat_clusters").
+#' @param assay: The name of the assay in 'ds' containing the expression counts (defaults to "RNA").
+#' @param min_cell_num: The minimum number of cells required in a group for analysis (defaults to 200).
+#' @param keep: A vector of specific group names to analyze (if NULL, all groups are analyzed).
+#' @param perc_expressed: The minimum percentage of cells in a group that must express a gene for it to be kept (defaults to 1).
+
+#' @return A tibble containing gene names and expression counts for each analyzed group.
+
+
+make_idents_counts_PR8 <- function(
+    ds,
+    idents_choose="seurat_clusters",
+    assay_="RNA",
+    min_cell_num=200,
+    keep=NULL,
+    perc_expressed=1){
+  slot_ <- "counts"
+  Idents(ds) <- idents_choose
+  group_names <- unique(Idents(ds))
+  if (!is.null(keep)) {group_names <- keep}
+  reads <- LayerData(object = seurat_nomock_onlyPR8_4_alveolar ,"counts")
+  #get rid of false genes / . in there name
+  reads <- reads[rownames(reads) %>% str_subset(pattern = "[.]",negate = T),]
+  #cut out genes with less then perc_expressed percent of cells that eypress the gene
+  i_cells <- WhichCells(ds, idents = keep)
+  reads_group <- reads[,i_cells]
+  
+  reads <- reads[(((reads_group > 1) %>% rowSums())> (length(i_cells)/100*perc_expressed)),]
+  print(paste0(as.character(nrow(reads))," genes kept"))  
+  # Extracts the expression matrix from the specified assay and filters genes based on     perc_expressed
+  sum_counts_ds <- tibble(.rows =  nrow(reads))
+  #z=1
+  for (i in seq_along(group_names)) { 
+    #Loops through the unique cell identities (groups) in ds
+    print(i)
+    #print(colnames(sum_counts_ds))
+    print(group_names[i])
+    i_cells <- WhichCells(object =ds,idents = group_names[i]) 
+    #Selects cells belonging to the current group using WhichCells.
+    
+    if (length(i_cells)<min_cell_num) { 
+      # the group has fewer cells than min_cell_num, add a column with zero counts and         a descriptive name to the results frame and skip to the next group.
+      sum_counts_ds <- sum_counts_ds %>%
+        add_column(dings=0)
+      colnames(sum_counts_ds)[i] <- paste0(as.character(group_names[i]),"_smaller" , as.character(min_cell_num)) 
+      #Adds a column to the results frame containing the counts for the current group        and assigns the group name as the column name.
+      
+      next}
+    #i_cells <- WhichCells(object =ds,idents = "hla_d_rlo_s100a_monocytes_C19-CB-0003")
+    reads_group <- reads[,i_cells] %>%  sparse_Sums(rowSums=T)
+    # selects part of the expression matrix (reads), keeping only those genes               expressed in cells beloning to the current group
+    
+    sum_counts_ds <- sum_counts_ds %>%
+      add_column(dings=reads_group) 
+    #ads a column called dings whose values are filled with the calculated group-wise      gene expression sums stored in reads_group
+    colnames(sum_counts_ds)[i] <- as.character(group_names[i]) 
+    # renames the newly added "dings" column to the actual group name corresponding to       the current iteration (i) in the loo
+    print(as.character(colnames(sum_counts_ds)[i]))
+    
+  }
+  
+  sum_counts_ds <- sum_counts_ds %>%  mutate(gene=rownames(reads)) %>% relocate(gene) #: Adds a column with gene names to the results frame 
+  return(sum_counts_ds)
+}
+```
+
+#### create a filtered count matrix for PR8
+
+```{r}
+obj_deseq_noMock_PR8 = make_idents_counts_PR8(ds = seurat_nomock_onlyPR8_4_alveolar,
+                                            idents_choose = "day_sample_type_cond_ms4a3_pos_gabbr2",
+                                            perc_expressed = 0.2)
+```
+
+#### Create a design matrix
+
+```{r}
+expression_matrix_PR8 = as.matrix(obj_deseq_noMock_PR8 %>% dplyr::select(-gene))
+## converts to expression matrix storing expression values for each sample
+rownames(expression_matrix_PR8) = obj_deseq_noMock_PR8 %>% pull(gene)
+## because we the amount of columns in the expression matrix has to be equal to the amount of rows in the design matrix 
+## need to filter the columns where the rowSums are 0 in the expression matrix to have it correctly
+keep_cols_PR8 <- colSums(abs(expression_matrix_PR8)) > 0
+# keeps those cells where the sums are not 0
+expression_matrix_PR8 = expression_matrix_PR8[, keep_cols_PR8]
+#only retain those
+design_PR8 = tibble(sampletag=colnames(expression_matrix_PR8)) |> separate(col=sampletag, into =c("days","x"),remove = F, extra="merge") |> 
+  separate(col=x, into=c("tissue","virus", "Ms4a3"), remove = F, extra = "merge")
+```
+
+#### create a DESeq2 object
+
+```{r}
+dds_PR8 <- DESeqDataSetFromMatrix(countData = expression_matrix_PR8,
+                              colData = design_PR8,
+                              design= ~ Ms4a3)
+dds_PR8_deseq <- DESeq(dds_PR8)
+```
+
+### export the raw and filtered
+
+```{r}
+markers_PR8_d60_filtered = markers_PR8_d60[markers_PR8_d60$avg_log2FC > 1,]
+nonsignficant_p_adj_d60PR8 <- which(markers_PR8_d60_filtered$p_val_adj <= 0.05)
+markers_PR8_d60_filtered <- markers_PR8_d60_filtered[nonsignficant_p_adj_d60PR8, ]
+
+write_xlsx(markers_PR8_d60, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d60.xlsx")
+write_xlsx(markers_PR8_d60_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d60_filtered.xlsx")
+
+markers_PR8_d8_filtered = markers_PR8_d8[markers_PR8_d8$avg_log2FC > 1,]
+nonsignficant_p_adj_d8PR8 <- which(markers_PR8_d8_filtered$p_val_adj <= 0.05)
+markers_PR8_d8_filtered <- markers_PR8_d8_filtered[nonsignficant_p_adj_d8PR8, ]
+
+write_xlsx(markers_PR8_d8, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d8.xlsx")
+write_xlsx(markers_PR8_d8_filtered, "../../Documents/machiels_lab_viral/output/DEA/markers_PR8_d8_filtered.xlsx")
+```
+
+### volcano plot PR8 d60
+
+```{r}
+markers_PR8_d60$diffexpressed <- "NO"
+markers_PR8_d60$diffexpressed[markers_PR8_d60$avg_log2FC > 1] <- "UP"
+
+markers_PR8_d60$diffexpressed[markers_PR8_d60$avg_log2FC < -1] <- "DOWN"
+
+markers_PR8_d60$delabel <- NA
+
+markers_PR8_d60$delabel[markers_PR8_d60$diffexpressed != "NO"]<-markers_PR8_d60$gene[markers_PR8_d60$diffexpressed != "NO"]
+
+
+
+volcano_PR8_d60 <- ggplot(data=markers_PR8_d60,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_PR8_d60$avg_log2FC)), 
+                           ceiling(max(markers_PR8_d60$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_PR8_d60
+ggsave("volcano_PR8_d60.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
+```
+
+### volcano plot PR8 d8
+
+```{r}
+markers_PR8_d8$diffexpressed <- "NO"
+markers_PR8_d8$diffexpressed[markers_PR8_d8$avg_log2FC > 1] <- "UP"
+
+markers_PR8_d8$diffexpressed[markers_PR8_d8$avg_log2FC < -1] <- "DOWN"
+
+markers_PR8_d8$delabel <- NA
+
+markers_PR8_d8$delabel[markers_PR8_d8$diffexpressed != "NO"]<-markers_PR8_d8$gene[markers_PR8_d8$diffexpressed != "NO"]
+
+
+
+volcano_PR8_d8 <- ggplot(data=markers_PR8_d8,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_PR8_d8$avg_log2FC)), 
+                           ceiling(max(markers_PR8_d8$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_PR8_d8
+ggsave("volcano_PR8_d8.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
+```
+
+## 2 B) Functional enrichment + pathway analysis of marker genes of PR8 d60
+
+```{r}
+genes_PR8_d60 = markers_PR8_d60_filtered$gene
+entrezids_PR8_d60_markers = select(org.Mm.eg.db, keys=genes_PR8_d60, keytype="SYMBOL", columns="ENTREZID")
+entrezids_PR8_d60_markers = na.omit(entrezids_PR8_d60_markers)
+```
+
+```{r}
+all_PR8_d60_genes = as.character(markers_PR8_d60$gene)
+entrezids_PR8_d60_all = select(org.Mm.eg.db, keys=all_PR8_d60_genes, keytype="SYMBOL", columns="ENTREZID")
+entrezids_PR8_d60_all = na.omit(entrezids_PR8_d60_all)
+```
+
+```{r}
+GO_enrichment_PR8_d60 = enrichGO(gene = entrezids_PR8_d60_markers$ENTREZID,
+                                   universe = entrezids_PR8_d60_all$ENTREZID,
+                                   OrgDb = org.Mm.eg.db, 
+                                   ont = "BP", 
+                                   qvalueCutoff = 0.05, 
+                                   readable = TRUE)
+```
+
+```{r}
+cluster_summary_enrichment_PR8_d60 = data.frame(GO_enrichment_PR8_d60)
+write.csv(cluster_summary_enrichment_PR8_d60, "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/results_clusterProfiler_PR8_d60.csv")
+```
+
+```{r}
+dotplot_goEnrichment_PR8_d60 = dotplot(GO_enrichment_PR8_d60, showCategory=50)
+ggsave(filename = "dotplot_goEnrichment_PR8_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/")
+```
+
+```{r}
+emapplot_goEnrichment_PR8_d60 = pairwise_termsim(GO_enrichment_PR8_d60)
+emapplot_goEnrichment_PR8_d60 = emapplot(emapplot_goEnrichment_PR8_d60)
+
+
+ggsave(filename = "emapplot_goEnrichment_PR8_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/")
+```
+
+```{r}
+PR8_d60_logfold = markers_PR8_d60_filtered$avg_log2FC
+names(PR8_d60_logfold) = markers_PR8_d60_filtered$gene
+
+cnetplot(GO_enrichment_PR8_d60,
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=PR8_d60_logfold, 
+         vertex.label.font=6)
+
+ggsave(filename = "cnetplot_goEnrichment_PR8_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/")
+```
+
+## 2 C) Functional enrichment + pathway analysis of marker genes of PR8 d8
+
+```{r}
+genes_PR8_d8 = markers_PR8_d8_filtered$gene
+entrezids_PR8_d8_markers = select(org.Mm.eg.db, keys=genes_PR8_d8, keytype="SYMBOL", columns="ENTREZID")
+entrezids_PR8_d8_markers = na.omit(entrezids_PR8_d8_markers)
+```
+
+```{r}
+all_PR8_d8_genes = as.character(markers_PR8_d8$gene)
+entrezids_PR8_d8_all = select(org.Mm.eg.db, keys=all_PR8_d8_genes, keytype="SYMBOL", columns="ENTREZID")
+entrezids_PR8_d8_all = na.omit(entrezids_PR8_d8_all)
+```
+
+shows the relationship between the top 50 most significantly enriched GO terms (padj.), by grouping similar terms together. The color represents the p-values relative to the other displayed terms (brighter red is more significant) and the size of the terms represents the number of genes that are significant from our list.
+
+```{r}
+GO_enrichment_PR8_d8 = enrichGO(gene = entrezids_PR8_d8_markers$ENTREZID,
+                                   universe = entrezids_PR8_d8_all$ENTREZID,
+                                   OrgDb = org.Mm.eg.db, 
+                                   ont = "BP", 
+                                   qvalueCutoff = 0.05, 
+                                   readable = TRUE)
+```
+
+```{r}
+cluster_summary_enrichment_PR8_d8 = data.frame(GO_enrichment_PR8_d8)
+write.csv(cluster_summary_enrichment_PR8_d8, "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d8/results_clusterProfiler_PR8_d8.csv")
+```
+
+```{r}
+dotplot_goEnrichment_PR8_d8 = dotplot(GO_enrichment_PR8_d8, showCategory=50)
+ggsave(filename = "dotplot_goEnrichment_PR8_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d8/")
+```
+
+```{r}
+emapplot_goEnrichment_PR8_d8 = pairwise_termsim(GO_enrichment_PR8_d8)
+emapplot_goEnrichment_PR8_d8 = emapplot(emapplot_goEnrichment_PR8_d8)
+
+
+ggsave(filename = "emapplot_goEnrichment_PR8_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d8/")
+```
+
+```{r}
+PR8_d8_logfold = markers_PR8_d8_filtered$avg_log2FC
+names(PR8_d8_logfold) = markers_PR8_d8_filtered$gene
+
+cnetplot(GO_enrichment_PR8_d8,
+         categorySize="pvalue", 
+         showCategory = 5, 
+         foldChange=PR8_d8_logfold, 
+         vertex.label.font=6)
+
+ggsave(filename = "cnetplot_goEnrichment_PR8_d8.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d8/")
+```
