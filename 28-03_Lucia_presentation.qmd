@@ -1,0 +1,315 @@
+---
+title: "final_march2024_joint_analysis"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+# 28-03 Lucia presentation
+
+## 1) Load in data and packages and load in functions 
+
+```{r}
+easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis")
+obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_daniel.rds")
+DefaultAssay(obj.v5) <- "RNA"
+output_file_path <- "output/final_march2024_joint_analysis/"
+
+# The palette with grey:
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# The palette with black:
+cbp2 <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+#### This function takes a Seurat object or data frame (`seurat_tbl`) as input, calculates counts based on various factors, converts certain columns to factors, filters out specific conditions, calculates proportions of samples in a cluster, and then calculates z-scores of frequencies per cluster. Finally, it returns a modified data frame with these calculated values.
+
+```{r}
+make_zscore_and_freq_data <- function(seurat_tbl) {
+  # Calculate counts of observations based on various factors
+  # Parameters:
+  #   seurat_tbl: A Seurat object or data frame containing the data
+  # Returns:
+  #   A modified data frame with z-scores and frequencies calculated
+  
+  seurat_tbl |> 
+    count(day_mock, sample_type, condition, sample_tag_ms4a3_pos_gabbr2, harmony_cluster_8dims_rough, .drop = FALSE) |> 
+    # Make columns factors
+    mutate(
+      day_mock = factor(day_mock, levels = c("Mock", "d8", "d60")),
+      sample_type = factor(sample_type, levels = c("lung", "bal")),
+      condition = as_factor(condition),
+      sampletag_Ms4a3 = as_factor(sample_tag_ms4a3_pos_gabbr2),
+      harmony_cluster_8dims_rough = as_factor(harmony_cluster_8dims_rough)
+    ) |> 
+    # Filter out specific conditions on Mock day
+    filter(!(day_mock == "Mock" & (condition %in% c("PR8", "MuHV4", "PVM", "MAV1")))) |> 
+    # Calculate proportions of samples in a given cluster
+    group_by(day_mock, sample_type, condition, sample_tag_ms4a3_pos_gabbr2) |> 
+    mutate(freq_cluster = n / sum(n)) |> 
+    # Calculate z-score of frequencies per cluster
+    group_by(harmony_cluster_8dims_rough) |> 
+    mutate(cluster_frequency_zscore = (freq_cluster - mean(freq_cluster)) / sd(freq_cluster))
+}
+
+```
+
+#### This function takes a data frame (`x`) containing the necessary columns for plotting and creates a heatmap using ggplot2. It maps `condition` to the x-axis, `harmony_cluster_8dims_rough` to the y-axis, and `cluster_frequency_zscore` to the fill color. The heatmap is then faceted based on `sample_tag_ms4a3_pos_gabbr2`, `sample_type`, and `day_mock`. Axis text on the x-axis is rotated by 45 degrees for better readability. Finally, the color gradient for the fill is set to blue (low values), white (mid values), and red (high values).
+
+```{r}
+frequency_heatmap <- function(x){ 
+  x |>   ggplot(aes(condition,
+                    harmony_cluster_8dims_rough,
+                    fill=cluster_frequency_zscore)) +
+  geom_tile()+ 
+  #scale_fill_viridis()+theme_bw() +
+  ggh4x::facet_nested_wrap(
+    vars(sample_tag_ms4a3_pos_gabbr2,
+         sample_type,
+         day_mock),
+    nrow = 1,
+    drop = TRUE,
+    scales = "free_x"#,
+    #space="free"
+    )+
+    theme_bw()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))+
+    scale_fill_gradient2( low = "blue", mid = "white", high = "red")}
+```
+
+## **2) Integrate macrophages of all datasets into a combined embedding (umap)**
+
+### 2a) Show the K nearest neighbour clusters
+
+```{r}
+obj.v5 |> DimPlot(group.by = "harmony_cluster_8dims_rough", label=T)
+
+```
+
+### Show the embeddings of lung and bal cells from the different timepoints
+
+```{r}
+obj.v5  |> ggplot(aes(umapharmony8dims_1,umapharmony8dims_2, 
+                      color=day_mock_sample_type))+
+  geom_point(aes(color="cell"))+
+  geom_density_2d(bins=20,linewidth=1)+
+  scale_color_manual(values = cbp1)+ theme_bw()+
+  ggtitle("local density of sample in umap embedding")
+```
+
+```{r}
+#| fig-width: 18
+#| fig-height: 10
+obj.v5  |>
+  ggplot(aes(umapharmony8dims_1,
+             umapharmony8dims_2,
+             color=day_mock_sample_type)) +
+  geom_point(aes(color="cell")) +
+  geom_density_2d(bins=20,linewidth=1) +
+  scale_color_manual(values = cbp1 )+
+  theme_bw() +
+  ggtitle("local density of sample in umap embedding")+
+  facet_wrap(~day_mock_sample_type)
+```
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+samples <- obj.v5$day_mock_sample_type |> unique()
+umap_sampletype_mock_point_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(day_mock_sample_type==sample)
+  obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(day_mock_sample_type!=sample)
+  
+  umap_sampletype_mock_point_plotlist[[sample]] <- obj.v5 |> 
+    ggplot() +
+    geom_point(data= obj.v5_not_sample,aes(umapharmony8dims_1,umapharmony8dims_2),color="grey")+
+    geom_point(data= obj.v5_filtered_for_sample,aes(umapharmony8dims_1,umapharmony8dims_2),
+               color="red",
+               alpha=0.4,
+               #plot points without outer border without alpha
+               stroke = 0,
+               shape=16)+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+ggarrange(plotlist = umap_sampletype_mock_point_plotlist)
+```
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+samples <- obj.v5$day_mock_sample_type |> unique()
+umap_sampletype_mock_dens_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(day_mock_sample_type==sample)
+  umap_sampletype_mock_dens_plotlist[[sample]] <- obj.v5 |> 
+    ggplot(aes(umapharmony8dims_1,umapharmony8dims_2) ) +
+    geom_point()+
+    stat_density_2d(data= obj.v5_filtered_for_sample, 
+                    aes(x= umapharmony8dims_1,
+                        y=umapharmony8dims_2,
+                        fill = after_stat(level)), geom = "polygon",contour_var = "ndensity"
+                    )+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+#densities have to be adjusted, overlap
+#https://stackoverflow.com/questions/76533721/plot-only-top-layers-of-ggplot-stat-density-2d-geom-density-2d-in-r
+
+ggarrange(plotlist =umap_sampletype_mock_dens_plotlist)
+```
+
+### Show the embeddings of Ms4a3 neg and Ms4a
+
+```{r}
+
+samples <- obj.v5$sampletag_Ms4a3 |> unique()
+umap_sampletag_Ms4a3_point_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_Ms4a3==sample)
+  obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_Ms4a3!=sample)
+  
+  umap_sampletag_Ms4a3_point_plotlist[[sample]] <- obj.v5 |> 
+    ggplot() +
+    geom_point(data= obj.v5_not_sample,aes(umapharmony8dims_1,umapharmony8dims_2),color="grey")+
+    geom_point(data= obj.v5_filtered_for_sample,aes(umapharmony8dims_1,umapharmony8dims_2),
+               color="red",
+               alpha=0.4,
+               #plot points without outer border without alpha
+               stroke = 0,
+               shape=16)+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+ggarrange(plotlist = umap_sampletag_Ms4a3_point_plotlist)
+```
+
+```{r}
+
+samples <- obj.v5$sampletag_Ms4a3 |> unique()
+umap_sampletag_Ms4a3_dens_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_Ms4a3==sample)
+  umap_sampletag_Ms4a3_dens_plotlist[[sample]] <- obj.v5 |> 
+    ggplot(aes(umapharmony8dims_1,umapharmony8dims_2) ) +
+    geom_point()+
+    stat_density_2d(data= obj.v5_filtered_for_sample, 
+                    aes(x= umapharmony8dims_1,
+                        y=umapharmony8dims_2,
+                        fill = after_stat(level)), geom = "polygon",contour_var = "ndensity"
+                    )+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+#densities have to be adjusted, overlap
+#https://stackoverflow.com/questions/76533721/plot-only-top-layers-of-ggplot-stat-density-2d-geom-density-2d-in-r
+
+ggarrange(plotlist =umap_sampletag_Ms4a3_dens_plotlist)
+```
+
+### Show embeddings of the different viral conditions as well as the mock
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+samples <- obj.v5$condition |> unique()
+umap_condition_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(condition==sample)
+  obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(condition!=sample)
+  
+  umap_condition_plotlist[[sample]] <- obj.v5 |> 
+    ggplot() +
+    geom_point(data= obj.v5_not_sample,aes(umapharmony8dims_1,umapharmony8dims_2),color="grey")+
+    geom_point(data= obj.v5_filtered_for_sample,aes(umapharmony8dims_1,umapharmony8dims_2),
+               color="red",
+               alpha=0.4,
+               #plot points without outer border without alpha
+               stroke = 0,
+               shape=16)+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+ggarrange(plotlist = umap_condition_plotlist)
+```
+
+### Show individual embeddings of the samples,  **individual samples (virus per time point)**
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+samples <- obj.v5$sampletag_name |> unique()
+umap_sampletag_name_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_name==sample)
+  obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_name!=sample)
+  
+  umap_sampletag_name_plotlist[[sample]] <- obj.v5 |> 
+    ggplot() +
+    geom_point(data= obj.v5_not_sample,
+               aes(umapharmony8dims_1,umapharmony8dims_2),
+               color="grey")+
+    geom_point(data= obj.v5_filtered_for_sample,
+               aes(umapharmony8dims_1,umapharmony8dims_2),
+               color="red",
+               alpha=0.4,
+               #plot points without outer border without alpha
+               stroke = 0,
+               shape=16)+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+ggarrange(plotlist = umap_sampletag_name_plotlist)
+```
+
+## 3) Heatmaps RNA-seq Abseq for markers 
+
+### Heatmaps Abseq for SiglecF and Cd11c
+
+```{r}
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "Cd11c"),assay="adt", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+```
+
+### Heatmaps RNA for alveolar markers
+
+```{r}
+obj.v5 |>
+  join_features(c("Pparg", "Chil3", "Fabp5", "Flt1", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79", "Itgax", "SiglecF"),assay="RNA", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+```
