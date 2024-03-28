@@ -313,3 +313,18 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
 ```
+
+### Heatmaps RNA for alveolar markers no fabp5
+
+```{r}
+obj.v5 |>
+  join_features(c("Pparg", "Chil3", "Flt1", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79", "Itgax", "SiglecF"),assay="RNA", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+```
