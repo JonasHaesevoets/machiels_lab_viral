@@ -18,53 +18,115 @@ As a test we will start of with comparing d8 MuHV44 vs d60 MuHV4 and d8 PR8 vs d
 
 ## load in the data and the required packages
 
-```{r}
+```{r, echo=FALSE}
 
-easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "DESeq2", "ggrepel", "writexl", "clusterProfiler", "DOSE", "pathview", "biomaRt", "org.Mm.eg.db", "enrichplot")
-obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+
+easypackages::libraries("viridis","patchwork", "Seurat", "tidyverse","tidyseurat", "DESeq2", "ggrepel", "writexl", "clusterProfiler", "DOSE", "pathview", "biomaRt", "org.Mm.eg.db", "enrichplot", "DGCA", "presto")
+library(tidyverse)
+library(cowplot)
+library(edgeR)
+library(Matrix)
+library(reshape2)
+library(S4Vectors)
+library(SingleCellExperiment)
+library(pheatmap)
+library(apeglm)
+library(png)
+library(DESeq2)
+library(RColorBrewer)
+library(data.table)
+library(textTinyR)
+obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_daniel.rds")
 
 ```
 
 ## data manipulations
 
+```{# {r}
+# seurat_d8 <- obj.v5 %>%filter(str_detect(day_mock, "d8"))
+# seurat_nod8 <- obj.v5 %>%filter(!str_detect(day_mock, "d8"))
+# seurat_nomock <- obj.v5 %>% filter(!str_detect(day_mock, "Mock"))
+# seurat_nomock = seurat_nomock %>% filter(!str_detect(condition, "Mock"))
+# #d60
+# seurat_d60 <- seurat_nod8 %>%filter(str_detect(day_mock, "d60"))
+# seurat_onlyMuHV4_d60 <- seurat_d60 %>% filter(str_detect(condition, "MuHV4"))
+# seurat_onlyMuHV4_d8 <- seurat_d8 %>% filter(str_detect(condition, "MuHV4"))
+# seurat_onlyPR8_d60 <- seurat_d60 %>% filter(str_detect(condition, "PR8"))
+# seurat_onlyPR8_d8 <- seurat_d8 %>% filter(str_detect(condition, "PR8"))
+# seurat_onlyMuHV4_d60_bal <- seurat_onlyMuHV4_d60 %>%  filter(str_detect(sample_type, "bal"))
+# 
+# #mock
+# seurat_mock <- seurat_nod8 %>%filter(str_detect(day_mock, "Mock"))
+# seurat_mock_onlyMuHV4 = seurat_mock %>%  filter(str_detect(condition, "MuHV4"))
+# seurat_mock_onlyMuHV4_bal = seurat_mock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
+# 
+# 
+# seurat_nomock_onlyMuHV4 = seurat_nomock %>% filter(str_detect(condition, "MuHV4"))
+# seurat_nomock_onlyMuHV4 = subset(seurat_nomock_onlyMuHV4 , idents = c(0,1,5,6,7))
+# seurat_nomock_onlyMuHV4_bal = seurat_nomock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
+# seurat_nomock_onlyMuHV4_lung = seurat_nomock_onlyMuHV4 %>% filter(str_detect(sample_type, "lung"))
+# 
+# seurat_nomock_onlyPR8 = seurat_nomock %>% filter(str_detect(condition, "PR8"))
+# seurat_nomock_onlyPR8 = subset(seurat_nomock_onlyPR8, idents = c(0,1,5,6,7))
+# seurat_nomock_onlyPR8_bal = seurat_nomock_onlyPR8 %>% filter(str_detect(sample_type, "bal"))
+# seurat_nomock_onlyPR8_lung = seurat_nomock_onlyPR8 %>% filter(str_detect(sample_type, "lung"))
+# DefaultAssay(seurat_nomock_onlyMuHV4 )= "RNA"
+# DefaultAssay(seurat_nomock_onlyPR8 )= "RNA"
+# 
+# num_cells_d60_MuHv4 <- ncol(seurat_onlyMuHV4_d60)
+# num_cells_d8_MuHv4 <- ncol(seurat_onlyMuHV4_d8)
+# num_cells_d60_PR8 <- ncol(seurat_onlyPR8_d60)
+# num_cells_d8_PR8 = ncol(seurat_onlyPR8_d8)
+# 
+# seurat_nomock_onlyMuHV4@meta.data[["day_sample_type_cond_ms4a3_pos_gabbr2"]]
+
+
+```
+
+### something wrong with the data manipulations!!!
+
 ```{r}
-seurat_nod8 <- obj.v5 %>%filter(!str_detect(day_mock, "d8"))
-seurat_nomock <- obj.v5 %>% filter(!str_detect(day_mock, "Mock"))
-seurat_nomock = seurat_nomock %>% filter(!str_detect(condition, "Mock"))
-#d60
-seurat_d60 <- seurat_nod8 %>%filter(str_detect(day_mock, "d60"))
-seurat_onlyMuHV4_d60 <- seurat_d60 %>% filter(str_detect(condition, "MuHV4"))
-seurat_onlyMuHV4_d60_bal <- seurat_onlyMuHV4_d60 %>%  filter(str_detect(sample_type, "bal"))
+# contains_d8 <- grepl("d8", seurat_nomock_onlyMuHV4$day_sample_type_cond_ms4a3_pos_gabbr2)
+# contains_true <- sum(contains_d8)
+```
 
-#mock
-seurat_mock <- seurat_nod8 %>%filter(str_detect(day_mock, "Mock"))
-seurat_mock_onlyMuHV4 = seurat_mock %>%  filter(str_detect(condition, "MuHV4"))
-seurat_mock_onlyMuHV4_bal = seurat_mock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
+### different way to create filtered seurat objects based on the metadata column for MuHV4
+
+```{r}
+seurat_nomock_0 <- obj.v5 %>%filter(!str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "Mock"))
+seurat_nomock_onlyMuHV4_1 = seurat_nomock_0 %>% filter(str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "MuHV4"))
+seurat_nomock_onlyMuHV4_2 = seurat_nomock_onlyMuHV4_1 %>% filter(str_detect(virus, "MuHV4"))
+seurat_nomock_onlyMuHV4_3 = seurat_nomock_onlyMuHV4_2%>% filter(str_detect(condition, "MuHV4"))
+seurat_nomock_onlyMuHV4_4 = seurat_nomock_onlyMuHV4_3 %>% filter(!str_detect(day_mock, "Mock"))
+
+seurat_nomock_onlyMuHV4_4_alveolar = subset(seurat_nomock_onlyMuHV4_4,
+                                            idents = c(0,1,5,6,7))
 
 
-seurat_nomock_onlyMuHV4 = seurat_nomock %>% filter(str_detect(condition, "MuHV4"))
-seurat_nomock_onlyMuHV4_bal = seurat_nomock_onlyMuHV4 %>% filter(str_detect(sample_type, "bal"))
-seurat_nomock_onlyMuHV4_lung = seurat_nomock_onlyMuHV4 %>% filter(str_detect(sample_type, "lung"))
 
-seurat_nomock_onlyPR8 = seurat_nomock %>% filter(str_detect(condition, "PR8"))
-seurat_nomock_onlyPR8_bal = seurat_nomock_onlyPR8 %>% filter(str_detect(sample_type, "bal"))
-seurat_nomock_onlyPR8_lung = seurat_nomock_onlyPR8 %>% filter(str_detect(sample_type, "lung"))
-DefaultAssay(seurat_nomock_onlyMuHV4 )= "RNA"
-DefaultAssay(seurat_nomock_onlyPR8 )= "RNA"
 
+```
+
+### different way to create filtered seurat objects based on the metadata column for PR8
+
+```{r}
+seurat_nomock_onlyPR8_1 = seurat_nomock_0 %>% filter(str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "PR8"))
+seurat_nomock_onlyPR8_2 = seurat_nomock_onlyPR8_1 %>% filter(str_detect(virus, "PR8"))
+seurat_nomock_onlyPR8_3 = seurat_nomock_onlyPR8_2%>% filter(str_detect(condition, "PR8"))
+seurat_nomock_onlyPR8_4 = seurat_nomock_onlyPR8_3 %>% filter(!str_detect(day_mock, "Mock"))
+seurat_nomock_onlyPR8_4_alveolar = subset(seurat_nomock_onlyPR8_4,
+                                            idents = c(0,1,5,6,7))
 ```
 
 ## 1) Exploratory analysis d8 vs d60 MuHV4
 
 ### CD11c
 
-```{r}
-featureplot_d8d60_MuHV4_cd11c = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Itgax", repel = TRUE)
+```{r, fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_cd11c = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "Itgax", repel = TRUE)
 
 
-featureplot_d8d60_MuHV4_cd11c 
-
-# + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
+featureplot_d8d60_MuHV4_cd11c
 
 
 
@@ -73,8 +135,8 @@ ggsave(filename = "featureplot_d8d60_MuHV4_cd11c.png", width = 45, height = 20, 
 
 ### PPARg
 
-```{r}
-featureplot_d8d60_MuHV4_pparg = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Pparg", repel = TRUE)
+```{r,fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_pparg = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "Pparg", repel = TRUE)
 
 featureplot_d8d60_MuHV4_pparg 
 
@@ -83,8 +145,8 @@ ggsave(filename = "featureplot_d8d60_MuHV4_pparg.png", width = 45, height = 20, 
 
 ### SiglecF
 
-```{r}
-featureplot_d8d60_MuHV4_siglecf = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Siglecf", repel = TRUE)
+```{r,fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_siglecf = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "Siglecf", repel = TRUE)
 
 
 featureplot_d8d60_MuHV4_siglecf
@@ -96,8 +158,8 @@ ggsave(filename = "featureplot_d8d60_MuHV4_siglecf.png", width = 45, height = 20
 
 ### H2-ia-ie
 
-```{r}
-featureplot_d8d60_MuHV4_h2 = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "H2-ia-ie-AbSeq", repel = TRUE)
+```{r,fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_h2 = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "H2-Ab1", repel = TRUE)
 
 
 featureplot_d8d60_MuHV4_h2
@@ -105,14 +167,13 @@ featureplot_d8d60_MuHV4_h2
 # + ggtitle("",subtitle = "UMAP plots with expression of CD11c at day 60 between Ms4a3 conditions in  mouse bal") + theme(plot.title = element_text(hjust = 0.5))
 
 
-
 ggsave(filename = "featureplot_d8d60_MuHV4_h2.png", width = 45, height = 20, units = "cm", path =  "../../Documents/machiels_lab_viral/output/plotsUmap/explorationDEA/")
 ```
 
 ### CD274
 
-```{r}
-featureplot_d8d60_MuHV4_CD274 = FeaturePlot(seurat_nomock_onlyMuHV4, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Cd274", repel = TRUE)
+```{r,fig.height= 20, fig.width= 30}
+featureplot_d8d60_MuHV4_CD274 = FeaturePlot(seurat_nomock_onlyMuHV4_4, reduction = "umap.harmony_8dims", label = T, label.size = 10, split.by = c("day_mock"), features = "Cd274", repel = TRUE)
 
 
 featureplot_d8d60_MuHV4_CD274
@@ -125,21 +186,19 @@ ggsave(filename = "featureplot_d8d60_MuHV4_cd274.png", width = 45, height = 20, 
 ## 1 A) Differential expression analysis MuHV4 d8 vs d60
 
 ```{r}
-Idents(seurat_nomock_onlyMuHV4) <- "day_mock"
+Idents(seurat_nomock_onlyMuHV4_4) <- "day"
 #  every gene in your dataset has a zero count in at least one sample.
 
-markers_MuHV4_d60 <- FindMarkers(seurat_nomock_onlyMuHV4 ,
+markers_MuHV4_d60 <- FindMarkers(seurat_nomock_onlyMuHV4_4 ,
                                  ident.1 =  "d60",
                                  ident.2 =  "d8",
-                                 test.use = "wilcox_limma", 
+                                 test.use = "wilcox", 
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_MuHV4_d8 <- FindMarkers(seurat_nomock_onlyMuHV4 ,
+markers_MuHV4_d8 <- FindMarkers(seurat_nomock_onlyMuHV4_4 ,
                                  ident.1 =  "d8",
                                  ident.2 =  "d60",
-                                 test.use = "wilcox_limma", 
+                                 test.use = "wilcox", 
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-                                 
-
 ```
 
 ### export the raw and filtered
@@ -163,7 +222,7 @@ write_xlsx(markers_MuHV4_d8_filtered, "../../Documents/machiels_lab_viral/output
 
 ### volcano plot Muhv4 d60
 
-```{r}
+```{r,fig.height= 20, fig.width= 30}
 markers_MuHV4_d60$diffexpressed <- "NO"
 markers_MuHV4_d60$diffexpressed[markers_MuHV4_d60$avg_log2FC > 1] <- "UP"
 
@@ -239,20 +298,22 @@ write.csv(cluster_summary_enrichment_MuHV4_d60, "../../Documents/machiels_lab_vi
 
 ```
 
-```{r}
+```{r,fig.height= 40, fig.width= 30}
 dotplot_goEnrichment_MuHV4_d60 = dotplot(GO_enrichment_MuHV4_d60, showCategory=50)
+dotplot_goEnrichment_MuHV4_d60
 ggsave(filename = "dotplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/")
 ```
 
-```{r}
+```{r,fig.height= 20, fig.width= 30}
 emapplot_goEnrichment_MuHV4_d60 = pairwise_termsim(GO_enrichment_MuHV4_d60)
 emapplot_goEnrichment_MuHV4_d60 = emapplot(emapplot_goEnrichment_MuHV4_d60)
 
+emapplot_goEnrichment_MuHV4_d60
 
 ggsave(filename = "emapplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/MuHV4_d60/")
 ```
 
-```{r}
+```{r,fig.height= 20, fig.width= 30}
 muhv4_d60_logfold = markers_MuHV4_d60_filtered$avg_log2FC
 names(muhv4_d60_logfold) = markers_MuHV4_d60_filtered$gene
 
@@ -266,6 +327,8 @@ ggsave(filename = "cnetplot_goEnrichment_MuHV4_d60.png", width = 45, height = 50
 ```
 
 ## 1 C) Functional enrichment + pathway analysis of marker genes of Muhv4 d8
+
+no genes were significantly expressed according to the criteria of log2FC \> 1 && padj \< 0.05
 
 ```{r}
 genes_MuHV4_d8 = markers_MuHV4_d8_filtered$gene
@@ -326,7 +389,7 @@ ggsave(filename = "cnetplot_goEnrichment_MuHV4_d8.png", width = 45, height = 50,
 ### CD11C
 
 ```{r}
-featureplot_d8d60_PR8_cd11c = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Itgax", repel = TRUE)
+featureplot_d8d60_PR8_cd11c = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Itgax", repel = TRUE)
 
 
 featureplot_d8d60_PR8_cd11c 
@@ -341,7 +404,7 @@ ggsave(filename = "featureplot_d8d60_PR8_cd11c.png", width = 45, height = 50, un
 ### PRARg
 
 ```{r}
-featureplot_d8d60_PR8_pparg = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Pparg", repel = TRUE)
+featureplot_d8d60_PR8_pparg = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Pparg", repel = TRUE)
 
 featureplot_d8d60_PR8_pparg 
 
@@ -351,7 +414,7 @@ ggsave(filename = "featureplot_d8d60_PR8_pparg.png", width = 45, height = 20, un
 ### SiglecF
 
 ```{r}
-featureplot_d8d60_PR8_siglecf = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Siglecf", repel = TRUE)
+featureplot_d8d60_PR8_siglecf = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Siglecf", repel = TRUE)
 
 
 featureplot_d8d60_PR8_siglecf
@@ -363,7 +426,7 @@ ggsave(filename = "featureplot_d8d60_PR8_siglecf.png", width = 45, height = 20, 
 ### H2-ia-ie
 
 ```{r}
-featureplot_d8d60_PR8_h2 = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "H2-ia-ie-AbSeq", repel = TRUE)
+featureplot_d8d60_PR8_h2 = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "H2-ia-ie-AbSeq", repel = TRUE)
 
 
 featureplot_d8d60_PR8_h2
@@ -378,7 +441,7 @@ ggsave(filename = "featureplot_d8d60_PR8_h2.png", width = 45, height = 20, units
 ### CD274
 
 ```{r}
-featureplot_d8d60_PR8_CD274 = FeaturePlot(seurat_nomock_onlyPR8, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Cd274", repel = TRUE)
+featureplot_d8d60_PR8_CD274 = FeaturePlot(seurat_nomock_onlyPR8_4_alveolar, reduction = "umap.harmony_8dims", label = T, split.by = c("day_mock"), features = "Cd274", repel = TRUE)
 
 
 featureplot_d8d60_PR8_CD274
@@ -391,18 +454,18 @@ ggsave(filename = "featureplot_d8d60_PR8_cd274.png", width = 45, height = 20, un
 ## 2 A) Differential expression analysis PR8 d8 vs d60
 
 ```{r}
-Idents(seurat_nomock_onlyPR8) <- "day_mock"
+Idents(seurat_nomock_onlyPR8_4) <- "day"
 #  every gene in your dataset has a zero count in at least one sample.
 
-markers_PR8_d60 <- FindMarkers(seurat_nomock_onlyPR8 ,
+markers_PR8_d60 <- FindMarkers(seurat_nomock_onlyPR8_4 ,
                                  ident.1 =  "d60",
                                  ident.2 =  "d8",
-                                 test.use = "wilcox_limma", 
+                                 test.use = "wilcox", 
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_PR8_d8 <- FindMarkers(seurat_nomock_onlyPR8 ,
+markers_PR8_d8 <- FindMarkers(seurat_nomock_onlyPR8_4 ,
                                  ident.1 =  "d8",
                                  ident.2 =  "d60",
-                                 test.use = "wilcox_limma", 
+                                 test.use = "wilcox", 
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
 ```
 
@@ -472,7 +535,7 @@ volcano_PR8_d8
 ggsave("volcano_PR8_d8.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/output/DEA/volcano/")
 ```
 
-## 2 B) Functional enrichment + pathway analysis of marker genes of PR8 d60 
+## 2 B) Functional enrichment + pathway analysis of marker genes of PR8 d60
 
 ```{r}
 genes_PR8_d60 = markers_PR8_d60_filtered$gene
@@ -526,7 +589,7 @@ cnetplot(GO_enrichment_PR8_d60,
 ggsave(filename = "cnetplot_goEnrichment_PR8_d60.png", width = 45, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/output/DEA/clusterProfiler/PR8_d60/")
 ```
 
-## 2 C) Functional enrichment + pathway analysis of marker genes of PR8 d8 
+## 2 C) Functional enrichment + pathway analysis of marker genes of PR8 d8
 
 ```{r}
 genes_PR8_d8 = markers_PR8_d8_filtered$gene
