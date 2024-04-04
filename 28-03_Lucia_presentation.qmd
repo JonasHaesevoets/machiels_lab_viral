@@ -15,10 +15,9 @@ execute:
 ## 1) Load in data and packages and load in functions
 
 ```{r}
-easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl")
+easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs")
 obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
 DefaultAssay(obj.v5) <- "RNA"
-output_file_path <- "output/final_march2024_joint_analysis/"
 
 # The palette with grey:
 cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
@@ -84,13 +83,44 @@ frequency_heatmap <- function(x){
     scale_fill_gradient2( low = "blue", mid = "white", high = "red")}
 ```
 
+#### this function selects the n amount of top differentially expressed genes in descending order in terms of avg_log2 fold change
+
+```{r}
+select_top_genes <- function(df, n = 5) {
+  top_genes <- by(df, df$cluster, function(cluster_df) {
+    cluster_df[order(cluster_df$avg_log2FC, decreasing = TRUE), ][1:n, ]
+  })
+  do.call(rbind, top_genes)
+}
+```
+
+#### this function as a sanity checker to see if the data is correctly initialized
+
+```{r}
+check_metadata_presence <- function(seurat_object, metadata_column, value_to_check) {
+  # Check if the specified value is present in the specified metadata colu
+    value_present <- any(str_detect(seurat_object@meta.data[[metadata_column]], value_to_check))
+
+  if(value_present) {
+    print(paste(value_to_check, "values are present in the", metadata_column, "metadata column."))
+  } else {
+    print(paste(value_to_check, "values are not present in the", metadata_column, "metadata column."))
+  }
+  
+  return(value_present)
+}
+
+
+
+```
+
 ## **2) Integrate macrophages of all datasets into a combined embedding (umap)**
 
 ### 2a) Show the K nearest neighbour clusters
 
 ```{r}
 obj.v5 |> DimPlot(group.by = "harmony_cluster_8dims_rough", label=T)
-
+ggsave("clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG")
 ```
 
 ### Show the embeddings of lung and bal cells from the different timepoints
@@ -102,6 +132,7 @@ obj.v5  |> ggplot(aes(umapharmony8dims_1,umapharmony8dims_2,
   geom_density_2d(bins=20,linewidth=1)+
   scale_color_manual(values = cbp1)+ theme_bw()+
   ggtitle("local density of sample in umap embedding")
+ggsave("Density_clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG", width = 30, height = 20)
 ```
 
 ```{r}
@@ -117,6 +148,7 @@ obj.v5  |>
   theme_bw() +
   ggtitle("local density of sample in umap embedding")+
   facet_wrap(~day_mock_sample_type_mockTissueIncluded)
+ggsave("Density_tissueDays_clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG", width = 18, height = 10)
 ```
 
 ```{r}
@@ -143,6 +175,7 @@ for (sample in samples) {
 }
 
 ggarrange(plotlist = umap_sampletype_mock_point_plotlist)
+ggsave("tissueDays_clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG", width = 18, height = 10)
 ```
 
 ```{r}
@@ -169,9 +202,10 @@ for (sample in samples) {
 #https://stackoverflow.com/questions/76533721/plot-only-top-layers-of-ggplot-stat-density-2d-geom-density-2d-in-r
 
 ggarrange(plotlist =umap_sampletype_mock_dens_plotlist)
+ggsave("density2_tissueDays_clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG", width = 18, height = 10)
 ```
 
-### Show the embeddings of Ms4a3 neg and Ms4a
+### Show the embeddings of Ms4a3 neg and Ms4a3 pos
 
 ```{r}
 
@@ -196,6 +230,7 @@ for (sample in samples) {
 }
 
 ggarrange(plotlist = umap_sampletag_Ms4a3_point_plotlist)
+ggsave("Ms4a3Embeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG")
 ```
 
 ```{r}
@@ -221,6 +256,7 @@ for (sample in samples) {
 #https://stackoverflow.com/questions/76533721/plot-only-top-layers-of-ggplot-stat-density-2d-geom-density-2d-in-r
 
 ggarrange(plotlist =umap_sampletag_Ms4a3_dens_plotlist)
+ggsave("Density_Ms4a3Embeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG")
 ```
 
 ### Show embeddings of the different viral conditions as well as the mock
@@ -249,6 +285,7 @@ for (sample in samples) {
 }
 
 ggarrange(plotlist = umap_condition_plotlist)
+ggsave("conditionsEmbeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG", height = 18, width = 18)
 ```
 
 ### Show individual embeddings of the samples, **individual samples (virus per time point)**
@@ -280,10 +317,7 @@ for (sample in samples) {
 }
 
 ggarrange(plotlist = umap_sampletag_name_plotlist)
-```
-
-```{r}
-
+ggsave("sample_Embeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG", height = 18, width = 18)
 ```
 
 ## 3) Heatmaps RNA-seq Abseq for markers
@@ -301,6 +335,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("ADT_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG")
 ```
 
 ### Heatmaps RNA for alveolar markers
@@ -316,6 +351,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("RNA_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG")
 ```
 
 ### Heatmaps RNA for alveolar markers no fabp5
@@ -335,20 +371,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
-```
-
-```{r}
-
-obj.v5 |>
-  join_features(c("Pparg", "Chil3", "Flt1", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79", "Itgax", "SiglecF"),assay="RNA", slot="scale.data")  |> 
-group_by(.feature,harmony_cluster_8dims_rough) |>
-  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
-  group_by(.feature) |> 
-  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
-  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
-                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
-  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
-  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("RNA_noFabp5_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG")
 ```
 
 ## 4) Compositional Analysis
@@ -385,7 +408,7 @@ p4 <- obj.v5 |>  as_tibble()  |> filter(sample_tag_ms4a3_pos_gabbr2!= "Gabbr2_po
   (p3+theme(strip.text.x = element_blank()))/
   p4 +
   plot_layout(guides = 'collect')
-ggsave(filename = "cluster frequencies per group.png", height = 50, width = 50, units = "cm")
+ggsave(filename = "cluster frequencies per group.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",  height = 20, width = 30, units = "cm")
 
 ```
 
@@ -426,7 +449,7 @@ obj.v5 |>
   high = "red")+ggtitle("proportions of cells from a given sample distributed across clusters ",
                         "Ms4a3 classification as sorted")
 
-
+ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",  height = 20, width = 30, units = "cm")
 ```
 
 ## 5) Reclustering of alveolar macrophages at d60 (clusters 0 1 5 6 7)
@@ -441,6 +464,36 @@ seurat_d60_1_alveolar = seurat_d60_1_alveolar %>%  filter(!str_detect(day_sample
 DimPlot(seurat_d60_1_alveolar, label = T)
 ```
 
+### Sanity checks to see if the new seurat object is correctly initialized
+
+```{r}
+# check if it contains bal and lung samples
+metadata_column <- "day"  
+value_to_check <- "d8"    
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day_sample_type_cond_ms4a3_pos_gabbr2"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+
+value_to_check = "d60"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_to_check = "bal"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "sample_type"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_to_check = "lung"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day_sample_type_cond_ms4a3_pos_gabbr2"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_to_check = "Mock"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "condition"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day_mock_sample_type_mockTissueIncluded"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+```
+
 ### reclustering of alveolar clusters at d60, UMAP stored as umap.harmony_8dims_reclusterumap.harmony_8dims_recluster
 
 ```{r, echo=FALSE}
@@ -450,28 +503,132 @@ seurat_d60_1_alveolar <- RunUMAP(seurat_d60_1_alveolar, reduction = "integrated.
 seurat_d60_1_alveolar|> DimPlot(group.by = "harmony_cluster_8dims_rough", label=T)
 ```
 
+scCustomize package used instead to generate the featureplots, the standard feature plots generated using Seurat have non expressing cells as part of the same color scale. In featureplot_scCustomize the parameter na_cutoff is used to plot only positive non-zero values using color scale and zero/negative values as NA. To plot all values using color palette set to `NA`.
+
+### Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+
+### dimplots for Ms4a3 + -
+
 ```{r}
-FeaturePlot(seurat_d60_1_alveolar, label = T, features = "Siglecf")
+DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition")
+ggsave("dimplot_virus.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
 ```{r}
+DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sample_type")
+ggsave("dimplot_virusGroupedTissue.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
+```
+
+```{r}
+DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sampletag_Ms4a3")
+ggsave("dimplot_virusGroupedMs4a3.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
+```
+
+### Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+
+```{r}
 umap_am_alveolar_d60 <- list()
-genes_AM <- c("Chil3", "Fabp5", "Flt1", "Pparg", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79")
+pallet = viridis(n = 10, option = "D")
+genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
 
 markers_am = unique(genes_AM)
 for (i in markers_am) {
-  plot <- FeaturePlot(seurat_d60_1_alveolar,  features = i, label = TRUE, label.size = 5)
+  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar,  features = i, label = TRUE, label.size = 5,  split.by = "sampletag_Ms4a3", colors_use = pallet, label_feature_yaxis = FALSE)
   umap_am_alveolar_d60[[i]] <- plot
 }
-
 # Arrange plots using ggarrange
-ggarrange(plotlist = umap_am_alveolar_d60)
-ggsave("featureplot_AM_alveolar.png", width = 30, height = 50, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/featureplots")
+ggarrange(plotlist = umap_am_alveolar_d60, nrow = 5)
+ggsave("featureplot_AM_alveolar_Ms4a3_scCustomize.png", width = 60, height = 90, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
+```
+
+### Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for sample type
+
+```{r}
+umap_am_alveolar_d60 <- list()
+pallet = viridis(n = 10, option = "D")
+genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
+
+markers_am = unique(genes_AM)
+for (i in markers_am) {
+  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar,  features = i, label = TRUE, label.size = 5,  split.by = "sample_type", colors_use = pallet, label_feature_yaxis = FALSE)
+  umap_am_alveolar_d60[[i]] <- plot
+}
+# Arrange plots using ggarrange
+ggarrange(plotlist = umap_am_alveolar_d60, nrow = 5)
+ggsave("featureplot_AM_alveolar_tissue_scCustomize.png", width = 60, height = 90, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
+```
+
+### 
+
+```{r}
+seurat_d60_1_alveolar |> 
+  as_tibble() |>  # Convert obj.v5 to a tibble
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+  mutate(sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  dplyr::group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |> 
+  dplyr::count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |> 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+  mutate(freq_cluster=n/sum(n)) |> 
+  mutate(condition=as.character(condition)) |> 
+  na.omit() |>  # This is where the error occurs, likely because the object isn't a data frame or tibble
+  group_by(harmony_cluster_8dims_rough) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
+  geom_tile()+ 
+  ggh4x::facet_nested_wrap(
+    vars(sampletag_Ms4a3,sample_type), nrow = 1,drop = TRUE,scales = "free_x"
+  )+theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))   + scale_fill_gradient2(  low = "blue",
+  mid = "white",
+  high = "red")+ggtitle("proportions of cells from a given sample distributed across clusters ",
+                        "Ms4a3 classification as sorted")
+
+ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",  height = 20, width = 30, units = "cm")
+```
+
+```{r}
+seurat_d60_1_alveolar |>  
+  as_tibble() |>  
+  mutate(sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  dplyr::group_by(sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |> 
+  dplyr::count(sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  mutate(sample=paste(sample_type,condition,sampletag_Ms4a3)) |> 
+  filter(!(condition %in% c("PR8","MuHV4", "PVM", "MAV1"))) |> 
+  mutate(freq_cluster=n/sum(n)) |> 
+  mutate(condition=as.character(condition)) |> 
+  na.omit() |>  
+  group_by(harmony_cluster_8dims_rough) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+  ggplot(aes(condition, harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
+  geom_tile() + 
+  ggh4x::facet_nested_wrap(
+    vars(sampletag_Ms4a3, sample_type), nrow = 1, drop = TRUE, scales = "free_x"
+  ) +
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red") +
+  ggtitle("Proportions of cells from a given sample distributed across clusters",
+          "Ms4a3 classification as sorted")
+
+ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",
+       height = 20, width = 30, units = "cm")
 ```
 
 ## 5) DE d60 of the reclustered genes
 
-```{r}
+```{r, echo=FALSE}
 markers_d60_alveolar <- FindAllMarkers(seurat_d60_1_alveolar,
                           assay = "RNA", 
                           logfc.threshold = 0.5,
@@ -491,12 +648,6 @@ write_xlsx(markers_d60_alveolar_filtered, "../../Documents/machiels_lab_viral/ou
 #select top 5 genes from each cluster
 
 markers_d60_alveolar_filtered = data.frame(markers_d60_alveolar_filtered)
-select_top_genes <- function(df, n = 5) {
-  top_genes <- by(df, df$cluster, function(cluster_df) {
-    cluster_df[order(cluster_df$avg_log2FC, decreasing = TRUE), ][1:n, ]
-  })
-  do.call(rbind, top_genes)
-}
 
 top_d60_alveolar <- select_top_genes(markers_d60_alveolar_filtered, n = 5)
 write_xlsx(top_d60_alveolar, "../../Documents/machiels_lab_viral/output/top_markers_d60_alveolar.xlsx")
