@@ -452,7 +452,31 @@ obj.v5 |>
 ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",  height = 20, width = 30, units = "cm")
 ```
 
-## 5) Reclustering of alveolar macrophages at d60 (clusters 0 1 5 6 7)
+## 5) top 20 most DE genes in all clusters
+
+```{r, echo=FALSE}
+markers_all <- FindAllMarkers(obj.v5,
+                          assay = "RNA", 
+                          logfc.threshold = 0.5,
+                          test.use = "wilcox", 
+                          min.pct = 0.2)
+
+```
+
+```{r}
+markers_d60_alveolar_filtered = markers_d60_alveolar[markers_d60_alveolar$avg_log2FC > 1,]
+nonsignficant_p_adj_d60_alveolar <- which(markers_d60_alveolar_filtered$p_val_adj <= 0.05)
+markers_d60_alveolar_filtered <- markers_d60_alveolar_filtered[nonsignficant_p_adj_d60_alveolar, ]
+write_xlsx(markers_d60_alveolar_filtered, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/all_markers_filtered_alveolarD60_recluster.xlsx")
+```
+
+```{r}
+markers_filtered_all = readxl::read_xlsx("../../Documents/machiels_lab_viral/output/markers_all_filtered.xlsx") 
+top_20_all <- select_top_genes(markers_filtered_all, n = 20)
+write_xlsx(top_20_all, "../../Documents/machiels_lab_viral/output/top_20_all_correct.xlsx")
+```
+
+## 6) Reclustering of alveolar macrophages at d60 (clusters 0 1 5 6 7)
 
 seurat_d60_alveolar_1 contains no mock
 
@@ -497,6 +521,8 @@ value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column,
 ### reclustering of alveolar clusters at d60, UMAP stored as umap.harmony_8dims_reclusterumap.harmony_8dims_recluster
 
 ```{r, echo=FALSE}
+seurat_d60_1_alveolar = NormalizeData(seurat_d60_1_alveolar)
+seurat_d60_1_alveolar = ScaleData(seurat_d60_1_alveolar)
 seurat_d60_1_alveolar <- FindNeighbors(seurat_d60_1_alveolar, reduction = "integrated.harmony", dims = 1:8 )
 seurat_d60_1_alveolar <- FindClusters(seurat_d60_1_alveolar, cluster.name = "harmony_cluster_8dims_rough", resolution = 0.25)
 seurat_d60_1_alveolar <- RunUMAP(seurat_d60_1_alveolar, reduction = "integrated.harmony", dims = 1:8, reduction.name = "umap.harmony_8dims_recluster")
@@ -515,12 +541,12 @@ ggsave("dimplot_virus.png", width = 20, height = 30, units = "cm", path =  "../.
 ```
 
 ```{r}
-DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sample_type")
+DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sample_type", label = T)
 ggsave("dimplot_virusGroupedTissue.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
 ```{r}
-DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sampletag_Ms4a3")
+DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sampletag_Ms4a3", )
 ggsave("dimplot_virusGroupedMs4a3.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
@@ -558,7 +584,7 @@ ggarrange(plotlist = umap_am_alveolar_d60, nrow = 5)
 ggsave("featureplot_AM_alveolar_tissue_scCustomize.png", width = 60, height = 90, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### 
+### **Z-scores of cluster frequencies: heatmap**
 
 ```{r}
 seurat_d60_1_alveolar |> 
@@ -589,44 +615,40 @@ seurat_d60_1_alveolar |>
   high = "red")+ggtitle("proportions of cells from a given sample distributed across clusters ",
                         "Ms4a3 classification as sorted")
 
-ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",  height = 20, width = 30, units = "cm")
+ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar",  height = 20, width = 30, units = "cm")
+```
+
+### PC plot showing Ms4a3 +/- distribution for all conditions for BAL
+
+```{r}
+seurat_d60_1_alveolar_bal = seurat_d60_1_alveolar %>% filter(str_detect(sample_type, "bal"))
 ```
 
 ```{r}
-seurat_d60_1_alveolar |>  
-  as_tibble() |>  
-  mutate(sample_type=as_factor(sample_type),
-         condition=as_factor(condition),
-         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
-         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
-         ) |> 
-  dplyr::group_by(sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |> 
-  dplyr::count(sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
-  mutate(sample=paste(sample_type,condition,sampletag_Ms4a3)) |> 
-  filter(!(condition %in% c("PR8","MuHV4", "PVM", "MAV1"))) |> 
-  mutate(freq_cluster=n/sum(n)) |> 
-  mutate(condition=as.character(condition)) |> 
-  na.omit() |>  
-  group_by(harmony_cluster_8dims_rough) |> 
-  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
-  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
-  ggplot(aes(condition, harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
-  geom_tile() + 
-  ggh4x::facet_nested_wrap(
-    vars(sampletag_Ms4a3, sample_type), nrow = 1, drop = TRUE, scales = "free_x"
-  ) +
-  theme_bw() + 
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red") +
-  ggtitle("Proportions of cells from a given sample distributed across clusters",
-          "Ms4a3 classification as sorted")
-
-ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",
-       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",
-       height = 20, width = 30, units = "cm")
+PCA_d60_alveolar_bal = PCAPlot(seurat_d60_1_alveolar_bal)
+PCA_d60_alveolar_bal
+ggsave("pcaplot_alveolar_bal.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
 ```
 
-## 5) DE d60 of the reclustered genes
+### PC plot showing Ms4a3 +/- distribution for all conditions for LUNG
+
+```{r}
+seurat_d60_1_alveolar_lung = seurat_d60_1_alveolar %>% filter(str_detect(sample_type, "lung"))
+```
+
+```{r}
+PCA_d60_alveolar_lung = PCAPlot(seurat_d60_1_alveolar_lung)
+PCA_d60_alveolar_lung
+ggsave("pcaplot_alveolar_lung.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
+```
+
+```{r}
+GetAssayData(seurat_d60_1_alveolar, assay = "RNA", slot = "scale.data")
+```
+
+## 7) DEA of the reclustered object
+
+### find the markers of each cluster =\> no DEA yet
 
 ```{r, echo=FALSE}
 markers_d60_alveolar <- FindAllMarkers(seurat_d60_1_alveolar,
@@ -641,7 +663,6 @@ markers_d60_alveolar_filtered = markers_d60_alveolar[markers_d60_alveolar$avg_lo
 nonsignficant_p_adj_d60_alveolar <- which(markers_d60_alveolar_filtered$p_val_adj <= 0.05)
 markers_d60_alveolar_filtered <- markers_d60_alveolar_filtered[nonsignficant_p_adj_d60_alveolar, ]
 write_xlsx(markers_d60_alveolar_filtered, "../../Documents/machiels_lab_viral/output/markers_d60_alveolar.xlsx")
-
 ```
 
 ```{r}
@@ -650,7 +671,7 @@ write_xlsx(markers_d60_alveolar_filtered, "../../Documents/machiels_lab_viral/ou
 markers_d60_alveolar_filtered = data.frame(markers_d60_alveolar_filtered)
 
 top_d60_alveolar <- select_top_genes(markers_d60_alveolar_filtered, n = 5)
-write_xlsx(top_d60_alveolar, "../../Documents/machiels_lab_viral/output/top_markers_d60_alveolar.xlsx")
+write_xlsx(top_d60_alveolar, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/top_markers_filtered_alveolarD60_recluster.xlsx")
 ```
 
 ```{r}
@@ -668,31 +689,113 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
 ```
 
-## 6) top 20 most DE genes in all clusters
+### DEA testing Ms4a3 status for all infections (not including mock)
 
 ```{r}
-markers_all <- FindAllMarkers(obj.v5,
-                          assay = "RNA", 
-                          logfc.threshold = 0.5,
-                          test.use = "wilcox", 
-                          min.pct = 0.2)
-
+seurat_d60_1_alveolar_noMock = seurat_d60_1_alveolar %>% filter(!str_detect(condition, "Mock"))
+seurat_d60_1_alveolar_Mock = seurat_d60_1_alveolar %>% filter(str_detect(condition, "Mock"))
 ```
 
 ```{r}
-markers_all_filtered = markers_all[markers_all$avg_log2FC > 1,]
-nonsignficant_p_adj_all <- which(markers_all_filtered$p_val_adj <= 0.05)
-markers_all_filtered <- markers_all_filtered[nonsignficant_p_adj_all, ]
-write_xlsx(markers_all_filtered, "../../Documents/machiels_lab_viral/output/markers_all_filtered.xlsx")
+
+Idents(seurat_d60_1_alveolar_noMock) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos<- FindMarkers(seurat_d60_1_alveolar_noMock ,
+                                 ident.1 =  "Ms4a3_pos",
+                                 ident.2 =  "Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_alveolar_nomock_neg <- FindMarkers(seurat_d60_1_alveolar_noMock ,
+                                 ident.1 =  "Ms4a3_neg",
+                                 ident.2 =  "Ms4a3_pos",
+                                 test.use = "wilcox", 
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
 ```
 
 ```{r}
-markers_filtered_all = readxl::read_xlsx("../../Documents/machiels_lab_viral/output/markers_all_filtered.xlsx") 
-top_20_all <- select_top_genes(markers_filtered_all, n = 20)
-write_xlsx(top_20_all, "../../Documents/machiels_lab_viral/output/top_20_all_correct.xlsx")
+markers_alveolar_nomock_pos_filtered = markers_alveolar_nomock_pos[markers_alveolar_nomock_pos$avg_log2FC > 1,]
+nonsignficant_p_adj_ms4a3pos <- which(markers_alveolar_nomock_pos_filtered$p_val_adj <= 0.05)
+markers_alveolar_nomock_pos_filtered <- markers_alveolar_nomock_pos_filtered[nonsignficant_p_adj_ms4a3pos, ]
+
+write_xlsx(markers_alveolar_nomock_pos, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_pos.xlsx")
+write_xlsx(markers_alveolar_nomock_pos_filtered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_pos_filtered.xlsx")
+
+markers_alveolar_nomock_neg_filtered = markers_alveolar_nomock_neg[markers_alveolar_nomock_neg$avg_log2FC > 1,]
+nonsignficant_p_adj_Ms4a3neg <- which(markers_alveolar_nomock_neg_filtered$p_val_adj <= 0.05)
+markers_alveolar_nomock_neg_filtered <- markers_alveolar_nomock_neg_filtered[nonsignficant_p_adj_Ms4a3neg, ]
+
+write_xlsx(markers_alveolar_nomock_neg, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_neg.xlsx")
+write_xlsx(markers_alveolar_nomock_neg_filtered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_neg_filtered.xlsx")
 ```
 
-## 7) Heatmap markers daniel 'clusters_gene_set.xlsx' for full object
+#### volcano plot noMock Ms4a3 positive
+
+```{r}
+markers_alveolar_nomock_pos$diffexpressed <- "NO"
+markers_alveolar_nomock_pos$diffexpressed[markers_alveolar_nomock_pos$avg_log2FC > 1] <- "UP"
+
+markers_alveolar_nomock_pos$diffexpressed[markers_alveolar_nomock_pos$avg_log2FC < -1] <- "DOWN"
+
+markers_alveolar_nomock_pos$delabel <- NA
+
+markers_alveolar_nomock_pos$delabel[markers_alveolar_nomock_pos$diffexpressed != "NO"]<-markers_alveolar_nomock_pos$gene[markers_alveolar_nomock_pos$diffexpressed != "NO"]
+
+
+
+volcano_alveolar_Ms4a3pos_noMock <- ggplot(data=markers_alveolar_nomock_pos,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_alveolar_nomock_pos$avg_log2FC)), 
+                           ceiling(max(markers_alveolar_nomock_pos$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_alveolar_Ms4a3pos_noMock
+ggsave("volcano_alveolar_Ms4a3pos_nomock.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+#### volcano plot noMock Ms4a3 negative
+
+```{r}
+markers_alveolar_nomock_neg$diffexpressed <- "NO"
+markers_alveolar_nomock_neg$diffexpressed[markers_alveolar_nomock_neg$avg_log2FC > 1] <- "UP"
+
+markers_alveolar_nomock_neg$diffexpressed[markers_alveolar_nomock_neg$avg_log2FC < -1] <- "DOWN"
+
+markers_alveolar_nomock_neg$delabel <- NA
+
+markers_alveolar_nomock_neg$delabel[markers_alveolar_nomock_neg$diffexpressed != "NO"]<-markers_alveolar_nomock_neg$gene[markers_alveolar_nomock_neg$diffexpressed != "NO"]
+
+
+
+volcano_alveolar_Ms4a3neg_noMock <- ggplot(data=markers_alveolar_nomock_neg,
+                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+                           geom_point() + theme_minimal() +
+                           scale_x_continuous(breaks = seq(floor(min (markers_alveolar_nomock_neg$avg_log2FC)), 
+                           ceiling(max(markers_alveolar_nomock_neg$avg_log2FC)), by = 0.5)) +
+                           geom_text_repel(max.overlaps = 100)
+volcano_alveolar_Ms4a3neg_noMock
+ggsave("volcano_alveolar_Ms4a3neg_nomock.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+## 8) Heatmap markers daniel 'clusters_gene_set.xlsx' for full object
+
+```{r}
+
+# load in the marker genes for the different celltypes + initialize as a list
+marker_genes <- list(
+  Alveolar_Macrophage = c("Chil3", "Fabp5", "Flt1", "Pparg", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79"),
+  Interstitial_Macrophage = c("C1qa", "C1qb", "C1qc", "Pf4", "C5ar1", "Apoe", "Cd14", "Csf1r", "Mafb", "Mrc1", "Folr2", "Lyve1", "Timd4", "H2-Ab1", "Cx3cr1", "CD163"),
+  recmacs = c("Ly6c2", "Ccr2", "Cd14", "Fn1", "Vcan", "IL1b", "S100a6", "S100a4", "Apoe", "Mafb", "C5ar1", "Ms4a4c"),
+  cDC1 = c("Cd24a", "Itgae", "Xcr1", "Batf3", "Cadm1", "Dpp4", "Zbtb46", "Id2", "Flt3", "Irf8", "Tlr3", "Clec9a", "Cst3", "Wdfy4", "Cxcr3", "Rnase6", "Ccr7", "Ccl5"),
+  cDC2 = c("Dpp4", "Zbtb46", "Clec10a", "Ccl17", "Ccl22", "Fabp5", "S100a6", "S100a4", "Flt3", "Irf4", "H2-Ab1", "CD209a", "Ccr7", "Ccl5"),
+  cDC2_infected = c("Ifit1", "Ifit1bl1", "Ifit2", "Ifit", "Ifit3b", "Ifi205", "Ifi206", "Rsad2", "Phf1 1d", "Mx1", "Cmpk2", "Helz2"),
+  peripheral_DC = c("Siglech", "Ly6d", "Ccr9", "Cox6a2", "Plac8", "Ly6c2", "Tcf4", "Bst2"),
+  Activated_Interstitial_Macrophage = c("Ly6c2", "Ccr2", "Cd14", "Fn1", "Vcan", "IL1b", "S100a6", "S100a4", "Apoe", "Mafb", "C5ar1", "Ms4a4c", "Lp1", "Mpeg1", "Clec4n", "Calr", "Siglec1"))
+
+obj.v5@meta.data$markersCelltypes = marker_genes
+
+
+gene_sets <- unique(Clusters_gene_sets$`Gene sets`)
+
+```
 
 ```{r}
 library(purrr)
@@ -704,7 +807,7 @@ Clusters_gene_sets <- read_excel("Clusters gene sets.xlsx")
 cell_types <- Clusters_gene_sets$`Cell type`
 
 # Add "Cell type" as metadata to Seurat object
-obj.v5 <- AddMetaData(object =  obj.v5, metadata = list(Cell_Type = factor(cell_types)))
+obj.v5 <- AddMetaData(object =  obj.v5, metadata = list(Cell_Type = (cell_types)))
 
 gene_sets <- unique(Clusters_gene_sets$`Gene sets`)
 
@@ -714,17 +817,40 @@ obj.v5 <- AddMetaData(object = obj.v5, metadata = list(Gene_Sets = factor_gene_s
 
 unique_gene_sets <- unique(Clusters_gene_sets$`Gene sets`)
 
-plot_heatmap_all = obj.v5 |>
-  join_features(unique_gene_sets,assay="RNA", slot="scale.data")  |> 
-group_by(.feature,harmony_cluster_8dims_rough) |>
-  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
-  group_by(.feature) |> 
-  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
-  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
-                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
-  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
-  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_all.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+obj.v5 |>  as_tibble() |>
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+    mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                                 "viral.experiment.2"="d8") )) |>
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+    mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, Cell_Type) |>
+  count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough,Cell_Type, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |>
+ 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+    mutate(freq_cluster=n/sum(n)) |>
+  mutate(condition=as.character(condition)) |> na.omit() |> 
+  group_by(harmony_cluster_8dims_rough) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  
+ # filter(harmony_cluster_8dims_rough %in% c(7,8,9,10)) |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+
+  ggplot(aes(Cell_Type,harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
+  geom_tile()+ 
+  ggh4x::facet_nested_wrap(
+    vars(sampletag_Ms4a3), nrow = 1,drop = TRUE,scales = "free_x"
+  )+theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))   + scale_fill_gradient2(  low = "blue",
+  mid = "white",
+  high = "red")+ggtitle("proportions of cells from a given sample distributed across clusters ",
+                        "Ms4a3 classification as sorted")
+ggsave(filename = "cellTypesWithMarkerExpressionAcrossClusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",  height = 20, width = 50, units = "cm")
 ```
 
 ```{r}
@@ -740,7 +866,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_am_geenomit.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+ggsave("heatmap_daniel_genes_am_geenomit.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
 
 
 ```
@@ -757,7 +883,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_im.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+ggsave("heatmap_daniel_genes_im.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
 
 ```
 
@@ -773,7 +899,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_recmacs.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+ggsave("heatmap_daniel_genes_recmacs.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
 ```
 
 ```{r}
@@ -788,7 +914,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_cdc1.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+ggsave("heatmap_daniel_genes_cdc1.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
 
 ```
 
@@ -805,7 +931,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_cdc2.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+ggsave("heatmap_daniel_genes_cdc2.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
 ```
 
 ```{r}
@@ -821,7 +947,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_cdc2_infected.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+ggsave("heatmap_daniel_genes_cdc2_infected.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
 ```
 
 ```{r}
@@ -836,7 +962,7 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_pdc.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+ggsave("heatmap_daniel_genes_pdc.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
 ```
 
 ```{r}
@@ -851,5 +977,5 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
                                        ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
-ggsave("heatmap_daniel_genes_activatedIM.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/")
+ggsave("heatmap_daniel_genes_activatedIM.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
 ```
