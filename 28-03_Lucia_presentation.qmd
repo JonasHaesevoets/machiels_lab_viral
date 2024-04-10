@@ -12,12 +12,13 @@ execute:
 
 # 28-03 Lucia presentation
 
-## 1) Load in data and packages and load in functions
+# 1) Load in data and packages and load in functions
 
 ```{r}
-easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi")
+easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi", "clusterProfiler", "enrichplot")
 obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
 DefaultAssay(obj.v5) <- "RNA"
+clusterProfiler::
 
 
 # The palette with grey:
@@ -115,9 +116,9 @@ check_metadata_presence <- function(seurat_object, metadata_column, value_to_che
 
 ```
 
-## **2) Integrate macrophages of all datasets into a combined embedding (umap)**
+# **2) Integrate macrophages of all datasets into a combined embedding (umap)**
 
-### 2a) Show the K nearest neighbour clusters
+## 2a) Show the K nearest neighbour clusters
 
 ```{r}
 obj.v5 |> DimPlot(group.by = "harmony_cluster_8dims_rough", label=T)
@@ -321,7 +322,7 @@ ggarrange(plotlist = umap_sampletag_name_plotlist)
 ggsave("sample_Embeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG", height = 18, width = 18)
 ```
 
-## 3) Heatmaps RNA-seq Abseq for markers
+# 3) Heatmaps RNA-seq Abseq for markers
 
 ### Heatmaps Abseq for SiglecF and Cd11c
 
@@ -375,9 +376,9 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
 ggsave("RNA_noFabp5_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG")
 ```
 
-## 4) Compositional Analysis
+# 4) Compositional Analysis
 
-### 4A) cluster frequencies per group
+## 4A) cluster frequencies per group
 
 ```{r}
 p1 <- obj.v5 |>  as_tibble()  |> filter(sample_tag_ms4a3_pos_gabbr2!= "Gabbr2_pos_Ms4a3_neg") |>  make_zscore_and_freq_data() |>
@@ -413,7 +414,7 @@ ggsave(filename = "cluster frequencies per group.png",path = "../../Documents/ma
 
 ```
 
-### 4b) **Z-scores of cluster frequencies: heatmap**
+## 4b) **Z-scores of cluster frequencies: heatmap**
 
 fix bug in it by specifying group by and count were used from the dplyr package it was not assumed
 
@@ -453,7 +454,7 @@ obj.v5 |>
 ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",  height = 20, width = 30, units = "cm")
 ```
 
-## 5) Finding cluster markers for full integrated object (obj.v5)
+# 5) Finding cluster markers for full integrated object (obj.v5)
 
 ```{r, echo=FALSE}
 # markers_all <- FindAllMarkers(obj.v5,
@@ -477,7 +478,7 @@ ggsave(filename = "proportions of cells from a given sample distributed across c
 # write_xlsx(top_20_all, "../../Documents/machiels_lab_viral/output/top_20_all_correct.xlsx")
 ```
 
-## 6) Reclustering of alveolar macrophages at d60 (clusters 0 1 5 6 7)
+# 6) Reclustering of alveolar macrophages at d60 (clusters 0 1 5 6 7)
 
 seurat_d60_alveolar_1 contains no mock
 
@@ -490,7 +491,7 @@ DimPlot(seurat_d60_1_alveolar, label = T)
 ggsave("dimplot_original.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### Sanity checks to see if the new seurat object is correctly initialized
+## 6a) Sanity checks to see if the new seurat object is correctly initialized
 
 ```{r}
 # check if it contains bal and lung samples
@@ -520,7 +521,7 @@ metadata_column = "day"
 value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
 ```
 
-### reclustering of alveolar clusters at d60, UMAP stored as umap.harmony_8dims_reclusterumap.harmony_8dims_recluster
+## 6b) reclustering of alveolar clusters at d60, UMAP stored as umap.harmony_8dims_reclusterumap.harmony_8dims_recluster
 
 ```{r, echo=FALSE}
 # seurat_d60_1_alveolar = SCTransform(seurat_d60_1_alveolar, vst.flavor = 'v2')
@@ -546,28 +547,28 @@ seurat_d60_1_alveolar|> DimPlot(group.by = "harmony_cluster_8dims_rough", label=
 
 scCustomize package used instead to generate the featureplots, the standard feature plots generated using Seurat have non expressing cells as part of the same color scale. In featureplot_scCustomize the parameter na_cutoff is used to plot only positive non-zero values using color scale and zero/negative values as NA. To plot all values using color palette set to `NA`.
 
-### dimplots for Ms4a3 + - 
+## 6c) dimplots for Ms4a3 + -
 
 ```{r}
 DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", colors_use = c("purple", "cyan", "lightgreen", "red", "orange", "blue", "pink"))
 ggsave("dimplot_virus.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### dimplots for tissue
+## 6d)dimplots for tissue
 
 ```{r}
 DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sample_type", label = T)
 ggsave("dimplot_virusGroupedTissue.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### dimplots for Ms4a3 + -
+## 6e) dimplots for Ms4a3 + -
 
 ```{r}
 DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sampletag_Ms4a3", )
 ggsave("dimplot_virusGroupedMs4a3.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+## 6f) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 DefaultAssay(seurat_d60_1_alveolar) = "adt"
@@ -585,7 +586,7 @@ ggarrange(plotlist = umap_am_alveolar_d60, nrow = 4)
 ggsave("abseq_featureplot_AM_alveolar_Ms4a3_scCustomize.png", width = 60, height = 90, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+## 6g) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 DefaultAssay(seurat_d60_1_alveolar) = "RNA"
@@ -604,7 +605,7 @@ ggarrange(plotlist = umap_am_alveolar_d60, nrow = 5)
 ggsave("featureplot_AM_alveolar_Ms4a3_scCustomize.png", width = 60, height = 90, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+## 6h) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 DefaultAssay(seurat_d60_1_alveolar) = "adt"
@@ -623,7 +624,7 @@ ggarrange(plotlist = umap_am_alveolar_d60, nrow = 5)
 ggsave("abseq_featureplot_AM_alveolar_tissue_scCustomize.png", width = 60, height = 90, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for sample type
+## 6i) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for sample type
 
 ```{r}
 umap_am_alveolar_d60 <- list()
@@ -640,7 +641,7 @@ ggarrange(plotlist = umap_am_alveolar_d60, nrow = 5)
 ggsave("featureplot_AM_alveolar_tissue_scCustomize.png", width = 60, height = 90, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
-### **Z-scores of cluster frequencies: heatmap**
+## **6j) Z-scores of cluster frequencies: heatmap**
 
 ```{r}
 seurat_d60_1_alveolar |> 
@@ -674,31 +675,33 @@ seurat_d60_1_alveolar |>
 ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar",  height = 20, width = 30, units = "cm")
 ```
 
-### PC plot showing Ms4a3 +/- distribution for all conditions for BAL
+## 6k) PC plot showing Ms4a3 +/- distribution for all conditions for BAL
 
 ```{r}
 seurat_d60_1_alveolar_bal = seurat_d60_1_alveolar %>% filter(str_detect(sample_type, "bal"))
 seurat_d60_1_alveolar_bal = FindVariableFeatures(seurat_d60_1_alveolar_bal)
 seurat_d60_1_alveolar_bal = NormalizeData(seurat_d60_1_alveolar_bal)
 seurat_d60_1_alveolar_bal = ScaleData(seurat_d60_1_alveolar_bal)
+Idents(seurat_d60_1_alveolar_bal) = "sampletag_name"
 PCAPlot(seurat_d60_1_alveolar_bal)
 ggsave("pcaplot_alveolar_bal.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
 ```
 
-### PC plot showing Ms4a3 +/- distribution for all conditions for LUNG
+## 6l) PC plot showing Ms4a3 +/- distribution for all conditions for LUNG
 
 ```{r}
 seurat_d60_1_alveolar_lung = seurat_d60_1_alveolar %>% filter(str_detect(sample_type, "lung"))
 seurat_d60_1_alveolar_lung = FindVariableFeatures(seurat_d60_1_alveolar_lung)
 seurat_d60_1_alveolar_lung = NormalizeData(seurat_d60_1_alveolar_lung)
 seurat_d60_1_alveolar_lung = ScaleData(seurat_d60_1_alveolar_lung)
+Idents(seurat_d60_1_alveolar_lung) = "sampletag_name"
 PCAPlot(seurat_d60_1_alveolar_lung)
 ggsave("pcaplot_alveolar_lung.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
 ```
 
-## 7) DEA of the reclustered object
+# 7) DEA of the reclustered object
 
-### find the markers of each cluster =\> no DEA yet
+## 7a) find the markers of each cluster =\> no DEA yet
 
 ```{r, echo=FALSE}
 markers_d60_alveolar <- FindAllMarkers(seurat_d60_1_alveolar,
@@ -741,11 +744,14 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
 ggsave("hetmap_Zscore_clusterMarkers.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar",  height = 50, width = 20, units = "cm")
 ```
 
-### DEA testing Ms4a3 status for all infections (not including mock)
+## 7b) DEA testing Ms4a3 status for all infections (not including mock)
 
 ```{r}
+DefaultAssay(seurat_d60_1_alveolar_noMock) = "RNA"
+DefaultAssay(seurat_d60_1_alveolar_Mock) = "RNA"
+
 seurat_d60_1_alveolar_noMock = seurat_d60_1_alveolar %>% filter(!str_detect(condition, "Mock"))
-seurat_d60_1_alveolar_noMock = FindVariableFeatures(seurat_d60_1_alveolar_noMock)
+seurat_d60_1_alveolar_noMock = FindVariableFeatures(seurat_d60_1_alveolar_noMock, loess.span = 0.8)
 seurat_d60_1_alveolar_noMock = ScaleData(seurat_d60_1_alveolar_noMock)
 
 seurat_d60_1_alveolar_Mock = seurat_d60_1_alveolar %>% filter(str_detect(condition, "Mock"))
@@ -817,7 +823,7 @@ volcano_alveolar_Ms4a3pos_noMock_sc <- ggplot(data = markers_alveolar_nomock_pos
 volcano_alveolar_Ms4a3pos_noMock_sc
 
 # Save the plot
-ggsave("volcano_alveolar_Ms4a3pos_nomock_sc.png",
+ggsave("volcano_alveolar_Ms4a3pos_nomock.png",
        width = 45, height = 20, units = "cm",
        path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
 ```
@@ -843,10 +849,10 @@ volcano_alveolar_Ms4a3neg_noMock_sc <- ggplot(data=markers_alveolar_nomock_neg,
                            ceiling(max(markers_alveolar_nomock_neg$avg_log2FC)), by = 0.5)) +
                            geom_text_repel(max.overlaps = 100)
 volcano_alveolar_Ms4a3neg_noMock_sc
-ggsave("volcano_alveolar_Ms4a3neg_nomock_sc.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+ggsave("volcano_alveolar_Ms4a3neg_nomock.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
 ```
 
-### DEA testing Ms4a3 status for Mock 
+## 7c) DEA testing Ms4a3 status for Mock
 
 ```{r}
 Idents(seurat_d60_1_alveolar_Mock) = "sampletag_Ms4a3"
@@ -911,7 +917,7 @@ volcano_alveolar_Ms4a3pos_mock_sc <- ggplot(data = markers_alveolar_mock_pos,
 volcano_alveolar_Ms4a3pos_mock_sc
 
 # Save the plot
-ggsave("volcano_alveolar_Ms4a3pos_Mock_sc.png",
+ggsave("volcano_alveolar_Ms4a3pos_Mock.png",
        width = 45, height = 20, units = "cm",
        path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
 ```
@@ -937,10 +943,10 @@ volcano_alveolar_Ms4a3neg_mock_sc <- ggplot(data=markers_alveolar_mock_neg,
                            ceiling(max(markers_alveolar_mock_neg$avg_log2FC)), by = 0.5)) +
                            geom_text_repel(max.overlaps = 100)
 volcano_alveolar_Ms4a3neg_mock_sc
-ggsave("volcano_alveolar_Ms4a3neg_Mock_sc.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+ggsave("volcano_alveolar_Ms4a3neg_Mock.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
 ```
 
-#### get ms4a3 specific markers
+## 7D) get ms4a3 specific markers
 
 ```{r}
 Ms4a3_pos_markers = inner_join(markers_alveolar_Mock_posfiltered, markers_alveolar_nomock_posfiltered, by = "gene")
@@ -952,7 +958,723 @@ write_xlsx(Ms4a3_neg_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_pr
 
 ```
 
-## 8) Heatmap markers daniel 'clusters_gene_set.xlsx' for full object
+# 8) DEA testing of alveolar nomock each infection separately
+
+#### initializing and rescaling the new objects
+
+```{r, echo= FALSE}
+
+
+Idents(seurat_d60_1_alveolar_noMock) = "condition"
+
+seurat_d60_1_alveolar_noMock_MuHV4 = subset(seurat_d60_1_alveolar_noMock, idents = "MuHV4")
+DefaultAssay(seurat_d60_1_alveolar_noMock_MuHV4) = "RNA"
+seurat_d60_1_alveolar_noMock_MuHV4 = FindVariableFeatures(seurat_d60_1_alveolar_noMock_MuHV4)
+seurat_d60_1_alveolar_noMock_MuHV4 = ScaleData(seurat_d60_1_alveolar_noMock_MuHV4)
+
+
+seurat_d60_1_alveolar_noMock_PR8 = subset(seurat_d60_1_alveolar_noMock, idents = "PR8")
+DefaultAssay(seurat_d60_1_alveolar_noMock_PR8) = "RNA"
+seurat_d60_1_alveolar_noMock_PR8 = FindVariableFeatures(seurat_d60_1_alveolar_noMock_PR8)
+seurat_d60_1_alveolar_noMock_PR8 = ScaleData(seurat_d60_1_alveolar_noMock_PR8)
+
+
+seurat_d60_1_alveolar_noMock_MAV1 = subset(seurat_d60_1_alveolar_noMock, idents = "MAV1")
+DefaultAssay(seurat_d60_1_alveolar_noMock_MAV1) = "RNA"
+seurat_d60_1_alveolar_noMock_MAV1 = FindVariableFeatures(seurat_d60_1_alveolar_noMock_MAV1)
+seurat_d60_1_alveolar_noMock_MAV1 = ScaleData(seurat_d60_1_alveolar_noMock_MAV1)
+
+
+seurat_d60_1_alveolar_noMock_PVM = subset(seurat_d60_1_alveolar_noMock, idents = "PVM")
+DefaultAssay(seurat_d60_1_alveolar_noMock_PVM) = "RNA"
+seurat_d60_1_alveolar_noMock_PVM = FindVariableFeatures(seurat_d60_1_alveolar_noMock_PVM)
+seurat_d60_1_alveolar_noMock_PVM = ScaleData(seurat_d60_1_alveolar_noMock_PVM)        
+
+```
+
+## 8a) DEA for alveolar noMock MuHV4
+
+```{r}
+Idents(seurat_d60_1_alveolar_noMock_MuHV4) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos_MuHV4<- FindMarkers(seurat_d60_1_alveolar_noMock_MuHV4 ,
+                                 ident.1 =  "Ms4a3_pos",
+                                 ident.2 =  "Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_alveolar_nomock_neg_MuHV4 <- FindMarkers(seurat_d60_1_alveolar_noMock_MuHV4 ,
+                                 ident.1 =  "Ms4a3_neg",
+                                 ident.2 =  "Ms4a3_pos",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+```{r}
+markers_alveolar_nomock_MuHv4posfiltered = markers_alveolar_nomock_pos_MuHV4[markers_alveolar_nomock_pos_MuHV4$avg_log2FC > 1,]
+nonsignficant_p_adj_ms4a3pos <- which(markers_alveolar_nomock_MuHv4posfiltered$p_val_adj <= 0.05)
+markers_alveolar_nomock_MuHv4posfiltered <- markers_alveolar_nomock_MuHv4posfiltered[nonsignficant_p_adj_ms4a3pos, ]
+
+write_xlsx(markers_alveolar_nomock_pos_MuHV4, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_pos_MuHV4.xlsx")
+write_xlsx(markers_alveolar_nomock_MuHv4posfiltered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_MuHv4posfiltered.xlsx")
+
+markers_alveolar_nomock_MuHV4negfiltered = markers_alveolar_nomock_neg_MuHV4[markers_alveolar_nomock_neg_MuHV4$avg_log2FC > 1,]
+nonsignficant_p_adj_Ms4a3neg <- which(markers_alveolar_nomock_MuHV4negfiltered$p_val_adj <= 0.05)
+markers_alveolar_nomock_MuHV4negfiltered <- markers_alveolar_nomock_negfiltered[nonsignficant_p_adj_Ms4a3neg, ]
+
+write_xlsx(markers_alveolar_nomock_neg, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_neg_MuHV4.xlsx")
+write_xlsx(markers_alveolar_nomock_negfiltered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_neg_MuHV4_filtered.xlsx")
+```
+
+### volcanoplot Ms4A3 positive noMock alveola MuHV4
+
+```{r}
+# Assign "NO" to diffexpressed column
+markers_alveolar_nomock_pos_MuHV4$diffexpressed <- "NO"
+
+# Categorize genes as "UP" or "DOWN" based on avg_log2FC
+markers_alveolar_nomock_pos_MuHV4$diffexpressed[markers_alveolar_nomock_pos_MuHV4$avg_log2FC > 1] <- "UP"
+markers_alveolar_nomock_pos_MuHV4$diffexpressed[markers_alveolar_nomock_pos_MuHV4$avg_log2FC < -1] <- "DOWN"
+
+# Add a column for labels
+markers_alveolar_nomock_pos_MuHV4$delabel <- NA
+
+# Assign gene names as labels for differentially expressed genes
+markers_alveolar_nomock_pos_MuHV4$delabel[markers_alveolar_nomock_pos_MuHV4$diffexpressed != "NO"] <-
+  markers_alveolar_nomock_pos_MuHV4$gene[markers_alveolar_nomock_pos_MuHV4$diffexpressed != "NO"]  # Ensure consistent variable names
+
+
+
+
+volcano_alveolar_Ms4a3pos_noMock_MuHV4 <- ggplot(data = markers_alveolar_nomock_pos_MuHV4,
+       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(markers_alveolar_nomock_pos_MuHV4$avg_log2FC)),
+                                 ceiling(max(markers_alveolar_nomock_pos_MuHV4$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+volcano_alveolar_Ms4a3pos_noMock_MuHV4
+
+# Save the plot
+ggsave("volcano_alveolar_Ms4a3pos_nomock_MuHV4.png",
+       width = 45, height = 20, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+### volcanoplot Ms4A3 negative noMock alveola MuHV4
+
+```{r}
+# Assign "NO" to diffexpressed column
+markers_alveolar_nomock_neg_MuHV4$diffexpressed <- "NO"
+
+# Categorize genes as "UP" or "DOWN" based on avg_log2FC
+markers_alveolar_nomock_neg_MuHV4$diffexpressed[markers_alveolar_nomock_neg_MuHV4$avg_log2FC > 1] <- "UP"
+markers_alveolar_nomock_neg_MuHV4$diffexpressed[markers_alveolar_nomock_neg_MuHV4$avg_log2FC < -1] <- "DOWN"
+
+# Add a column for labels
+markers_alveolar_nomock_neg_MuHV4$delabel <- NA
+
+# Assign gene names as labels for differentially expressed genes
+markers_alveolar_nomock_neg_MuHV4$delabel[markers_alveolar_nomock_neg_MuHV4$diffexpressed != "NO"] <-
+  markers_alveolar_nomock_neg_MuHV4$gene[markers_alveolar_nomock_neg_MuHV4$diffexpressed != "NO"]  # Ensure consistent variable names
+
+
+
+
+volcano_alveolar_Ms4a3neg_noMock_MuHV4 <- ggplot(data = markers_alveolar_nomock_neg_MuHV4,
+       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(markers_alveolar_nomock_neg_MuHV4$avg_log2FC)),
+                                 ceiling(max(markers_alveolar_nomock_neg_MuHV4$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+volcano_alveolar_Ms4a3neg_noMock_MuHV4
+
+# Save the plot
+ggsave("volcano_alveolar_Ms4a3neg_nomock_MuHV4.png",
+       width = 45, height = 20, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+## 8b) DEA for alveolar noMock PR8
+
+```{r}
+Idents(seurat_d60_1_alveolar_noMock_PR8) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos_PR8<- FindMarkers(seurat_d60_1_alveolar_noMock_PR8 ,
+                                 ident.1 =  "Ms4a3_pos",
+                                 ident.2 =  "Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_alveolar_nomock_neg_PR8 <- FindMarkers(seurat_d60_1_alveolar_noMock_PR8 ,
+                                 ident.1 =  "Ms4a3_neg",
+                                 ident.2 =  "Ms4a3_pos",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+```{r}
+markers_alveolar_nomock_PR8posfiltered = markers_alveolar_nomock_pos_PR8[markers_alveolar_nomock_pos_PR8$avg_log2FC > 1,]
+nonsignficant_p_adj_ms4a3pos <- which(markers_alveolar_nomock_PR8posfiltered$p_val_adj <= 0.05)
+markers_alveolar_nomock_PR8posfiltered <- markers_alveolar_nomock_PR8posfiltered[nonsignficant_p_adj_ms4a3pos, ]
+
+write_xlsx(markers_alveolar_nomock_pos_PR8, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_pos_PR8.xlsx")
+write_xlsx(markers_alveolar_nomock_PR8posfiltered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PR8posfiltered.xlsx")
+
+markers_alveolar_nomock_PR8negfiltered = markers_alveolar_nomock_neg_PR8[markers_alveolar_nomock_neg_PR8$avg_log2FC > 1,]
+nonsignficant_p_adj_Ms4a3neg <- which(markers_alveolar_nomock_PR8negfiltered$p_val_adj <= 0.05)
+markers_alveolar_nomock_PR8negfiltered <- markers_alveolar_nomock_negfiltered[nonsignficant_p_adj_Ms4a3neg, ]
+
+write_xlsx(markers_alveolar_nomock_neg, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PR8_neg.xlsx")
+write_xlsx(markers_alveolar_nomock_negfiltered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PR8_neg_filtered.xlsx")
+```
+
+### volcanoplot Ms4A3 positive noMock alveola PR8
+
+```{r}
+# Assign "NO" to diffexpressed column
+markers_alveolar_nomock_pos_PR8$diffexpressed <- "NO"
+
+# Categorize genes as "UP" or "DOWN" based on avg_log2FC
+markers_alveolar_nomock_pos_PR8$diffexpressed[markers_alveolar_nomock_pos_MuHV4$avg_log2FC > 1] <- "UP"
+markers_alveolar_nomock_pos_PR8$diffexpressed[markers_alveolar_nomock_pos_PR8$avg_log2FC < -1] <- "DOWN"
+
+# Add a column for labels
+markers_alveolar_nomock_pos_PR8$delabel <- NA
+
+# Assign gene names as labels for differentially expressed genes
+markers_alveolar_nomock_pos_PR8$delabel[markers_alveolar_nomock_pos_PR8$diffexpressed != "NO"] <-
+  markers_alveolar_nomock_pos_PR8$gene[markers_alveolar_nomock_pos_PR8$diffexpressed != "NO"]  # Ensure consistent variable names
+
+
+
+
+volcano_alveolar_Ms4a3pos_noMock_PR8 <- ggplot(data = markers_alveolar_nomock_pos_PR8,
+       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(markers_alveolar_nomock_pos_PR8$avg_log2FC)),
+                                 ceiling(max(markers_alveolar_nomock_pos_PR8$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+volcano_alveolar_Ms4a3pos_noMock_PR8
+
+# Save the plot
+ggsave("volcano_alveolar_Ms4a3pos_nomock_PR8.png",
+       width = 45, height = 20, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+### volcanoplot Ms4A3 negative noMock alveola PR8
+
+```{r}
+# Assign "NO" to diffexpressed column
+markers_alveolar_nomock_neg_PR8$diffexpressed <- "NO"
+
+# Categorize genes as "UP" or "DOWN" based on avg_log2FC
+markers_alveolar_nomock_neg_PR8$diffexpressed[markers_alveolar_nomock_neg_PR8$avg_log2FC > 1] <- "UP"
+markers_alveolar_nomock_neg_PR8$diffexpressed[markers_alveolar_nomock_neg_PR8$avg_log2FC < -1] <- "DOWN"
+
+# Add a column for labels
+markers_alveolar_nomock_neg_PR8$delabel <- NA
+
+# Assign gene names as labels for differentially expressed genes
+markers_alveolar_nomock_neg_PR8$delabel[markers_alveolar_nomock_neg_PR8$diffexpressed != "NO"] <-
+  markers_alveolar_nomock_neg_PR8$gene[markers_alveolar_nomock_neg_PR8$diffexpressed != "NO"]  # Ensure consistent variable names
+
+
+
+
+volcano_alveolar_Ms4a3neg_noMock_PR8 <- ggplot(data = markers_alveolar_nomock_neg_PR8,
+       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(markers_alveolar_nomock_neg_PR8$avg_log2FC)),
+                                 ceiling(max(markers_alveolar_nomock_neg_PR8$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+volcano_alveolar_Ms4a3neg_noMock_PR8
+
+# Save the plot
+ggsave("volcano_alveolar_Ms4a3neg_nomock_PR8.png",
+       width = 45, height = 20, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+## 8C) DEA for alveolar noMock PVM
+
+```{r}
+Idents(seurat_d60_1_alveolar_noMock_PVM) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos_PVM<- FindMarkers(seurat_d60_1_alveolar_noMock_PVM ,
+                                 ident.1 =  "Ms4a3_pos",
+                                 ident.2 =  "Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_alveolar_nomock_neg_PVM <- FindMarkers(seurat_d60_1_alveolar_noMock_PVM ,
+                                 ident.1 =  "Ms4a3_neg",
+                                 ident.2 =  "Ms4a3_pos",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+```{r}
+markers_alveolar_nomock_PVMposfiltered = markers_alveolar_nomock_pos_PVM[markers_alveolar_nomock_pos_PVM$avg_log2FC > 1,]
+nonsignficant_p_adj_ms4a3pos <- which(markers_alveolar_nomock_PVMposfiltered$p_val_adj <= 0.05)
+markers_alveolar_nomock_PVMposfiltered <- markers_alveolar_nomock_PVMposfiltered[nonsignficant_p_adj_ms4a3pos, ]
+
+write_xlsx(markers_alveolar_nomock_pos_PVM, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_pos_PVM.xlsx")
+write_xlsx(markers_alveolar_nomock_PVMposfiltered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PVMposfiltered.xlsx")
+
+markers_alveolar_nomock_PVMnegfiltered = markers_alveolar_nomock_neg_PVM[markers_alveolar_nomock_neg_PVM$avg_log2FC > 1,]
+nonsignficant_p_adj_Ms4a3neg <- which(markers_alveolar_nomock_PVMnegfiltered$p_val_adj <= 0.05)
+markers_alveolar_nomock_PVMnegfiltered <- markers_alveolar_nomock_negfiltered[nonsignficant_p_adj_Ms4a3neg, ]
+
+write_xlsx(markers_alveolar_nomock_neg, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PVM_neg.xlsx")
+write_xlsx(markers_alveolar_nomock_negfiltered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PVM_neg_filtered.xlsx")
+```
+
+### volcanoplot Ms4A3 positive noMock alveola PVM
+
+```{r}
+# Assign "NO" to diffexpressed column
+markers_alveolar_nomock_pos_PVM$diffexpressed <- "NO"
+
+# Categorize genes as "UP" or "DOWN" based on avg_log2FC
+markers_alveolar_nomock_pos_PVM$diffexpressed[markers_alveolar_nomock_pos_PVM$avg_log2FC > 1] <- "UP"
+markers_alveolar_nomock_pos_PVM$diffexpressed[markers_alveolar_nomock_pos_PVM$avg_log2FC < -1] <- "DOWN"
+
+# Add a column for labels
+markers_alveolar_nomock_pos_PVM$delabel <- NA
+
+# Assign gene names as labels for differentially expressed genes
+markers_alveolar_nomock_pos_PVM$delabel[markers_alveolar_nomock_pos_PVM$diffexpressed != "NO"] <-
+  markers_alveolar_nomock_pos_PVM$gene[markers_alveolar_nomock_pos_PVM$diffexpressed != "NO"]  # Ensure consistent variable names
+
+
+
+
+volcano_alveolar_Ms4a3pos_noMock_PVM <- ggplot(data = markers_alveolar_nomock_pos_PVM,
+       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(markers_alveolar_nomock_pos_PVM$avg_log2FC)),
+                                 ceiling(max(markers_alveolar_nomock_pos_PVM$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+volcano_alveolar_Ms4a3pos_noMock_PVM
+
+# Save the plot
+ggsave("volcano_alveolar_Ms4a3pos_nomock_PVM.png",
+       width = 45, height = 20, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+### volcanoplot Ms4A3 negative noMock alveola PVM
+
+```{r}
+# Assign "NO" to diffexpressed column
+markers_alveolar_nomock_neg_PVM$diffexpressed <- "NO"
+
+# Categorize genes as "UP" or "DOWN" based on avg_log2FC
+markers_alveolar_nomock_neg_PVM$diffexpressed[markers_alveolar_nomock_neg_PVM$avg_log2FC > 1] <- "UP"
+markers_alveolar_nomock_neg_PVM$diffexpressed[markers_alveolar_nomock_neg_PVM$avg_log2FC < -1] <- "DOWN"
+
+# Add a column for labels
+markers_alveolar_nomock_neg_PVM$delabel <- NA
+
+# Assign gene names as labels for differentially expressed genes
+markers_alveolar_nomock_neg_PVM$delabel[markers_alveolar_nomock_neg_PVM$diffexpressed != "NO"] <-
+  markers_alveolar_nomock_neg_PVM$gene[markers_alveolar_nomock_neg_PVM$diffexpressed != "NO"]  # Ensure consistent variable names
+
+
+
+
+volcano_alveolar_Ms4a3neg_noMock_PVM <- ggplot(data = markers_alveolar_nomock_neg_PVM,
+       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(markers_alveolar_nomock_neg_PVM$avg_log2FC)),
+                                 ceiling(max(markers_alveolar_nomock_neg_PVM$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+volcano_alveolar_Ms4a3neg_noMock_PVM
+
+# Save the plot
+ggsave("volcano_alveolar_Ms4a3neg_nomock_PVM.png",
+       width = 45, height = 20, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+## 8d) DEA for alveolar noMock MAV1
+
+```{r}
+Idents(seurat_d60_1_alveolar_noMock_MAV1) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos_MAV1<- FindMarkers(seurat_d60_1_alveolar_noMock_MAV1 ,
+                                 ident.1 =  "Ms4a3_pos",
+                                 ident.2 =  "Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_alveolar_nomock_neg_MAV1 <- FindMarkers(seurat_d60_1_alveolar_noMock_PR8 ,
+                                 ident.1 =  "Ms4a3_neg",
+                                 ident.2 =  "Ms4a3_pos",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+```{r}
+markers_alveolar_nomock_MAV1posfiltered = markers_alveolar_nomock_pos_MAV1[markers_alveolar_nomock_pos_MAV1$avg_log2FC > 1,]
+nonsignficant_p_adj_ms4a3pos <- which(markers_alveolar_nomock_MAV1posfiltered$p_val_adj <= 0.05)
+markers_alveolar_nomock_MAV1posfiltered <- markers_alveolar_nomock_MAV1posfiltered[nonsignficant_p_adj_ms4a3pos, ]
+
+write_xlsx(markers_alveolar_nomock_pos_MAV1, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_pos_MAV1.xlsx")
+write_xlsx(markers_alveolar_nomock_MAV1posfiltered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_MAV1posfiltered.xlsx")
+
+markers_alveolar_nomock_MAV1negfiltered = markers_alveolar_nomock_neg_MAV1[markers_alveolar_nomock_neg_MAV1$avg_log2FC > 1,]
+nonsignficant_p_adj_Ms4a3neg <- which(markers_alveolar_nomock_MAV1negfiltered$p_val_adj <= 0.05)
+markers_alveolar_nomock_MAV1negfiltered <- markers_alveolar_nomock_negfiltered[nonsignficant_p_adj_Ms4a3neg, ]
+
+write_xlsx(markers_alveolar_nomock_neg, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_MAV1_neg.xlsx")
+write_xlsx(markers_alveolar_nomock_negfiltered, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_MAV1_neg_filtered.xlsx")
+```
+
+### volcanoplot Ms4A3 positive noMock alveola MAV1
+
+```{r}
+# Assign "NO" to diffexpressed column
+markers_alveolar_nomock_pos_MAV1$diffexpressed <- "NO"
+
+# Categorize genes as "UP" or "DOWN" based on avg_log2FC
+markers_alveolar_nomock_pos_MAV1$diffexpressed[markers_alveolar_nomock_pos_MAV1$avg_log2FC > 1] <- "UP"
+markers_alveolar_nomock_pos_MAV1$diffexpressed[markers_alveolar_nomock_pos_MAV1$avg_log2FC < -1] <- "DOWN"
+
+# Add a column for labels
+markers_alveolar_nomock_pos_MAV1$delabel <- NA
+
+# Assign gene names as labels for differentially expressed genes
+markers_alveolar_nomock_pos_MAV1$delabel[markers_alveolar_nomock_pos_MAV1$diffexpressed != "NO"] <-
+  markers_alveolar_nomock_pos_MAV1$gene[markers_alveolar_nomock_pos_MAV1$diffexpressed != "NO"]  # Ensure consistent variable names
+
+
+
+
+volcano_alveolar_Ms4a3pos_noMock_MAV1 <- ggplot(data = markers_alveolar_nomock_pos_MAV1,
+       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(markers_alveolar_nomock_pos_MAV1$avg_log2FC)),
+                                 ceiling(max(markers_alveolar_nomock_pos_MAV1$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+volcano_alveolar_Ms4a3pos_noMock_MAV1
+
+# Save the plot
+ggsave("volcano_alveolar_Ms4a3pos_nomock_MAV1.png",
+       width = 45, height = 20, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+### volcanoplot Ms4A3 negative noMock alveola MAV1
+
+```{r}
+# Assign "NO" to diffexpressed column
+markers_alveolar_nomock_neg_MAV1$diffexpressed <- "NO"
+
+# Categorize genes as "UP" or "DOWN" based on avg_log2FC
+markers_alveolar_nomock_neg_MAV1$diffexpressed[markers_alveolar_nomock_neg_MAV1$avg_log2FC > 1] <- "UP"
+markers_alveolar_nomock_neg_MAV1$diffexpressed[markers_alveolar_nomock_neg_MAV1$avg_log2FC < -1] <- "DOWN"
+
+# Add a column for labels
+markers_alveolar_nomock_neg_MAV1$delabel <- NA
+
+# Assign gene names as labels for differentially expressed genes
+markers_alveolar_nomock_neg_MAV1$delabel[markers_alveolar_nomock_neg_MAV1$diffexpressed != "NO"] <-
+  markers_alveolar_nomock_neg_MAV1$gene[markers_alveolar_nomock_neg_MAV1$diffexpressed != "NO"]  # Ensure consistent variable names
+
+
+
+
+volcano_alveolar_Ms4a3neg_noMock_MAV1 <- ggplot(data = markers_alveolar_nomock_neg_MAV1,
+       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(markers_alveolar_nomock_neg_MAV1$avg_log2FC)),
+                                 ceiling(max(markers_alveolar_nomock_neg_MAV1$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+volcano_alveolar_Ms4a3neg_noMock_MAV1
+
+# Save the plot
+ggsave("volcano_alveolar_Ms4a3neg_nomock_MAV1.png",
+       width = 45, height = 20, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+```
+
+## 8e) markers for each disease and Ms4a3 status separate
+
+Need to find the markers for each combination of infection and Ms4a3 status
+
+reasoning: inner join meaning only overlap between two filtered dataframes of marker genes. with df1 (x in the excel) representing the status Ms4a3 and virus and df2 (y in the excel) representing the differentially expressed genes for the infections respective of status Ms4a3
+
+```{r}
+MuHV4_Ms4a3pos_markers =  markers_alveolar_nomock_MuHv4posfiltered[!(markers_alveolar_nomock_MuHv4posfiltered$gene %in% markers_alveolar_nomock_posfiltered$gene), ]
+
+write_xlsx(MuHV4_Ms4a3pos_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/MuHV4_Ms4a3pos_markers.xlsx")
+
+
+MuHV4_Ms4a3neg_markers = markers_alveolar_nomock_MuHV4negfiltered[!(markers_alveolar_nomock_MuHV4negfiltered$gene %in% markers_alveolar_nomock_negfiltered$gene), ]
+
+write_xlsx(MuHV4_Ms4a3pos_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/MuHV4_Ms4a3neg_markers.xlsx")
+
+
+PR8_Ms4a3neg_markers = markers_alveolar_nomock_PR8negfiltered[!(markers_alveolar_nomock_PR8negfiltered$gene %in% markers_alveolar_nomock_negfiltered$gene), ]
+write_xlsx(PR8_Ms4a3neg_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/PR8_Ms4a3neg_markers.xlsx")
+
+
+PR8_Ms4a3pos_markers = markers_alveolar_nomock_PR8posfiltered[!(markers_alveolar_nomock_PR8posfiltered$gene %in% markers_alveolar_nomock_posfiltered$gene), ]
+write_xlsx(PR8_Ms4a3pos_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/PR8_Ms4a3pos_markers.xlsx")
+
+
+PVM_Ms4a3pos_markers = markers_alveolar_nomock_PVMposfiltered[!(markers_alveolar_nomock_PVMposfiltered$gene %in% markers_alveolar_nomock_posfiltered$gene), ]
+write_xlsx(PVM_Ms4a3pos_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/PVM_Ms4a3pos_markers.xlsx")
+
+
+PVM_Ms4a3neg_markers = markers_alveolar_nomock_PVMnegfiltered[!(markers_alveolar_nomock_PVMnegfiltered$gene %in% markers_alveolar_nomock_negfiltered$gene), ]
+write_xlsx(PVM_Ms4a3neg_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/PVM_Ms4a3neg_markers.xlsx")
+
+
+MAV1_Ms4a3pos_markers =  markers_alveolar_nomock_MAV1posfiltered[!(markers_alveolar_nomock_MAV1posfiltered$gene %in% markers_alveolar_nomock_posfiltered$gene), ]
+write_xlsx(MAV1_Ms4a3pos_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/MAV1_Ms4a3pos_markers.xlsx")
+
+
+MAV1_Ms4a3neg_markers = markers_alveolar_nomock_MAV1negfiltered[!(markers_alveolar_nomock_MAV1negfiltered$gene %in% markers_alveolar_nomock_negfiltered$gene), ]
+write_xlsx(MAV1_Ms4a3neg_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/MAV1_Ms4a3neg_markers.xlsx")
+
+
+
+Mock_Ms4a3pos_markers =  markers_alveolar_Mock_posfiltered[!(markers_alveolar_Mock_posfiltered$gene %in% markers_alveolar_nomock_posfiltered$gene), ]
+write_xlsx(MAV1_Ms4a3pos_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/Mock_Ms4a3pos_markers.xlsx")
+
+
+
+Mock_Ms4a3neg_markers =  markers_alveolar_Mock_negfiltered[!(markers_alveolar_Mock_negfiltered$gene %in% markers_alveolar_nomock_negfiltered$gene), ]
+write_xlsx(MAV1_Ms4a3neg_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h)/Mock_Ms4a3neg_markers.xlsx")
+```
+
+# 9) GSEA of MuHV4_Ms4a3+
+
+```{r}
+organism = "org.Mm.eg.db"
+library(organism, character.only = TRUE)
+```
+
+```{r}
+MuHV4_Ms4a3pos = read_xlsx("../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_MuHv4posfiltered.xlsx")
+MuHV4_Ms4a3pos_input = MuHV4_Ms4a3pos$avg_log2FC
+names(MuHV4_Ms4a3pos_input) = MuHV4_Ms4a3pos$gene
+#sort in descending order => required for clusterProfiler
+gene_list_MuHV4_Ms4a3pos = sort(MuHV4_Ms4a3pos_input, decreasing = TRUE)
+```
+
+```{r}
+gse_MuHV4_Ms4a3_pos <- gseGO(geneList=gene_list_MuHV4_Ms4a3pos, 
+             ont ="ALL", 
+             keyType = "SYMBOL", 
+             minGSSize = 3, 
+             maxGSSize = 800, 
+             pvalueCutoff = 0.05, 
+             verbose = TRUE, 
+             OrgDb = organism,
+             pAdjustMethod = "none")
+```
+
+```{r}
+#| fig-width: 18
+#| fig-height: 10
+require(DOSE)
+dotplot(gse_MuHV4_Ms4a3_pos, showCategory=10, split=".sign") + facet_grid(.~.sign)
+ggsave("dotPlot_MuHV4_Ms4a3+_GO.png",
+       width = 30, height = 35, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/GSEA/MuHV4_Ms4a3+")
+```
+
+```{r}
+ridgeplot(gse_MuHV4_Ms4a3_pos) + labs(x = "enrichment distribution")
+ggsave("ridge_MuHV4_Ms4a3+_GO.png",
+       width = 30, height = 35, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/GSEA/MuHV4_Ms4a3+")
+```
+
+## 9a) KEGG GSEA
+
+```{r}
+ids<-bitr(names(MuHV4_Ms4a3pos_input), fromType = "SYMBOL", toType = "ENTREZID", OrgDb=organism)
+
+dedup_ids = ids[!duplicated(ids[c("SYMBOL")]),]
+
+# Create a new dataframe df2 which has only the genes which were successfully mapped using the bitr function above
+df2 = MuHV4_Ms4a3pos[MuHV4_Ms4a3pos$gene %in% dedup_ids$SYMBOL,]
+
+# Create a new column in df2 with the corresponding ENTREZ IDs
+df2$Y = dedup_ids$ENTREZID
+
+# Create a vector of the gene unuiverse
+kegg_gene_list <- df2$avg_log2FC
+
+
+d
+# Name vector with ENTREZ ids
+names(kegg_gene_list) <- df2$Y
+
+# omit any NA values 
+kegg_gene_list<-na.omit(kegg_gene_list)
+
+# sort the list in decreasing order (required for clusterProfiler)
+kegg_gene_list = sort(kegg_gene_list, decreasing = TRUE)
+```
+
+```{r}
+kegg_organism = "mmu"
+gse_MuHV4_Ms4a3_pos_kegg <- gseKEGG(geneList     = kegg_gene_list,
+               organism     = kegg_organism,
+               nPerm        = 10000,
+               minGSSize    = 3,
+               maxGSSize    = 800,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "none",
+               keyType       = "ncbi-geneid")
+```
+
+```{r}
+dotplot(gse_MuHV4_Ms4a3_kegg, showCategory = 10, title = "Enriched Pathways" , split=".sign") + facet_grid(.~.sign)
+```
+
+# 10) GSEA of MuHV4 Ms4a3 -
+
+```{r}
+analyze_gsea_and_kegg <- function(data_file, organism, data) {
+  # Read data from Excel file
+  # Replace 'data' with the actual variable name containing your data
+  data <- read_xlsx(data_file)
+  
+  # Prepare data for GSEA
+  data_input <- data$avg_log2FC
+  names(data_input) <- data$gene
+  gene_list <- sort(data_input, decreasing = TRUE)
+  
+  # Perform GSEA analysis (adjusted p-value not calculated)
+  gse_result <- gseGO(geneList = gene_list, 
+                      ont = "ALL", 
+                      keyType = "SYMBOL", 
+                      minGSSize = 3, 
+                      maxGSSize = 800, 
+                      pvalueCutoff = 0.05, 
+                      verbose = TRUE, 
+                      OrgDb = organism, 
+                      pAdjustMethod = "none")
+  
+ # Generate dotplot for GSEA results
+  gsea_plot <- dotplot(gse_result, showCategory = 10, split = ".sign") + 
+                facet_grid(.~.sign)
+  
+  # Save the plot using ggsave with a constructed filename
+  ggsave(paste0("dotPlot_[data_name]_GO.png", sep = ""), gsea_plot,
+         width = 30, height = 35, units = "cm", 
+         path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/GSEA/[data_name]")
+  
+  # Similar approach for ridgeplot
+  ridgeplot_plot <- ridgeplot(gse_result) + labs(x = "enrichment distribution")
+  ggsave(paste0("ridge_[data_name]_GO.png", sep = ""), ridgeplot_plot,
+         width = 30, height = 35, units = "cm", 
+         path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/GSEA/[data_name]")
+  
+  # Map gene symbols to ENTREZ IDs
+  ids <- bitr(names(data_input), fromType = "SYMBOL", toType = "ENTREZID", OrgDb = organism)
+  dedup_ids <- ids[!duplicated(ids[c("SYMBOL")]), ]
+  
+  # Filter dataframe based on successful mapping
+  filtered_data <- data[data$gene %in% dedup_ids$SYMBOL, ]
+  filtered_data$Y <- dedup_ids$ENTREZID
+  
+  # Create gene list for KEGG pathway analysis
+  kegg_gene_list <- filtered_data$avg_log2FC
+  names(kegg_gene_list) <- filtered_data$Y
+  kegg_gene_list <- na.omit(kegg_gene_list)
+  kegg_gene_list <- sort(kegg_gene_list, decreasing = TRUE)
+  
+  # Return the gene list for further KEGG analysis (replace 'd' with your KEGG analysis code)
+  return(kegg_gene_list)
+}
+```
+
+```{r}
+data_file <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_neg_MuHV4_filtered.xlsx"
+
+# Analyze GSEA and KEGG pathways
+kegg_gene_list <- analyze_gsea_and_kegg(data_file, organism, my_data)
+```
+
+# 11) GSEA of PR8 Ms4a3 -
+
+```{r}
+data_file <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PR8_neg_filtered.xlsx"
+
+# Analyze GSEA and KEGG pathways
+kegg_gene_list <- analyze_gsea_and_kegg(data_file, organism, my_data)
+```
+
+# 11) GSEA of PR8 Ms4a3 +
+
+```{r}
+data_file <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PR8posfiltered.xlsx"
+
+# Analyze GSEA and KEGG pathways
+kegg_gene_list <- analyze_gsea_and_kegg(data_file, organism, my_data)
+```
+
+# 12) GSEA of PVM Ms4a3 +
+
+```{r}
+data_file <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PVMposfiltered.xlsx"
+
+# Analyze GSEA and KEGG pathways
+kegg_gene_list <- analyze_gsea_and_kegg(data_file, organism, my_data)
+```
+
+# 12) GSEA of PVM Ms4a3 -
+
+```{r}
+data_file <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_PVM_neg_filtered.xlsx"
+
+# Analyze GSEA and KEGG pathways
+kegg_gene_list <- analyze_gsea_and_kegg(data_file, organism, my_data)
+```
+
+# 13) GSEA of MAV1 Ms4a3 -
+
+```{r}
+data_file <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_MAV1_neg_filtered.xlsx"
+
+# Analyze GSEA and KEGG pathways
+kegg_gene_list <- analyze_gsea_and_kegg(data_file, organism, my_data)
+```
+
+# 14) GSEA of MAV1 Ms4a3 +
+
+```{r}
+data_file <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_alveolar_nomock_MAV1posfiltered.xlsx"
+
+# Analyze GSEA and KEGG pathways
+kegg_gene_list <- analyze_gsea_and_kegg(data_file, organism, my_data)
+```
+
+# 19) Heatmap markers daniel 'clusters_gene_set.xlsx' for full object
 
 ```{r}
 
@@ -1155,4 +1877,8 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
   ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
   geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) 
 ggsave("heatmap_daniel_genes_activatedIM.png", width = 20, height = 10, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/")
+```
+
+```{r}
+
 ```
