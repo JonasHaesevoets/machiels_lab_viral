@@ -1809,7 +1809,6 @@ make
 ```{r}
 MuHV4_pos <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h/markers_alveolar_MuHV4p_filtered.xlsx"
 
-# Analyze GSEA and KEGG pathways
 kegg_gene_list <- gsea_GO_KEGG(filename = MuHV4_pos, sample_name = "MuHV4_p", organism = organism)
 ```
 
@@ -1954,7 +1953,45 @@ MAV1_pos <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/D
 kegg_gene_list <- gsea_GO_KEGG(filename = MAV1_pos, sample_name = "MAV1_p", organism = organism)
 ```
 
-# 19) Heatmap markers daniel 'clusters_gene_set.xlsx' for full object
+# 19) Differential expression DNA viruses RNA viuses
+
+```{r}
+# Identify rows with specific virus types (modify as needed)
+muhv4_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "MuHV4")
+mav1_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "MAV1")
+pr8_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "PR8")
+pvm_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "PVM")
+mock_rows <- which(seurat_d60_1_alveolar@meta.data$virus == "Mock")  # Identify Mock rows
+
+# Create logical vectors
+is_dna_virus <- logical(length(seurat_d60_1_alveolar@meta.data$virus))
+is_rna_virus <- logical(length(seurat_d60_1_alveolar@meta.data$virus))
+is_mock <- logical(length(seurat_d60_1_alveolar@meta.data$virus))  # New vector for Mock
+
+# Assign TRUE to corresponding elements in logical vectors
+is_dna_virus[muhv4_rows] <- TRUE
+is_dna_virus[mav1_rows] <- TRUE
+
+is_rna_virus[pr8_rows] <- TRUE
+is_rna_virus[pvm_rows] <- TRUE
+
+is_mock[mock_rows] <- TRUE  # Assign TRUE to Mock rows
+
+# Combine classifications (modify if needed for more categories)
+virus_classification <- ifelse(is_dna_virus, "DNA_virus",
+                               ifelse(is_rna_virus, "RNA_virus", "Mock"))
+
+# Add the new metadata column
+seurat_d60_1_alveolar <- AddMetaData(seurat_d60_1_alveolar, metadata = virus_classification, col.name = "virus_classification")
+
+
+```
+
+```{r}
+
+```
+
+# 22) Heatmap markers daniel 'clusters_gene_set.xlsx' for full object
 
 ```{r}
 
