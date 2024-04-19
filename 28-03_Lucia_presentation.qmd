@@ -180,6 +180,18 @@ ggsave("tissueDays_clusters_originalIntegratedSeuratObject.png", path = "../../D
 ```
 
 ```{r}
+FeaturePlot(obj.v5, feature = "C5ar1", label = T, label.size = 6)
+ggsave("obj_v5_c5ar1_improved.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG")
+
+FeaturePlot(obj.v5, features = "Pparg", label = T, label.size = 6)
+ggsave("obj_v5_pparg_improved.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG")
+
+
+FeaturePlot(obj.v5, features = "Mafb", label = T, label.size = 6)
+ggsave("obj_v5_mafb_improved.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG")
+```
+
+```{r}
 #| fig-width: 18
 #| fig-height: 18
 samples <- obj.v5$day_mock_sample_type_mockTissueIncluded |> unique()
@@ -375,6 +387,20 @@ group_by(.feature,harmony_cluster_8dims_rough) |>
 ggsave("RNA_noFabp5_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG")
 ```
 
+```{r}
+obj.v5 |>
+  join_features(c("Pparg", "C5AR1","Itgax", "SiglecF", "Ccr2", "Ly6c1"),assay="RNA", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("RNA_pparg_cd88_itgax_siglecf_ccr2_ly6c_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG")
+```
+
 # 4) Compositional Analysis
 
 ## 4A) cluster frequencies per group
@@ -453,28 +479,84 @@ obj.v5 |>
 ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG",  height = 20, width = 30, units = "cm")
 ```
 
+## 4c) Heatmap cluster 5 pparg
+
+```{r}
+obj.v5_onlycluster5 =  subset(obj.v5, idents = c(5))
+obj.v5_onlycluster5 |> 
+
+  as_tibble() |>  # Convert obj.v5 to a tibble
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+  mutate(sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  dplyr::group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |> 
+  dplyr::count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |> 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+  mutate(freq_cluster=n/sum(n)) |> 
+  mutate(condition=as.character(condition)) |> 
+  na.omit() |> 
+  join_features("Pparg",assay="RNA", slot="scale.data")  |> 
+  group_by(harmony_cluster_8dims_rough) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
+  geom_tile()+ 
+  ggh4x::facet_nested_wrap(
+    vars(day,condition), nrow = 1,drop = TRUE,scales = "free_x"
+  )+theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))   + scale_fill_gradient2(  low = "blue",
+  mid = "white",
+  high = "red")+ggtitle("proportions of cells from a given sample distributed across clusters ",
+                        "Ms4a3 classification as sorted")
+
+
+ggsave(filename = "cluster5_pparg.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG/",  height = 20, width = 30, units = "cm")
+```
+
 # 5) Finding cluster markers for full integrated object (obj.v5)
 
 ```{r, echo=FALSE}
-# markers_all <- FindAllMarkers(obj.v5,
-#                           assay = "RNA", 
-#                           logfc.threshold = 0.5,
-#                           test.use = "wilcox", 
-#                           min.pct = 0.2)
+markers_all <- FindAllMarkers(obj.v5,
+                          assay = "RNA",
+                          logfc.threshold = 0.5,
+                          test.use = "wilcox",
+                          min.pct = 0.2)
 
 ```
 
 ```{r}
-# markers_d60_alveolar_filtered = markers_d60_alveolar[markers_d60_alveolar$avg_log2FC > 1,]
-# nonsignficant_p_adj_d60_alveolar <- which(markers_d60_alveolar_filtered$p_val_adj <= 0.05)
-# markers_d60_alveolar_filtered <- markers_d60_alveolar_filtered[nonsignficant_p_adj_d60_alveolar, ]
-# write_xlsx(markers_d60_alveolar_filtered, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/all_markers_filtered_alveolarD60_recluster.xlsx")
+markers_all_filtered = markers_all[markers_all$avg_log2FC > 1,]
+nonsignficant_p_adj_all <- which(markers_all_filtered$p_val_adj <= 0.05)
+markers_all_filtered <- markers_all_filtered[nonsignficant_p_adj_all, ]
+write_xlsx(markers_all_filtered, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/all_markers_filtered_alveolarD60_recluster.xlsx")
+
+fullobj_top20 =  select_top_genes(markers_all_filtered, n = 20)
+write_xlsx(fullobj_top20, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/top20_all_markers.xlsx")
+
+
 ```
 
 ```{r}
-# markers_filtered_all = readxl::read_xlsx("../../Documents/machiels_lab_viral/output/markers_all_filtered.xlsx") 
-# top_20_all <- select_top_genes(markers_filtered_all, n = 20)
-# write_xlsx(top_20_all, "../../Documents/machiels_lab_viral/output/top_20_all_correct.xlsx")
+fullobj_top5 =  select_top_genes(markers_all_filtered, n = 5)
+genes_fullobj_top5 = fullobj_top5$gene
+genes_fullobj_top5
+
+obj.v5 |>
+  join_features(c("Wfdc10", "Lipf", "Acaa1b", "Lepr", "Spag11b", "Rpusd3", "Car4", "Gm34907", "Wfdc21", "Stac2", "Gm15056", "Ccl8", "Arg1", "Ms4a14", "C1qa", "F13a1", "Vcan", "Cd177", "Thbs1", "F5", "Cd7", "Sept3", "Cd209a", "Xcr1", "Itgae", "Tgm3", "S1pr5", "Gm16120", "Slc12a2", "Gjb2", "Pbk", "Esco2", "Pimreg", "Nek2", "Pclaf", "Adhfe1", "Ear6", "Serpina3f", "Cfb", "Slc39a2", "Fscn1", "Gm37422", "Cacnb3", "1810064F22Rik", "Ccr7", "Pmp22", "Mmp12", "H2-M2", "Apoe", "Pianp", "S100a9", "Stfa2l1", "Gm5483", "Asprv1", "Il1f9"),assay="RNA", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("RNA_seurat_mean_top5_fullobject dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/seuratOG", width = 20)
+
 ```
 
 # 6) Reclustering of alveolar macrophages at d60 (clusters 0 1 5 6 7)
@@ -494,12 +576,11 @@ ggsave("dimplot_original_D60.png", path =  "../../Documents/machiels_lab_viral/2
 ```
 
 ```{r}
-seurat_d60 = obj.v5 %>% filter(str_detect(day_factor, "d60"))
-seurat_d60_1 = seurat_d60  %>% filter(!str_detect(day_mock_sample_type, "Mock"))
-seurat_d60_1_alveolar =  subset(seurat_d60_1, idents = c(0,1,5,6,7))
-seurat_d60_1_alveolar = seurat_d60_1_alveolar %>%  filter(!str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "Gabbr2_pos_Ms4a3_neg"))
-DimPlot(seurat_d60_1_alveolar, label = T)
-ggsave("dimplot_original.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
+seurat_d60d8_1 = obj.v5  %>% filter(!str_detect(day_mock_sample_type, "Mock"))
+seurat_d60d8_1_alveolar =  subset(seurat_d60d8_1, idents = c(0,1,5,6,7))
+seurat_d60d8_1_alveolar = seurat_d60d8_1_alveolar %>%  filter(!str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "Gabbr2_pos_Ms4a3_neg"))
+DimPlot(seurat_d60d8_1_alveolar, label = T)
+ggsave("dimplot_recluster.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
 ## 6a) Sanity checks to see if the new seurat object is correctly initialized
@@ -508,52 +589,53 @@ ggsave("dimplot_original.png", path =  "../../Documents/machiels_lab_viral/28-03
 # check if it contains bal and lung samples
 metadata_column <- "day"  
 value_to_check <- "d8"    
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 metadata_column = "day_sample_type_cond_ms4a3_pos_gabbr2"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 
 value_to_check = "d60"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 value_to_check = "bal"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 metadata_column = "sample_type"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 value_to_check = "lung"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 metadata_column = "day_sample_type_cond_ms4a3_pos_gabbr2"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 value_to_check = "Mock"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 metadata_column = "condition"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 metadata_column = "day_mock_sample_type_mockTissueIncluded"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 metadata_column = "day"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar, metadata_column, value_to_check)
 ```
 
 ## 6b) reclustering of alveolar clusters at d60, UMAP stored as umap.harmony_8dims_reclusterumap.harmony_8dims_recluster
 
 ```{r, echo=FALSE}
-# seurat_d60_1_alveolar = SCTransform(seurat_d60_1_alveolar, vst.flavor = 'v2')
-# seurat_d60_1_alveolar <- FindNeighbors(seurat_d60_1_alveolar,  assay = "SCT", graph.name = "harmony_cluster_8dims_rough")  
-# seurat_d60_1_alveolar <- FindClusters(seurat_d60_1_alveolar, resolution = 0.25, cluster.name = "harmony_cluster_8dims_rough", graph.name = "harmony_cluster_8dims_rough" )
-# seurat_d60_1_alveolar <- RunUMAP(seurat_d60_1_alveolar, reduction = "integrated.harmony", dims = 1:8, reduction.name = "umap.harmony_8dims_recluster", assay = "SCT")
-# seurat_d60_1_alveolar@reductions$umap.harmony_8dims_recluster
-# DimPlot(seurat_d60_1_alveolar, label = TRUE, group.by = "harmony_cluster_8dims_rough_res.0.25")
+# seurat_d60d8_1_alveolar = SCTransform(seurat_d60d8_1_alveolar, vst.flavor = 'v2')
+# seurat_d60d8_1_alveolar <- FindNeighbors(seurat_d60d8_1_alveolar,  assay = "SCT", graph.name = "harmony_cluster_8dims_rough")  
+# seurat_d60d8_1_alveolar <- FindClusters(seurat_d60d8_1_alveolar, resolution = 0.25, cluster.name = "harmony_cluster_8dims_rough", graph.name = "harmony_cluster_8dims_rough" )
+# seurat_d60d8_1_alveolar <- RunUMAP(seurat_d60d8_1_alveolar, reduction = "integrated.harmony", dims = 1:8, reduction.name = "umap.harmony_8dims_recluster", assay = "SCT")
+# seurat_d60d8_1_alveolar@reductions$umap.harmony_8dims_recluster
+# DimPlot(seurat_d60d8_1_alveolar, label = TRUE, group.by = "harmony_cluster_8dims_rough_res.0.25")
 # ggsave("dimplot_recluster.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 
 ```
 
 ```{r, echo=FALSE}
-seurat_d60_1_alveolar = FindVariableFeatures(seurat_d60_1_alveolar)
-seurat_d60_1_alveolar = NormalizeData(seurat_d60_1_alveolar)
-seurat_d60_1_alveolar = ScaleData(seurat_d60_1_alveolar)
-seurat_d60_1_alveolar <- FindNeighbors(seurat_d60_1_alveolar, reduction = "integrated.harmony", dims = 1:8)
-seurat_d60_1_alveolar <- FindClusters(seurat_d60_1_alveolar, cluster.name = "harmony_cluster_8dims_rough", resolution = 0.25)
+seurat_d60d8_1_alveolar = FindVariableFeatures(seurat_d60d8_1_alveolar)
+seurat_d60d8_1_alveolar = NormalizeData(seurat_d60d8_1_alveolar)
+seurat_d60d8_1_alveolar = ScaleData(seurat_d60d8_1_alveolar)
+seurat_d60d8_1_alveolar <- FindNeighbors(seurat_d60d8_1_alveolar, reduction = "integrated.harmony", dims = 1:8)
+seurat_d60d8_1_alveolar <- FindClusters(seurat_d60d8_1_alveolar, cluster.name = "harmony_cluster_8dims_rough", resolution = 0.25)
 
-seurat_d60_1_alveolar <- RunUMAP(seurat_d60_1_alveolar, reduction = "integrated.harmony", dims = 1:8, reduction.name = "umap.harmony_8dims_recluster")
-seurat_d60_1_alveolar|> DimPlot(group.by = "harmony_cluster_8dims_rough", label=T)
+seurat_d60d8_1_alveolar <- RunUMAP(seurat_d60d8_1_alveolar, reduction = "integrated.harmony", dims = 1:8, reduction.name = "umap.harmony_8dims_recluster")
+seurat_d60d8_1_alveolar|> DimPlot(group.by = "harmony_cluster_8dims_rough", label=T)
+ggsave("dimplot_recluster.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
 scCustomize package used instead to generate the featureplots, the standard feature plots generated using Seurat have non expressing cells as part of the same color scale. In featureplot_scCustomize the parameter na_cutoff is used to plot only positive non-zero values using color scale and zero/negative values as NA. To plot all values using color palette set to `NA`.
@@ -561,21 +643,21 @@ scCustomize package used instead to generate the featureplots, the standard feat
 ## 6c) dimplots for Ms4a3 + -
 
 ```{r}
-DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", colors_use = c("purple", "cyan", "lightgreen", "red", "orange", "blue", "pink"))
+DimPlot_scCustom(seurat_d60d8_1_alveolar, split.by = "condition", colors_use = c("purple", "cyan", "lightgreen", "red", "orange", "blue", "pink"))
 ggsave("dimplot_virus.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
 ## 6d)dimplots for tissue
 
 ```{r}
-DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sample_type",colors_use = c("blue", "orange"))
+DimPlot_scCustom(seurat_d60d8_1_alveolar, split.by = "condition", group.by = "sample_type",colors_use = c("blue", "orange"))
 ggsave("dimplot_virusGroupedTissue.png", width = 40, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
 ## 6e) dimplots for Ms4a3 + -
 
 ```{r}
-DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "condition", group.by = "sampletag_Ms4a3", colors_use = c("darkgrey", "red") )
+DimPlot_scCustom(seurat_d60d8_1_alveolar, split.by = "condition", group.by = "sampletag_Ms4a3", colors_use = c("darkgrey", "red") )
 ggsave("dimplot_virusGroupedMs4a3.png", width = 40, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
@@ -583,10 +665,10 @@ ggsave("dimplot_virusGroupedMs4a3.png", width = 40, height = 30, units = "cm", p
 
 ```{r}
 
-seurat_d60_1_alveolar@meta.data$sampletag_name_factor = factor(seurat_d60_1_alveolar@meta.data$sampletag_name, levels = sort(unique(seurat_d60_1_alveolar$sampletag_name)))
+seurat_d60d8_1_alveolar@meta.data$sampletag_name_factor = factor(seurat_d60d8_1_alveolar@meta.data$sampletag_name, levels = sort(unique(seurat_d60d8_1_alveolar$sampletag_name)))
 
-Idents(seurat_d60_1_alveolar) = "sampletag_name_factor"
-DimPlot_scCustom(seurat_d60_1_alveolar, split.by = "sampletag_name_factor", num_columns = 10, colors_use = c("red", "orange", "black", "darkgrey", "blue", "cyan", "green", "lightgreen", "purple", "pink"), label = F)
+Idents(seurat_d60d8_1_alveolar) = "sampletag_name_factor"
+DimPlot_scCustom(seurat_d60d8_1_alveolar, split.by = "sampletag_name_factor", num_columns = 10, colors_use = c("red", "orange", "black", "darkgrey", "blue", "cyan", "green", "lightgreen", "purple", "pink"), label = F)
 ggsave("dimplot_virusGroupedMs4a3_virus.png", width = 49 , path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
@@ -624,7 +706,7 @@ ggsave("heatmap_celltypes.png", width = 60, height = 50, units = "cm", bg = 'whi
 
 ```{r}
 
-dimplot_Ms4a3 = DimPlot_scCustom(seurat_d60_1_alveolar, group.by = "sampletag_Ms4a3",  colors_use = c("darkgrey", "red"))
+dimplot_Ms4a3 = DimPlot_scCustom(seurat_d60d8_1_alveolar, group.by = "sampletag_Ms4a3",  colors_use = c("darkgrey", "red"))
 dimplot_Ms4a3
 ggsave("umap_Ms4a3.png", bg = 'white',  path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar//")
 
@@ -636,8 +718,8 @@ ggsave("umap_Ms4a3.png", bg = 'white',  path =  "../../Documents/machiels_lab_vi
 
 
 pallet = viridis(n = 10, option = "D")
-Idents(seurat_d60_1_alveolar) = "sampletag_name"
-DimPlot_All_Samples(seurat_d60_1_alveolar, meta_data_column = 'sampletag_name', colors_use = pallet, num_columns = 10)
+Idents(seurat_d60d8_1_alveolar) = "sampletag_name"
+DimPlot_All_Samples(seurat_d60d8_1_alveolar, meta_data_column = 'sampletag_name', colors_use = pallet, num_columns = 10)
 
 ggsave("umap_Ms4a3_virus.png", bg = 'white', width = 49 , path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar/")
 ```
@@ -645,31 +727,31 @@ ggsave("umap_Ms4a3_virus.png", bg = 'white', width = 49 , path =  "../../Documen
 ## 6i) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
-Idents(seurat_d60_1_alveolar) = "seurat_clusters"
-DefaultAssay(seurat_d60_1_alveolar) = "adt"
+Idents(seurat_d60d8_1_alveolar) = "seurat_clusters"
+DefaultAssay(seurat_d60d8_1_alveolar) = "adt"
 umap_am_alveolar_d60 <- list()
 pallet = viridis(n = 10, option = "D")
 genes_AM <- c("H2-ia-ie-AbSeq", "Cd11c", "Siglecf-AbSeq", "Cd274-AbSeq")
 
 markers_am = unique(genes_AM)
 for (i in markers_am) {
-  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar,  features = i, label = FALSE, label.size = 5,  split.by = "sampletag_Ms4a3", colors_use = pallet, label_feature_yaxis = FALSE )
+  plot <- FeaturePlot_scCustom(seurat_d60d8_1_alveolar,  features = i, label = FALSE, label.size = 5,  split.by = "sampletag_Ms4a3", colors_use = pallet, label_feature_yaxis = FALSE )
   
 }
 # Arrange plots using ggarrange
-ggarrange(plotlist = umap_am_alveolar_d60, nrow = 4)
+ggarrange(plotlist = umap_am_alveolar_d60)
 ggsave("abseq_featureplot_AM_alveolar_Ms4a3_scCustomize.png", width = 60, height = 90, units = "cm", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/Alveolar")
 ```
 
 ```{r}
-DefaultAssay(seurat_d60_1_alveolar) = "adt"
+DefaultAssay(seurat_d60d8_1_alveolar) = "adt"
 umap_am_alveolar_d60 <- list()
 pallet = viridis(n = 10, option = "D")
 genes_AM <- c("H2-ia-ie-AbSeq", "Cd11c", "Siglecf-AbSeq", "Cd274-AbSeq")
 
 # Define a function to create and save the plot
 create_and_save_plot <- function(gene) {
-  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar, 
+  plot <- FeaturePlot_scCustom(seurat_d60d8_1_alveolar, 
                               features = gene, 
                               label = TRUE, 
                               label.size = 5, 
@@ -698,7 +780,7 @@ for (i in genes_AM) {
 ## 6j) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
-DefaultAssay(seurat_d60_1_alveolar) = "RNA"
+DefaultAssay(seurat_d60d8_1_alveolar) = "RNA"
 genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
 
 umap_am_alveolar_d60 <- list()
@@ -706,7 +788,7 @@ pallet = viridis(n = 10, option = "D")
 
 markers_am = unique(genes_AM)
 for (i in markers_am) {
-  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar,   features = i, label = TRUE, label.size = 5,  split.by = "sampletag_Ms4a3", colors_use = pallet, label_feature_yaxis = FALSE)
+  plot <- FeaturePlot_scCustom(seurat_d60d8_1_alveolar,   features = i, label = TRUE, label.size = 5,  split.by = "sampletag_Ms4a3", colors_use = pallet, label_feature_yaxis = FALSE)
   umap_am_alveolar_d60[[i]] <- plot
 }
 # Arrange plots using ggarrange
@@ -715,14 +797,14 @@ ggsave("featureplot_AM_alveolar_Ms4a3_scCustomize.png", width = 60, height = 90,
 ```
 
 ```{r}
-DefaultAssay(seurat_d60_1_alveolar) = "RNA"
+DefaultAssay(seurat_d60d8_1_alveolar) = "RNA"
 genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
 
 pallet = viridis(n = 10, option = "D")
 
 # Define a function to create and save the plot
 create_and_save_plot <- function(gene) {
-  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar, 
+  plot <- FeaturePlot_scCustom(seurat_d60d8_1_alveolar, 
                               features = gene, 
                               label = TRUE, 
                               label.size = 5, 
@@ -751,7 +833,7 @@ for (i in genes_AM) {
 ## 6k) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
-DefaultAssay(seurat_d60_1_alveolar) = "adt"
+DefaultAssay(seurat_d60d8_1_alveolar) = "adt"
 genes_AM <- c("H2-ia-ie-AbSeq", "Cd11c", "Siglecf-AbSeq", "Cd274-AbSeq")
 
 umap_am_alveolar_d60 <- list()
@@ -759,7 +841,7 @@ pallet = viridis(n = 10, option = "D")
 
 markers_am = unique(genes_AM)
 for (i in markers_am) {
-  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar,   features = i, label = TRUE, label.size = 5,  split.by = "sample_type", colors_use = pallet, label_feature_yaxis = FALSE)
+  plot <- FeaturePlot_scCustom(seurat_d60d8_1_alveolar,   features = i, label = TRUE, label.size = 5,  split.by = "sample_type", colors_use = pallet, label_feature_yaxis = FALSE)
   umap_am_alveolar_d60[[i]] <- plot
 }
 # Arrange plots using ggarrange
@@ -768,14 +850,14 @@ ggsave("abseq_featureplot_AM_alveolar_tissue_scCustomize.png", width = 60, heigh
 ```
 
 ```{r}
-DefaultAssay(seurat_d60_1_alveolar) = "adt"
+DefaultAssay(seurat_d60d8_1_alveolar) = "adt"
 genes_AM <- c("H2-ia-ie-AbSeq", "Cd11c", "Siglecf-AbSeq", "Cd274-AbSeq")
 
 pallet = viridis(n = 10, option = "D")
 
 # Define a function to create and save the plot
 create_and_save_plot <- function(gene) {
-  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar, 
+  plot <- FeaturePlot_scCustom(seurat_d60d8_1_alveolar, 
                               features = gene, 
                               label = TRUE, 
                               label.size = 5, 
@@ -812,7 +894,7 @@ genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
 
 markers_am = unique(genes_AM)
 for (i in markers_am) {
-  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar,  features = i, label = TRUE, label.size = 5,  split.by = "sample_type", colors_use = pallet, label_feature_yaxis = FALSE)
+  plot <- FeaturePlot_scCustom(seurat_d60d8_1_alveolar,  features = i, label = TRUE, label.size = 5,  split.by = "sample_type", colors_use = pallet, label_feature_yaxis = FALSE)
   umap_am_alveolar_d60[[i]] <- plot
 }
 # Arrange plots using ggarrange
@@ -827,7 +909,7 @@ genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
 
 # Define a function to create and save the plot
 create_and_save_plot <- function(gene) {
-  plot <- FeaturePlot_scCustom(seurat_d60_1_alveolar, 
+  plot <- FeaturePlot_scCustom(seurat_d60d8_1_alveolar, 
                               features = gene, 
                               label = TRUE, 
                               label.size = 5, 
@@ -857,7 +939,7 @@ for (i in genes_AM) {
 ## **6m) Z-scores of cluster frequencies: heatmap**
 
 ```{r}
-seurat_d60_1_alveolar |> 
+seurat_d60d8_1_alveolar |> 
   as_tibble() |>  # Convert obj.v5 to a tibble
   mutate(day=ifelse(condition=="Mock",condition,day)) |> 
   mutate(sample_type=as_factor(sample_type),
@@ -891,67 +973,114 @@ ggsave(filename = "proportions of cells from a given sample distributed across c
 ## 6n) PC plot showing Ms4a3 +/- distribution for all conditions for BAL
 
 ```{r}
-seurat_d60_1_alveolar_bal = seurat_d60_1_alveolar %>% filter(str_detect(sample_type, "bal"))
-seurat_d60_1_alveolar_bal = FindVariableFeatures(seurat_d60_1_alveolar_bal)
-seurat_d60_1_alveolar_bal = NormalizeData(seurat_d60_1_alveolar_bal)
-seurat_d60_1_alveolar_bal = ScaleData(seurat_d60_1_alveolar_bal)
-DimPlot(seurat_d60_1_alveolar_bal, reduction = "pca", group.by = "condition")
+seurat_d60d8_1_alveolar_bal = seurat_d60d8_1_alveolar %>% filter(str_detect(sample_type, "bal"))
+seurat_d60d8_1_alveolar_bal = FindVariableFeatures(seurat_d60d8_1_alveolar_bal)
+seurat_d60d8_1_alveolar_bal = NormalizeData(seurat_d60d8_1_alveolar_bal)
+seurat_d60d8_1_alveolar_bal = ScaleData(seurat_d60d8_1_alveolar_bal)
+DimPlot(seurat_d60d8_1_alveolar_bal, reduction = "pca", group.by = "condition")
 ggsave("pcaplot_alveolar_bal_virus.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
-DimPlot(seurat_d60_1_alveolar_bal, reduction = "pca", group.by = "sampletag_Ms4a3")
+DimPlot(seurat_d60d8_1_alveolar_bal, reduction = "pca", group.by = "sampletag_Ms4a3")
 ggsave("pcaplot_alveolar_bal_Ms4a3.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
-DimPlot(seurat_d60_1_alveolar_bal, reduction = "pca", group.by = "sampletag_name")
+DimPlot(seurat_d60d8_1_alveolar_bal, reduction = "pca", group.by = "sampletag_name")
 ggsave("pcaplot_alveolar_bal_Ms4a3_virus.png", path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
 ```
 
 ```{r}
 value_to_check = "lung"
 metadata_column = "day_sample_type_cond_ms4a3_pos_gabbr2"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar_bal, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar_bal, metadata_column, value_to_check)
 
 metadata_column = "sample_type"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar_bal, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar_bal, metadata_column, value_to_check)
 
 value_to_check = "bal"
 metadata_column = "day_sample_type_cond_ms4a3_pos_gabbr2"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar_lung, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar_lung, metadata_column, value_to_check)
 
 metadata_column = "sample_type"
-value_present <- check_metadata_presence(seurat_d60_1_alveolar_lung, metadata_column, value_to_check)
+value_present <- check_metadata_presence(seurat_d60d8_1_alveolar_lung, metadata_column, value_to_check)
 ```
 
 ## 6o) PC plot showing Ms4a3 +/- distribution for all conditions for LUNG
 
 ```{r}
-seurat_d60_1_alveolar_lung = seurat_d60_1_alveolar %>% filter(str_detect(sample_type, "lung"))
-seurat_d60_1_alveolar_lung = FindVariableFeatures(seurat_d60_1_alveolar_lung)
-seurat_d60_1_alveolar_lung = NormalizeData(seurat_d60_1_alveolar_lung)
-seurat_d60_1_alveolar_lung = ScaleData(seurat_d60_1_alveolar_lung)
+seurat_d60d8_1_alveolar_lung = seurat_d60d8_1_alveolar %>% filter(str_detect(sample_type, "lung"))
+seurat_d60d8_1_alveolar_lung = FindVariableFeatures(seurat_d60d8_1_alveolar_lung)
+seurat_d60d8_1_alveolar_lung = NormalizeData(seurat_d60d8_1_alveolar_lung)
+seurat_d60d8_1_alveolar_lung = ScaleData(seurat_d60d8_1_alveolar_lung)
 
-DimPlot(seurat_d60_1_alveolar_lung, reduction = "pca", group.by = "condition")
+DimPlot(seurat_d60d8_1_alveolar_lung, reduction = "pca", group.by = "condition")
 ggsave("pcaplot_alveolar_lung_condition.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
-DimPlot(seurat_d60_1_alveolar_lung, reduction = "pca", group.by = "sampletag_Ms4a3")
+DimPlot(seurat_d60d8_1_alveolar_lung, reduction = "pca", group.by = "sampletag_Ms4a3")
 ggsave("pcaplot_alveolar_lung_Ms4a3.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
-DimPlot(seurat_d60_1_alveolar_lung, reduction = "pca", group.by = "sampletag_name")
+DimPlot(seurat_d60d8_1_alveolar_lung, reduction = "pca", group.by = "sampletag_name")
 ggsave("pcaplot_alveolar_lung_condition_Ms4a3.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
 ```
 
+## 6p) PC plot showing Ms4a3 and sample type 
+
+```{r}
+DimPlot(seurat_d60d8_1_alveolar, reduction = "pca", group.by = "sampletag_name", split.by = "sample_type")
+ggsave("pcaplot_alveolar_bal_lung_condition_Ms4a3.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
+```
+
+## 6q) heatmap 4b but for seurat_d60d8_1_alveolar
+
+```{r}
+seurat_d60d8_1_alveolar |> 
+  as_tibble() |>  # Convert obj.v5 to a tibble
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+  mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                   "viral.experiment.2"="d8") )) |> 
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+  mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         harmony_cluster_8dims_rough=as_factor(harmony_cluster_8dims_rough)
+         ) |> 
+  dplyr::group_by(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough) |> 
+  dplyr::count(day,sample_type, condition,sampletag_Ms4a3,harmony_cluster_8dims_rough, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |> 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+  mutate(freq_cluster=n/sum(n)) |> 
+  mutate(condition=as.character(condition)) |> 
+  na.omit() |>  # This is where the error occurs, likely because the object isn't a data frame or tibble
+  group_by(harmony_cluster_8dims_rough) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+  ggplot(aes(condition,harmony_cluster_8dims_rough, fill=cluster_mean_freq_zscore)) +
+  geom_tile()+ 
+  ggh4x::facet_nested_wrap(
+    vars(sampletag_Ms4a3,sample_type ,day), nrow = 1,drop = TRUE,scales = "free_x"
+  )+theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))   + scale_fill_gradient2(  low = "blue",
+  mid = "white",
+  high = "red")+ggtitle("proportions of cells from a given sample distributed across clusters ",
+                        "Ms4a3 classification as sorted")
+
+ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar/",  height = 20, width = 30, units = "cm")
+```
+
+## 6r) obj.v5 (central object) featureplot adt cd11c siglecf
+
 ```{r}
 DefaultAssay(obj.v5) = "adt"
-plot_cd11c = FeaturePlot_scCustom(obj.v5, features = c("Cd11c"), colors_use = pallet)
+plot_cd11c = FeaturePlot(obj.v5, features = c("Cd11c"))
+
 plot_cd11c + scale_fill_continuous(limits = c(0, 15)) +
   scale_color_continuous(limits = c(0, 15)) +
   scale_size_continuous(limits = c(0, 15))
 ggsave("cd11c_abseq.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG/" )
+```
 
-
-plot_siglecf = FeaturePlot_scCustom(obj.v5, features = c("Siglecf-AbSeq"), colors_use = pallet)
-plot_siglecf + scale_fill_continuous(limits = c(0, 15)) +
+```{r}
+plot_siglecf = FeaturePlot(obj.v5, features = c("Siglecf-AbSeq"))
+plot_siglecf + scale_fill_continuous(limits = c(0, 15)) +  # Remove extra space here
   scale_color_continuous(limits = c(0, 15)) +
   scale_size_continuous(limits = c(0, 15))
-ggsave("siglecf_abseq.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG/" )
+ggsave("siglecf_abseq.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG/")
 DefaultAssay(object = obj.v5) = "RNA"
-
-
 ```
 
 # 7) DEA of the reclustered object
@@ -959,34 +1088,35 @@ DefaultAssay(object = obj.v5) = "RNA"
 ## 7a) find the markers of each cluster =\> no DEA yet
 
 ```{r, echo=FALSE}
-markers_d60_alveolar <- FindAllMarkers(seurat_d60_1_alveolar,
+markers_d60d8_alveolar <- FindAllMarkers(seurat_d60d8_1_alveolar,
                           assay = "RNA", 
                           logfc.threshold = 0.5,
                           test.use = "wilcox", 
                           min.pct = 0.2)
-write_xlsx(markers_d60_alveolar, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_d60_alveolar.xlsx")
+write_xlsx(markers_d60d8_alveolar, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_d60_alveolar.xlsx")
 ```
 
 ```{r}
-markers_d60_alveolar_filtered = markers_d60_alveolar[markers_d60_alveolar$avg_log2FC > 1,]
-nonsignficant_p_adj_d60_alveolar <- which(markers_d60_alveolar_filtered$p_val_adj <= 0.05)
-markers_d60_alveolar_filtered <- markers_d60_alveolar_filtered[nonsignficant_p_adj_d60_alveolar, ]
-write_xlsx(markers_d60_alveolar_filtered, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_d60_alveolar_filtered.xlsx")
+markers_d60d8_alveolar_filtered = markers_d60d8_alveolar[markers_d60d8_alveolar$avg_log2FC > 1,]
+nonsignficant_p_adj_d60_alveolar <- which(markers_d60d8_alveolar_filtered$p_val_adj <= 0.05)
+markers_d60d8_alveolar_filtered <- markers_d60d8_alveolar_filtered[nonsignficant_p_adj_d60_alveolar, ]
+write_xlsx(markers_d60d8_alveolar_filtered, path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_d60d8_alveolar_filtered.xlsx")
 ```
 
 ```{r}
 #select top 20 genes from each cluster
 
-markers_d60_alveolar_filtered = data.frame(markers_d60_alveolar_filtered)
+markers_d60d8_alveolar_filtered = data.frame(markers_d60d8_alveolar_filtered)
 
-top_d60_alveolar <- select_top_genes(markers_d60_alveolar_filtered, n = 20)
-write_xlsx(top_d60_alveolar,path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/top20_per_cluster_markers_d60_alveolar.xlsx")
+top_d60d8_alveolar <- select_top_genes(markers_d60d8_alveolar_filtered, n = 20)
+write_xlsx(top_d60d8_alveolar,path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/top20_per_cluster_markers_d60d8_alveolar.xlsx")
 ```
 
 ```{r}
-top_d60_alveolar5 <- select_top_genes(markers_d60_alveolar_filtered, n = 10)
+top_d60d8_alveolar5 <- select_top_genes(markers_d60d8_alveolar_filtered, n = 5)
 
-genes_d60_alveolar = top_d60_alveolar5$gene
+genes_d60d8_alveolar = top_d60d8_alveolar5$gene
+genes_d60d8_alveolar = as.factor(genes_d60d8_alveolar)
 
 # Library loading (assuming libraries are already loaded)
 # library(ggplot2)
@@ -994,69 +1124,83 @@ genes_d60_alveolar = top_d60_alveolar5$gene
 # library(dplyr)
 # library(Seurat)
 
-# Assuming top_d60_alveolar5 is available (replace with actual selection logic if needed)
-genes_d60_alveolar <- top_d60_alveolar5$gene
 
 # Seurat analysis pipeline (adapted to use genes_d60_alveolar)
-seurat_d60_1_alveolar %>%
-  join_features(genes_d60_alveolar, assay = "RNA", slot = "scale.data") %>%  # Use genes_d60_alveolar for joining
-  group_by(genes_d60_alveolar, harmony_cluster_8dims_rough) %>%
-  summarise(mean_scaled_dsb = mean(.abundance_RNA)) %>%
-  # ... (rest of the code remains the same) ...
-  ggplot(aes(reorder(genes_d60_alveolar, harmony_cluster_8dims_rough), harmony_cluster_8dims_rough, fill = zscore_mean_scaled_dsb)) +
-  geom_tile() +
-  scale_fill_viridis() +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+seurat_d60d8_1_alveolar %>% as_tibble() %>% 
+  join_features(genes_d60d8_alveolar, assay = "RNA", slot = "scale.data") %>%  # Use genes_d60_alveolar for joining
+  group_by(genes_d60d8_alveolar,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
+  group_by(genes_d60d8_alveolar) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("RNA_seurat_clusters_top5_alveolar dsb-normalized protein counts, z-score of cluster averages per marker.svg", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar/", width = 20)
+
+```
+
+postscript("RNA_markers_alveolar_mean dsb-normalized protein counts, z-score of cluster averages per marker.eps", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar/", width = 15)
+
+```{r}
+
+genes_d60_d8_cluster = as.factor(c("Esco2", "Cdca7", "Cxcl2", "Nos2", "Tmem26", "Lipf", "Pbk", "Ung", "Hilpda", "Ifit1", "Ifitm6", "Sema3e", "Nek2", "Mcm6", "Nr4a3", "Cxcl9", "Gjb2", "Sema3e", "Ska1", "Mcm2", "Cxcr1", "Ifit2", "Adgre4", "Colec12", "Pimreg", "Fignl1", "Il1a", "Serpina3f", "Pglyrp1", "Oaf", "Plac8", "Marco", "Cd93", "Lrg1", "Mmp8", "Spp1", "S100a6"))
+seurat_d60d8_1_alveolar |>
+  join_features(as.factor(c("Esco2", "Cdca7", "Cxcl2", "Nos2", "Tmem26", "Lipf", "Pbk", "Ung", "Hilpda", "Ifit1", "Ifitm6", "Sema3e", "Nek2", "Mcm6", "Nr4a3", "Cxcl9", "Gjb2", "Sema3e", "Ska1", "Mcm2", "Cxcr1", "Ifit2", "Adgre4", "Colec12", "Pimreg", "Fignl1", "Il1a", "Serpina3f", "Pglyrp1", "Oaf", "Plac8", "Marco", "Cd93", "Lrg1", "Mmp8", "Spp1", "S100a6"
+                  )),assay="RNA", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("RNA_markers_alveolar_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar/", width = 15)
+ggsave("RNA_markers_alveolar_mean dsb-normalized protein counts, z-score of cluster averages per marker.svg", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar/", width = 15)
+filename <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar/RNA_markers_alveolar_mean.eps"
+postscript(filename, width = 15)
 
 ```
 
 ```{r}
-# Seurat analysis pipeline (adapted to use genes_d60_alveolar)
-seurat_obj <- seurat_d60_1_alveolar %>%
-  join_features(genes_d60_alveolar, assay = "RNA", slot = "scale.data") %>%
-  group_by(.feature, harmony_cluster_8dims_rough) %>%
-  summarise(mean_scaled_dsb = mean(.abundance_RNA)) %>%
-  group_by(.feature) %>%
-  mutate(zscore_mean_scaled_dsb = (mean_scaled_dsb - mean(mean_scaled_dsb)) / sd(mean_scaled_dsb)) %>%
-  na.omit() %>%
-  mutate(zscore_mean_scaled_dsb = ifelse(zscore_mean_scaled_dsb > 2, 2,
-                                       ifelse(zscore_mean_scaled_dsb < (-2), -2, zscore_mean_scaled_dsb)))
-
-# Create heatmap
-ggplot(seurat_obj, aes(x = harmony_cluster_8dims_rough, y = .feature, fill = zscore_mean_scaled_dsb)) +
-  geom_tile() +
-  scale_fill_viridis() +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker") +
-  labs(x = "Harmony Cluster", y = "Gene")  # Optional: Add axis labels
+seurat_d60d8_1_alveolar |>
+  join_features(genes_d60_d8_cluster,assay="RNA", slot="scale.data")  |> 
+group_by(.feature,harmony_cluster_8dims_rough) |>
+  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,harmony_cluster_8dims_rough, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
 ```
 
 ## 7b) DEA testing Ms4a3 status for all infections (not including mock)
 
 ```{r}
-DefaultAssay(seurat_d60_1_alveolar_noMock) = "RNA"
-DefaultAssay(seurat_d60_1_alveolar_Mock) = "RNA"
+DefaultAssay(seurat_d60d8_1_alveolar_noMock) = "RNA"
+DefaultAssay(seurat_d60d8_1_alveolar_Mock) = "RNA"
 
-seurat_d60_1_alveolar_noMock = seurat_d60_1_alveolar %>% filter(!str_detect(condition, "Mock"))
-seurat_d60_1_alveolar_noMock = FindVariableFeatures(seurat_d60_1_alveolar_noMock, loess.span = 0.8)
-seurat_d60_1_alveolar_noMock = ScaleData(seurat_d60_1_alveolar_noMock)
+seurat_d60d8_1_alveolar_noMock = seurat_d60d8_1_alveolar %>% filter(!str_detect(condition, "Mock"))
+seurat_d60d8_1_alveolar_noMock = FindVariableFeatures(seurat_d60d8_1_alveolar_noMock, loess.span = 0.8)
+seurat_d60d8_1_alveolar_noMock = ScaleData(seurat_d60d8_1_alveolar_noMock)
 
-seurat_d60_1_alveolar_Mock = seurat_d60_1_alveolar %>% filter(str_detect(condition, "Mock"))
-seurat_d60_1_alveolar_Mock = FindVariableFeatures(seurat_d60_1_alveolar_Mock)
-seurat_d60_1_alveolar_Mock = ScaleData(seurat_d60_1_alveolar_Mock)
+seurat_d60d8_1_alveolar_Mock = seurat_d60d8_1_alveolar %>% filter(str_detect(condition, "Mock"))
+seurat_d60d8_1_alveolar_Mock = FindVariableFeatures(seurat_d60d8_1_alveolar_Mock)
+seurat_d60d8_1_alveolar_Mock = ScaleData(seurat_d60d8_1_alveolar_Mock)
 ```
 
 ```{r}
 
-Idents(seurat_d60_1_alveolar_noMock) = "sampletag_Ms4a3"
-markers_alveolar_nomock_pos<- FindMarkers(seurat_d60_1_alveolar_noMock ,
+Idents(seurat_d60d8_1_alveolar_noMock) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos<- FindMarkers(seurat_d60d8_1_alveolar_noMock ,
                                  ident.1 =  "Ms4a3_pos",
                                  ident.2 =  "Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_nomock_neg <- FindMarkers(seurat_d60_1_alveolar_noMock ,
+markers_alveolar_nomock_neg <- FindMarkers(seurat_d60d8_1_alveolar_noMock ,
                                  ident.1 =  "Ms4a3_neg",
                                  ident.2 =  "Ms4a3_pos",
                                  test.use = "wilcox", 
@@ -1143,14 +1287,14 @@ ggsave("volcano_alveolar_Ms4a3neg_nomock.png",width = 45, height = 20, units = "
 ## 7c) DEA testing Ms4a3 status for Mock
 
 ```{r}
-Idents(seurat_d60_1_alveolar_Mock) = "sampletag_Ms4a3"
-markers_alveolar_mock_pos<- FindMarkers(seurat_d60_1_alveolar_Mock ,
+Idents(seurat_d60d8_1_alveolar_Mock) = "sampletag_Ms4a3"
+markers_alveolar_mock_pos<- FindMarkers(seurat_d60d8_1_alveolar_Mock ,
                                  ident.1 =  "Ms4a3_pos",
                                  ident.2 =  "Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_mock_neg <- FindMarkers(seurat_d60_1_alveolar_Mock ,
+markers_alveolar_mock_neg <- FindMarkers(seurat_d60d8_1_alveolar_Mock ,
                                  ident.1 =  "Ms4a3_neg",
                                  ident.2 =  "Ms4a3_pos",
                                  test.use = "wilcox", 
@@ -1253,44 +1397,44 @@ write_xlsx(Ms4a3_neg_markers, "../../Documents/machiels_lab_viral/28-03_Lucia_pr
 ```{r, echo= FALSE}
 
 
-Idents(seurat_d60_1_alveolar_noMock) = "condition"
+Idents(seurat_d60d8_1_alveolar_noMock) = "condition"
 
-seurat_d60_1_alveolar_noMock_MuHV4 = subset(seurat_d60_1_alveolar_noMock, idents = "MuHV4")
-DefaultAssay(seurat_d60_1_alveolar_noMock_MuHV4) = "RNA"
-seurat_d60_1_alveolar_noMock_MuHV4 = FindVariableFeatures(seurat_d60_1_alveolar_noMock_MuHV4)
-seurat_d60_1_alveolar_noMock_MuHV4 = ScaleData(seurat_d60_1_alveolar_noMock_MuHV4)
-
-
-seurat_d60_1_alveolar_noMock_PR8 = subset(seurat_d60_1_alveolar_noMock, idents = "PR8")
-DefaultAssay(seurat_d60_1_alveolar_noMock_PR8) = "RNA"
-seurat_d60_1_alveolar_noMock_PR8 = FindVariableFeatures(seurat_d60_1_alveolar_noMock_PR8)
-seurat_d60_1_alveolar_noMock_PR8 = ScaleData(seurat_d60_1_alveolar_noMock_PR8)
+seurat_d60d8_1_alveolar_noMock_MuHV4 = subset(seurat_d60d8_1_alveolar_noMock, idents = "MuHV4")
+DefaultAssay(seurat_d60d8_1_alveolar_noMock_MuHV4) = "RNA"
+seurat_d60d8_1_alveolar_noMock_MuHV4 = FindVariableFeatures(seurat_d60d8_1_alveolar_noMock_MuHV4)
+seurat_d60d8_1_alveolar_noMock_MuHV4 = ScaleData(seurat_d60d8_1_alveolar_noMock_MuHV4)
 
 
-seurat_d60_1_alveolar_noMock_MAV1 = subset(seurat_d60_1_alveolar_noMock, idents = "MAV1")
-DefaultAssay(seurat_d60_1_alveolar_noMock_MAV1) = "RNA"
-seurat_d60_1_alveolar_noMock_MAV1 = FindVariableFeatures(seurat_d60_1_alveolar_noMock_MAV1)
-seurat_d60_1_alveolar_noMock_MAV1 = ScaleData(seurat_d60_1_alveolar_noMock_MAV1)
+seurat_d60d8_1_alveolar_noMock_PR8 = subset(seurat_d60d8_1_alveolar_noMock, idents = "PR8")
+DefaultAssay(seurat_d60d8_1_alveolar_noMock_PR8) = "RNA"
+seurat_d60d8_1_alveolar_noMock_PR8 = FindVariableFeatures(seurat_d60d8_1_alveolar_noMock_PR8)
+seurat_d60d8_1_alveolar_noMock_PR8 = ScaleData(seurat_d60d8_1_alveolar_noMock_PR8)
 
 
-seurat_d60_1_alveolar_noMock_PVM = subset(seurat_d60_1_alveolar_noMock, idents = "PVM")
-DefaultAssay(seurat_d60_1_alveolar_noMock_PVM) = "RNA"
-seurat_d60_1_alveolar_noMock_PVM = FindVariableFeatures(seurat_d60_1_alveolar_noMock_PVM)
-seurat_d60_1_alveolar_noMock_PVM = ScaleData(seurat_d60_1_alveolar_noMock_PVM)        
+seurat_d60d8_1_alveolar_noMock_MAV1 = subset(seurat_d60d8_1_alveolar_noMock, idents = "MAV1")
+DefaultAssay(seurat_d60d8_1_alveolar_noMock_MAV1) = "RNA"
+seurat_d60d8_1_alveolar_noMock_MAV1 = FindVariableFeatures(seurat_d60d8_1_alveolar_noMock_MAV1)
+seurat_d60d8_1_alveolar_noMock_MAV1 = ScaleData(seurat_d60d8_1_alveolar_noMock_MAV1)
+
+
+seurat_d60d8_1_alveolar_noMock_PVM = subset(seurat_d60d8_1_alveolar_noMock, idents = "PVM")
+DefaultAssay(seurat_d60d8_1_alveolar_noMock_PVM) = "RNA"
+seurat_d60d8_1_alveolar_noMock_PVM = FindVariableFeatures(seurat_d60d8_1_alveolar_noMock_PVM)
+seurat_d60d8_1_alveolar_noMock_PVM = ScaleData(seurat_d60d8_1_alveolar_noMock_PVM)        
 
 ```
 
 ## 8a) DEA for alveolar noMock MuHV4
 
 ```{r}
-Idents(seurat_d60_1_alveolar_noMock_MuHV4) = "sampletag_Ms4a3"
-markers_alveolar_nomock_pos_MuHV4<- FindMarkers(seurat_d60_1_alveolar_noMock_MuHV4 ,
+Idents(seurat_d60d8_1_alveolar_noMock_MuHV4) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos_MuHV4<- FindMarkers(seurat_d60d8_1_alveolar_noMock_MuHV4 ,
                                  ident.1 =  "Ms4a3_pos",
                                  ident.2 =  "Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_nomock_neg_MuHV4 <- FindMarkers(seurat_d60_1_alveolar_noMock_MuHV4 ,
+markers_alveolar_nomock_neg_MuHV4 <- FindMarkers(seurat_d60d8_1_alveolar_noMock_MuHV4 ,
                                  ident.1 =  "Ms4a3_neg",
                                  ident.2 =  "Ms4a3_pos",
                                  test.use = "wilcox", 
@@ -1389,14 +1533,14 @@ ggsave("volcano_alveolar_Ms4a3neg_nomock_MuHV4.png",
 ## 8b) DEA for alveolar noMock PR8
 
 ```{r}
-Idents(seurat_d60_1_alveolar_noMock_PR8) = "sampletag_Ms4a3"
-markers_alveolar_nomock_pos_PR8<- FindMarkers(seurat_d60_1_alveolar_noMock_PR8 ,
+Idents(seurat_d60d8_1_alveolar_noMock_PR8) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos_PR8<- FindMarkers(seurat_d60d8_1_alveolar_noMock_PR8 ,
                                  ident.1 =  "Ms4a3_pos",
                                  ident.2 =  "Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_nomock_neg_PR8 <- FindMarkers(seurat_d60_1_alveolar_noMock_PR8 ,
+markers_alveolar_nomock_neg_PR8 <- FindMarkers(seurat_d60d8_1_alveolar_noMock_PR8 ,
                                  ident.1 =  "Ms4a3_neg",
                                  ident.2 =  "Ms4a3_pos",
                                  test.use = "wilcox", 
@@ -1495,14 +1639,14 @@ ggsave("volcano_alveolar_Ms4a3neg_nomock_PR8.png",
 ## 8C) DEA for alveolar noMock PVM
 
 ```{r}
-Idents(seurat_d60_1_alveolar_noMock_PVM) = "sampletag_Ms4a3"
-markers_alveolar_nomock_pos_PVM<- FindMarkers(seurat_d60_1_alveolar_noMock_PVM ,
+Idents(seurat_d60d8_1_alveolar_noMock_PVM) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos_PVM<- FindMarkers(seurat_d60d8_1_alveolar_noMock_PVM ,
                                  ident.1 =  "Ms4a3_pos",
                                  ident.2 =  "Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_nomock_neg_PVM <- FindMarkers(seurat_d60_1_alveolar_noMock_PVM ,
+markers_alveolar_nomock_neg_PVM <- FindMarkers(seurat_d60d8_1_alveolar_noMock_PVM ,
                                  ident.1 =  "Ms4a3_neg",
                                  ident.2 =  "Ms4a3_pos",
                                  test.use = "wilcox", 
@@ -1596,14 +1740,14 @@ ggsave("volcano_alveolar_Ms4a3neg_nomock_PVM.png",
 ## 8d) DEA for alveolar noMock MAV1
 
 ```{r}
-Idents(seurat_d60_1_alveolar_noMock_MAV1) = "sampletag_Ms4a3"
-markers_alveolar_nomock_pos_MAV1<- FindMarkers(seurat_d60_1_alveolar_noMock_MAV1 ,
+Idents(seurat_d60d8_1_alveolar_noMock_MAV1) = "sampletag_Ms4a3"
+markers_alveolar_nomock_pos_MAV1<- FindMarkers(seurat_d60d8_1_alveolar_noMock_MAV1 ,
                                  ident.1 =  "Ms4a3_pos",
                                  ident.2 =  "Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_nomock_neg_MAV1 <- FindMarkers(seurat_d60_1_alveolar_noMock_PR8 ,
+markers_alveolar_nomock_neg_MAV1 <- FindMarkers(seurat_d60d8_1_alveolar_noMock_PR8 ,
                                  ident.1 =  "Ms4a3_neg",
                                  ident.2 =  "Ms4a3_pos",
                                  test.use = "wilcox", 
@@ -1753,28 +1897,28 @@ write_xlsx(MAV1_Ms4a3neg_markers, "../../Documents/machiels_lab_viral/28-03_Luci
 # 9) DEGs comparing each infection to all the groups, including Mock.
 
 ```{r}
-Idents(seurat_d60_1_alveolar) = "condition"
-markers_alveolar_MuHV4<- FindMarkers(seurat_d60_1_alveolar,
+Idents(seurat_d60d8_1_alveolar) = "condition"
+markers_alveolar_MuHV4<- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "MuHV4",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_PR8 <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_PR8 <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "PR8",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_PVM <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_PVM <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "PVM",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_MAV1 <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_MAV1 <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "MAV1",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_Mock <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_Mock <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "Mock",
                                  test.use = "wilcox", 
                                  assay = "RNA",
@@ -1822,53 +1966,53 @@ write_xlsx(markers_alveolar_PVM_filtered, "../../Documents/machiels_lab_viral/28
 # 10) DEGs comparing each infection to all the groups, including Mock.
 
 ```{r}
-Idents(seurat_d60_1_alveolar) = "sampletag_name"
-markers_alveolar_MuHV4n<- FindMarkers(seurat_d60_1_alveolar,
+Idents(seurat_d60d8_1_alveolar) = "sampletag_name"
+markers_alveolar_MuHV4n<- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "MuHV4_Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_MuHV4p<- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_MuHV4p<- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "MuHV4_Ms4a3_pos",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_PR8n <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_PR8n <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "PR8_Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_PR8p <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_PR8p <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "PR8_Ms4a3_pos",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_PVMn <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_PVMn <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "PVM_Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_PVMp <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_PVMp <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "PVM_Ms4a3_pos",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_MAV1n <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_MAV1n <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "MAV1_Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_MAV1p <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_MAV1p <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "MAV1_Ms4a3_pos",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_Mockn <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_Mockn <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "Mock_Ms4a3_neg",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_alveolar_Mockp <- FindMarkers(seurat_d60_1_alveolar,
+markers_alveolar_Mockp <- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "Mock_Ms4a3_pos",
                                  test.use = "wilcox", 
                                  assay = "RNA",
@@ -2364,6 +2508,10 @@ for (virus, data in virus_data) {
 # 20) Differential expression DNA viruses RNA viuses
 
 ```{r}
+seurat_d60 = obj.v5 %>% filter(str_detect(day_factor, "d60"))
+seurat_d60_1 = seurat_d60  %>% filter(!str_detect(day_mock_sample_type, "Mock"))
+seurat_d60_1_alveolar =  subset(seurat_d60_1, idents = c(0,1,5,6,7))
+seurat_d60_1_alveolar = seurat_d60_1_alveolar %>%  filter(!str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "Gabbr2_pos_Ms4a3_neg"))
 # Identify rows with specific virus types (modify as needed)
 muhv4_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "MuHV4")
 mav1_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "MAV1")
@@ -2439,7 +2587,7 @@ write_xlsx(markers_RNA_vs_mock_filter, "../../Documents/machiels_lab_viral/28-03
 write_xlsx(markers_RNA_vs_mock, "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/markers_RNA_vs_mock.xlsx")
 
 
-markers_DNA_vs_RNA_filter = markers_DNA_vs_RNA[markers_DNA_vs_RNA$avg_log2FC > 0.5,]
+markers_DNA_vs_RNA_filter = markers_DNA_vs_RNA[markers_DNA_vs_RNA$avg_log2FC > 0.75,]
 nonsignficant_p_adj_DNA <- which(markers_DNA_vs_RNA$p_val_adj <= 0.05)
 markers_DNA_vs_RNA_filter <- markers_DNA_vs_RNA_filter[nonsignficant_p_adj_DNA, ]
 
@@ -2452,8 +2600,8 @@ write_xlsx(markers_DNA_vs_RNA, "../../Documents/machiels_lab_viral/28-03_Lucia_p
 markers_DNA_vs_RNA$diffexpressed <- "NO"
 
 # Categorize genes as "UP" or "DOWN" based on avg_log2FC
-markers_DNA_vs_RNA$diffexpressed[markers_DNA_vs_RNA$avg_log2FC > 1] <- "UP"
-markers_DNA_vs_RNA$diffexpressed[markers_DNA_vs_RNA$avg_log2FC < -1] <- "DOWN"
+markers_DNA_vs_RNA$diffexpressed[markers_DNA_vs_RNA$avg_log2FC > 0.75] <- "UP"
+markers_DNA_vs_RNA$diffexpressed[markers_DNA_vs_RNA$avg_log2FC < -0.75] <- "DOWN"
 
 # Add a column for labels
 markers_DNA_vs_RNA$delabel <- NA
@@ -2470,15 +2618,16 @@ volcano_alveolar_DNAvsRNA <- ggplot(data = markers_DNA_vs_RNA,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(markers_DNA_vs_RNA$avg_log2FC)),
-                                 ceiling(max(markers_DNA_vs_RNA$avg_log2FC)), by = 0.5)) +
-  geom_text_repel(max.overlaps = 100)
+                                   ceiling(max(markers_DNA_vs_RNA$avg_log2FC)), by = 0.5)) +  geom_text_repel(max.overlaps = 100) + ylim(0,500)
 
 volcano_alveolar_DNAvsRNA
 
 # Save the plot
 ggsave("volcano_alveolar_DNAvsRNA.png",
-       width = 45, height = 20, units = "cm",
-       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+       width = 45, height = 30, units = "cm",
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/", bg = 'white')
+filename <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar/DNAvsRNvolcano.eps"
+postscript(filename, width = 45, height = 30)
 ```
 
 ```{r}
@@ -2513,7 +2662,7 @@ volcano_alveolar_DNAvsmock
 # Save the plot
 ggsave("volcano_alveolar_DNAvsmock.png",
        width = 45, height = 20, units = "cm",
-       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/", bg = "white")
 ```
 
 ```{r}
@@ -2547,10 +2696,10 @@ volcano_alveolar_RNAvsmock
 # Save the plot
 ggsave("volcano_alveolar_RNAvsmock.png",
        width = 45, height = 20, units = "cm",
-       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/")
+       path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/", bg = 'white')
 ```
 
-# 22) Heatmap markers daniel 
+# 22) Heatmap markers daniel
 
 # 'clusters_gene_set.xlsx' for full object
 
@@ -2758,10 +2907,39 @@ ggsave("heatmap_daniel_genes_activatedIM.png", width = 20, height = 10, units = 
 ```
 
 ```{r}
-Idents(seurat_d60_1_alveolar) = "condition"
-markers_alveolar_MuHV4<- FindMarkers(seurat_d60_1_alveolar,
+Idents(seurat_d60d8_1_alveolar) = "condition"
+markers_alveolar_MuHV4<- FindMarkers(seurat_d60d8_1_alveolar,
                                  ident.1 =  "MuHV4",
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+```{r}
+cells_d60_bal = ncol(seurat_obj_experiment_1_bal_workflowed)
+cells_d60_lung = ncol(seurat_obj_experiment_1_lung_workflowed)
+cells_d8_bal = ncol(seurat_obj_experiment_2_bal_workflowed)
+cells_d8_lung = ncol(seurat_obj_experiment_2_lung_workflowed)
+
+## after qc
+
+cells_d60_bal_qc = ncol(seurat_obj_experiment_1_bal_afterQCdashboard)
+cells_d60_lung_qc = ncol(seurat_obj_experiment_1_lung_afterQCdashboard)
+cells_d8_bal_qc = ncol(seurat_obj_experiment_2_bal_afterQCdashboard)
+cells_d8_lung_qc = ncol(seurat_obj_experiment_2_lung_afterQCdashboard)
+
+
+## percentage filtered cells per case
+
+percentage_d60_bal = cells_d60_bal_qc / cells_d60_bal
+percentage_d60_lung = cells_d60_lung_qc / cells_d60_lung
+percentage_d8_bal = cells_d8_bal_qc / cells_d8_bal
+percentage_d8_lung = cells_d8_lung_qc / cells_d8_lung
+
+amountCellsBeforeAfterQC <- data.frame(
+  sample = c("bal_d60", "lung_d60", "bal_d8", "lung_d8"),
+  amount_cells = c(18000, 14000, 11000, 11500),
+  amount_cells_after_qc = c(13372, 7485, 5533, 6858),
+  percentage_filtered = c(percentage_d60_bal, percentage_d60_lung, percentage_d8_bal, percentage_d8_lung)
+)
 ```
