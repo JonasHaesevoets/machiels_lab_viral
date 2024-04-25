@@ -14,7 +14,7 @@ execute:
 
 # 1) Load in data and packages and load in functions
 
-```{r}
+```{r, echo=FALSE}
 easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi", "clusterProfiler", "enrichplot")
 obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
 DefaultAssay(obj.v5) <- "RNA"
@@ -1017,7 +1017,7 @@ DimPlot(seurat_d60d8_1_alveolar_lung, reduction = "pca", group.by = "sampletag_n
 ggsave("pcaplot_alveolar_lung_condition_Ms4a3.png", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/PCA")
 ```
 
-## 6p) PC plot showing Ms4a3 and sample type 
+## 6p) PC plot showing Ms4a3 and sample type
 
 ```{r}
 DimPlot(seurat_d60d8_1_alveolar, reduction = "pca", group.by = "sampletag_name", split.by = "sample_type")
@@ -1140,7 +1140,11 @@ ggsave("RNA_seurat_clusters_top5_alveolar dsb-normalized protein counts, z-score
 
 ```
 
-postscript("RNA_markers_alveolar_mean dsb-normalized protein counts, z-score of cluster averages per marker.eps", path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/heatmap/Alveolar/", width = 15)
+# do this like point 6g
+
+```{r}
+
+```
 
 ```{r}
 
@@ -1778,8 +1782,8 @@ write_xlsx(markers_alveolar_nomock_negfiltered, "../../Documents/machiels_lab_vi
 markers_alveolar_nomock_pos_MAV1$diffexpressed <- "NO"
 
 # Categorize genes as "UP" or "DOWN" based on avg_log2FC
-markers_alveolar_nomock_pos_MAV1$diffexpressed[markers_alveolar_nomock_pos_MAV1$avg_log2FC > 1] <- "UP"
-markers_alveolar_nomock_pos_MAV1$diffexpressed[markers_alveolar_nomock_pos_MAV1$avg_log2FC < -1] <- "DOWN"
+markers_alveolar_nomock_pos_MAV1$diffexpressed[markers_alveolar_nomock_pos_MAV1$avg_log2FC > 0.5] <- "UP"
+markers_alveolar_nomock_pos_MAV1$diffexpressed[markers_alveolar_nomock_pos_MAV1$avg_log2FC < -0.5] <- "DOWN"
 
 # Add a column for labels
 markers_alveolar_nomock_pos_MAV1$delabel <- NA
@@ -1963,7 +1967,7 @@ write_xlsx(markers_alveolar_PVM_filtered, "../../Documents/machiels_lab_viral/28
 
 ```
 
-# 10) DEGs comparing each infection to all the groups, including Mock.
+# 10) DEGs comparing each infection to all the groups including Ms4a3, including Mock.
 
 ```{r}
 Idents(seurat_d60d8_1_alveolar) = "sampletag_name"
@@ -2209,7 +2213,7 @@ MuHV4_pos <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/
 kegg_gene_list <- gsea_GO_KEGG(filename = MuHV4_pos, sample_name = "MuHV4_p", organism = organism)
 ```
 
-# 11) GSEA of MuHV4 Ms4a3 -
+# 12) GSEA of MuHV4 Ms4a3 -
 
 ```{r}
 gsea_GO_KEGG <- function(filename, organism, sample_name = "MuHV4_Ms4a3+") {
@@ -2296,7 +2300,7 @@ MuHV4_neg <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/
 kegg_gene_list <- gsea_GO_KEGG(filename = MuHV4_neg, sample_name = "MuHV4_n", organism = organism)
 ```
 
-# 12) GSEA of PR8 Ms4a3 -
+# 13) GSEA of PR8 Ms4a3 -
 
 ```{r}
 PR8_neg <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h/markers_alveolar_PR8n_filtered.xlsx"
@@ -2305,7 +2309,7 @@ PR8_neg <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DE
 kegg_gene_list <- gsea_GO_KEGG(filename = PR8_neg, sample_name = "PR8_n", organism = organism)
 ```
 
-# 13) GSEA of PR8 Ms4a3 +
+# 14) GSEA of PR8 Ms4a3 +
 
 ```{r}
 PR8_pos <- "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/h/markers_alveolar_PR8p_filtered.xlsx"
@@ -2505,7 +2509,7 @@ for (virus, data in virus_data) {
 }
 ```
 
-# 20) Differential expression DNA viruses RNA viuses
+# markers_alveolar_MuHV4vsMock_filtered = markers_alveolar_MuHV4vsMock\[abs(markers_alveolar_MuHV4vsMock\['avg_log2FC'\]) == 0.5\] 20) Differential expression DNA viruses RNA viuses
 
 ```{r}
 seurat_d60 = obj.v5 %>% filter(str_detect(day_factor, "d60"))
@@ -2699,9 +2703,9 @@ ggsave("volcano_alveolar_RNAvsmock.png",
        path = "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/DEA/", bg = 'white')
 ```
 
-# 22) Heatmap markers daniel
+# 21) Heatmap markers daniel
 
-# 'clusters_gene_set.xlsx' for full object
+### 'clusters_gene_set.xlsx' for full object
 
 ```{r}
 
@@ -2913,33 +2917,4 @@ markers_alveolar_MuHV4<- FindMarkers(seurat_d60d8_1_alveolar,
                                  test.use = "wilcox", 
                                  assay = "RNA",
                                  min.pct = 0.2) |> as_tibble(rownames="gene")
-```
-
-```{r}
-cells_d60_bal = ncol(seurat_obj_experiment_1_bal_workflowed)
-cells_d60_lung = ncol(seurat_obj_experiment_1_lung_workflowed)
-cells_d8_bal = ncol(seurat_obj_experiment_2_bal_workflowed)
-cells_d8_lung = ncol(seurat_obj_experiment_2_lung_workflowed)
-
-## after qc
-
-cells_d60_bal_qc = ncol(seurat_obj_experiment_1_bal_afterQCdashboard)
-cells_d60_lung_qc = ncol(seurat_obj_experiment_1_lung_afterQCdashboard)
-cells_d8_bal_qc = ncol(seurat_obj_experiment_2_bal_afterQCdashboard)
-cells_d8_lung_qc = ncol(seurat_obj_experiment_2_lung_afterQCdashboard)
-
-
-## percentage filtered cells per case
-
-percentage_d60_bal = cells_d60_bal_qc / cells_d60_bal
-percentage_d60_lung = cells_d60_lung_qc / cells_d60_lung
-percentage_d8_bal = cells_d8_bal_qc / cells_d8_bal
-percentage_d8_lung = cells_d8_lung_qc / cells_d8_lung
-
-amountCellsBeforeAfterQC <- data.frame(
-  sample = c("bal_d60", "lung_d60", "bal_d8", "lung_d8"),
-  amount_cells = c(18000, 14000, 11000, 11500),
-  amount_cells_after_qc = c(13372, 7485, 5533, 6858),
-  percentage_filtered = c(percentage_d60_bal, percentage_d60_lung, percentage_d8_bal, percentage_d8_lung)
-)
 ```
