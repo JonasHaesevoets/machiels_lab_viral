@@ -1,0 +1,954 @@
+---
+title: "caseStudy_DEA_GSEA"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+------------------------------------------------------------------------
+
+# 1) Load in central object and required libraries + methods
+
+![](images/clipboard-3047492009.png)
+
+```{r, echo=FALSE}
+easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi", "clusterProfiler", "enrichplot")
+obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+DefaultAssay(obj.v5) <- "RNA"
+```
+
+```{r}
+check_metadata_presence <- function(seurat_object, metadata_column, value_to_check) {
+  # Check if the specified value is present in the specified metadata colu
+    value_present <- any(str_detect(seurat_object@meta.data[[metadata_column]], value_to_check))
+
+  if(value_present) {
+    print(paste(value_to_check, "values are present in the", metadata_column, "metadata column."))
+  } else {
+    print(paste(value_to_check, "values are not present in the", metadata_column, "metadata column."))
+  }
+  
+  return(value_present)
+}
+```
+
+```{r}
+select_top_genes <- function(df, n) {
+  top_genes <- by(df, df$cluster, function(cluster_df) {
+    cluster_df[order(cluster_df$avg_log2FC, decreasing = TRUE), ][1:n, ]
+  })
+  do.call(rbind, top_genes)
+}
+```
+
+```{r}
+process_markers <- function(data) {
+  # Assign "NO" to diffexpressed column
+  data$diffexpressed <- "NO"
+  
+  # Categorize genes as "UP" or "DOWN" based on avg_log2FC
+  data$diffexpressed[data$avg_log2FC > 0.5] <- "UP"
+  data$diffexpressed[data$avg_log2FC < -0.5] <- "DOWN"
+  data$diffexpressed[data$p_val_adj == 0] = "P value of 0"
+
+
+  
+  
+  # Add a column for labels
+  data$delabel <- NA
+  
+  # Assign gene names as labels for differentially expressed genes
+  data$delabel[data$diffexpressed != "NO"] <- data$gene[data$diffexpressed != "NO"]
+  
+  return(data)
+}
+```
+
+```{r}
+prepare_rnk <- function(data) {
+  #remove NA
+  data <- na.omit(data)
+
+  # Arrange the dataframe by avg_log2FC in descending order
+  ordered_data <- data %>% arrange(desc(avg_log2FC))
+  
+  # Select only the "gene" and "avg_log2FC" columns
+  selected_data <- ordered_data[, c("gene", "avg_log2FC")]}
+
+prepare_ora <- function(data) {
+  #remove NA
+  data <- na.omit(data)
+
+  
+  # Select only the "gene" and "avg_log2FC" columns
+  selected_data <- data[, c("gene")]}
+
+prepare_rnk_neg <- function(data) {
+  #remove NA
+  data <- na.omit(data)
+  # Arrange the dataframe by avg_log2FC in descending order
+  ordered_data <- data %>% arrange(avg_log2FC)
+  
+  # Select only the "gene" and "avg_log2FC" columns
+  selected_data <- ordered_data[, c("gene", "avg_log2FC")]}
+```
+
+```{r}
+remove_numbers_and_quotes_between_genes_with_tabs <- function(file_path) {
+  # Read the file
+  text <- readLines(file_path)
+  
+  # Pattern to match numbers between ""
+  pattern_numbers <- "\"[0-9]+\""
+  
+  # Pattern to match "" between genes
+  pattern_quotes_between_genes <- "(?<=\\w)\"\"(?=\\w)"
+  
+  # Replace numbers between ""
+  text <- gsub(pattern_numbers, "", text)
+  
+  # Remove "" between genes
+  text <- gsub(pattern_quotes_between_genes, "", text, perl = TRUE)
+  
+  # Add a tab between genes and values, and a tab after the values
+  text <- gsub("(\\w+)\\s+(\\w+)", "\\1\t\\2\t", text)
+  
+  # Write modified text back to the file
+  writeLines(text, file_path)
+}
+
+remove_quotes <- function(file_path) {
+  # Read the file
+  text <- readLines(file_path)
+  
+  
+  # Remove the first row
+  text <- text[-1]
+  
+  # Remove all occurrences of "
+  text <- gsub("\"", "", text)
+  
+  # Remove spaces and replace with tabs
+  text <- gsub(" ", "\t", text)
+  
+  text <- gsub("^\\s+", "", text)  # Remove initial whitespace
+
+  
+  # Write modified text back to the file
+  writeLines(text, file_path)
+}
+
+```
+
+## 1A) Transform the data to only contain the clusters corresponding to alveolar macrophages at d60
+
+these seurat objects still contain the data for the mock to do the eventual DEA analysis with
+
+```{r, echo=FALSE}
+seurat_d60 = obj.v5 %>% filter(str_detect(day_factor, "d60"))
+seurat_d60 = seurat_d60 %>% filter(!str_detect(sex_classifier_2, "no_expression_of_specific_genes"))
+seurat_d60 = seurat_d60 %>% filter(!str_detect(sex_classifier_2, "detection_of_male_and_female_genes"))
+seurat_d60_alveolar =  subset(seurat_d60, idents = c(0,1,5,6,7))
+seurat_d60_1_alveolar = seurat_d60_alveolar %>%  filter(!str_detect(day_sample_type_cond_ms4a3_pos_gabbr2, "Gabbr2_pos_Ms4a3_neg"))
+```
+
+```{r}
+metadata_column <- "day"  
+value_to_check <- "d8"    
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day_sample_type_cond_ms4a3_pos_gabbr2"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day_mock_sample_type_mockTissueIncluded"
+value_present = check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_to_check = "d60"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_to_check = "bal"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "sample_type"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_to_check = "lung"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day_sample_type_cond_ms4a3_pos_gabbr2"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+value_to_check = "Mock"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "condition"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day_mock_sample_type_mockTissueIncluded"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+metadata_column = "day"
+value_present <- check_metadata_presence(seurat_d60_1_alveolar, metadata_column, value_to_check)
+
+
+```
+
+```{r, echo=FALSE}
+seurat_d60_1_alveolar = FindVariableFeatures(seurat_d60_1_alveolar)
+seurat_d60_1_alveolar = NormalizeData(seurat_d60_1_alveolar)
+seurat_d60_1_alveolar = ScaleData(seurat_d60_1_alveolar)
+```
+
+```{r}
+seurat_d60_1_alveolar |>  write_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_alveolar_d60_withMock.rds")
+```
+
+```{r}
+
+
+```
+
+# 2) PCA plot to find major driver of change wether it being Ms4a3 status condition or tissue
+
+## 2A) PCA plot showing different viruses split by Ms4a3
+
+```{r}
+DimPlot_scCustom(seurat_d60_1_alveolar, reduction = "pca", group.by = "condition", split.by = "sampletag_Ms4a3")
+ggsave("PCA_condition_splitby_Ms4a3.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_condition_splitby_Ms4a3.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2B) PCA plot showing Ms4a3 split by virus
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+DimPlot_scCustom(seurat_d60_1_alveolar, reduction = "pca", group.by = "sampletag_Ms4a3", split.by = "condition", colors_use = c("darkgrey", "red"))
+ggsave("PCA_Ms4a3_splitby_condition.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_Ms4a3_splitby_condition.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2C) PCA plot showing Ms4a3 split by tissue
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+DimPlot_scCustom(seurat_d60_1_alveolar, reduction = "pca", group.by = "sampletag_Ms4a3", split.by = "sample_type", colors_use = c("darkgrey", "red"))
+ggsave("PCA_Ms4a3_splitby_tissue.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_Ms4a3_splitby_tissue.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2D) PCA plot showing tissue split by virus
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+DimPlot_scCustom(seurat_d60_1_alveolar, reduction = "pca", group.by = "sample_type", split.by = "condition")
+ggsave("PCA_tissue_splitby_condition.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_tissue_splitby_condition.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2E) PCA plot showing virus
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+Idents(seurat_d60_1_alveolar) = "condition"
+DimPlot_scCustom(seurat_d60_1_alveolar, reduction = "pca", label = FALSE)
+ggsave("PCA_condition.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_condition.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2F) PCA plot showing tissue
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+Idents(seurat_d60_1_alveolar) = "sample_type"
+DimPlot_scCustom(seurat_d60_1_alveolar, reduction = "pca", label = FALSE)
+ggsave("PCA_tissue.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_tissue.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2G) PCA plot showing Ms4a3
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+Idents(seurat_d60_1_alveolar) = "sampletag_Ms4a3"
+DimPlot_scCustom(seurat_d60_1_alveolar, reduction = "pca", colors_use = c("darkgrey", "red"), label = FALSE)
+ggsave("PCA_Ms4a3.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_Ms4a3.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2H) PCA plots showing effects of different viruses
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+DimPlot_All_Samples(seurat_object = seurat_d60_1_alveolar, meta_data_column = "condition",reduction = "pca")
+ggsave("PCA_condition_all_samples.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_condition_all_samples.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2G) PCA plots showing effects of different viruses in combination with Ms4a3
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+
+seurat_d60_1_alveolar@meta.data$sampletag_name_factor = factor(seurat_d60_1_alveolar@meta.data$sampletag_name, levels = sort(unique(seurat_d60_1_alveolar$sampletag_name)))
+DimPlot_All_Samples(seurat_object = seurat_d60_1_alveolar, meta_data_column = "sampletag_name_factor",reduction = "pca")
+ggsave("PCA_conditionMs4a3_all_samples.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_conditionMs4a3_all_samples.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+## 2H) PCA plots showing effects of different viruses in combination with Ms4a3 and tissue
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+
+seurat_d60_1_alveolar@meta.data$day_sample_type_cond_ms4a3_factor = factor(seurat_d60_1_alveolar@meta.data$day_sample_type_cond_ms4a3, levels = sort(unique(seurat_d60_1_alveolar$day_sample_type_cond_ms4a3)))
+
+DimPlot_All_Samples(seurat_object = seurat_d60_1_alveolar, meta_data_column = "day_sample_type_cond_ms4a3_factor",reduction = "pca", num_columns = 4 )
+ggsave("PCA_conditionMs4a3tissue_all_samples.svg", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+ggsave("PCA_conditionMs4a3tissue_all_samples.png", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/PCA")
+```
+
+# 3) Differential expression analysis Mock vs Virus
+
+"*For a particular gene, a log2 fold change of −1 for condition virus vs mockmeans that the virus induces a change in observed expression level of 2\^−1 = 0.5 compared to the untreated condition.*"
+
+in this case study group B is the Virus and group A is the mock situation or the virus group we are comparing with
+
+-   **A positive fold change means the gene is upregulated in group B compared to group A.**
+
+-   **A negative fold change means the gene is downregulated in group B compared to A.**
+
+-   
+
+![](images/clipboard-195901765.png)
+
+![](images/clipboard-1579983031.png)
+
+Specifications DEA: FindMarkers() from Seurat using the standard Wilcoxon Signed Rank Test
+
+min.pct = 0.2 means only genes are tested that are detected in at least 20% in either
+
+```{r}
+Idents(seurat_d60_1_alveolar) = "condition"
+markers_alveolar_MuHV4vsMock<- FindMarkers(seurat_d60_1_alveolar ,
+                                 ident.1 =  "MuHV4",
+                                 ident.2 =  "Mock",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2,
+                                 latent.vars = "sex_classifier_2") |> 
+                                 as_tibble(rownames="gene")
+markers_alveolar_MAV1vsMock <- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "MAV1",
+                                 ident.2 =  "Mock",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_alveolar_PR8vsMock <- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "PR8",
+                                 ident.2 =  "Mock",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+markers_alveolar_PVMvsMock <- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "PVM",
+                                 ident.2 =  "Mock",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+```{r}
+markers_alveolar_MuHV4vsMock_filtered = markers_alveolar_MuHV4vsMock[abs(markers_alveolar_MuHV4vsMock$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_MuHV4vsMock_filtered$p_val_adj <= 0.05)
+markers_alveolar_MuHV4vsMock_filtered <- markers_alveolar_MuHV4vsMock_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_MuHV4vsMock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_MuHV4vsMock.xlsx")
+write_xlsx(markers_alveolar_MuHV4vsMock_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_MuHV4vsMock_filtered.xlsx")
+```
+
+```{r}
+positive_MuHv4vsMock = markers_alveolar_MuHV4vsMock_filtered[markers_alveolar_MuHV4vsMock_filtered$avg_log2FC >= 0.5,]
+negative_MuHv4vsMock = markers_alveolar_MuHV4vsMock_filtered[markers_alveolar_MuHV4vsMock_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+markers_alveolar_MAV1vsMock_filtered = markers_alveolar_MAV1vsMock[abs(markers_alveolar_MAV1vsMock$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_MAV1vsMock_filtered$p_val_adj <= 0.05)
+markers_alveolar_MAV1vsMock_filtered <- markers_alveolar_MAV1vsMock_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_MAV1vsMock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_MAV1vsMock.xlsx")
+write_xlsx(markers_alveolar_MAV1vsMock_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_MAV1vsMock_filtered.xlsx")
+```
+
+```{r}
+positive_MAV1vsMock = markers_alveolar_MAV1vsMock_filtered[markers_alveolar_MAV1vsMock_filtered$avg_log2FC >= 0.5,]
+negative_MAV1vsMock = markers_alveolar_MAV1vsMock_filtered[markers_alveolar_MAV1vsMock_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+markers_alveolar_PR8vsMock_filtered = markers_alveolar_PR8vsMock[abs(markers_alveolar_PR8vsMock$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_PR8vsMock_filtered$p_val_adj <= 0.05)
+markers_alveolar_PR8vsMock_filtered <- markers_alveolar_PR8vsMock_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_PR8vsMock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_PR8vsMock.xlsx")
+write_xlsx(markers_alveolar_PR8vsMock_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_PR8vsMock_filtered.xlsx")
+```
+
+```{r}
+positive_PR8vsMock = markers_alveolar_PR8vsMock_filtered[markers_alveolar_PR8vsMock_filtered$avg_log2FC >= 0.5,]
+negative_PR8vsMock = markers_alveolar_PR8vsMock_filtered[markers_alveolar_PR8vsMock_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+markers_alveolar_PVMvsMock_filtered = markers_alveolar_PVMvsMock[abs(markers_alveolar_PVMvsMock$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_PVMvsMock_filtered$p_val_adj <= 0.05)
+markers_alveolar_PVMvsMock_filtered <- markers_alveolar_PVMvsMock_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_PVMvsMock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_PVMvsMock.xlsx")
+write_xlsx(markers_alveolar_PVMvsMock_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_PVMvsMock_filtered.xlsx")
+```
+
+```{r}
+positive_PVMvsMock = markers_alveolar_PVMvsMock_filtered[markers_alveolar_PVMvsMock_filtered$avg_log2FC >= 0.5,]
+negative_PVMvsMock = markers_alveolar_PVMvsMock_filtered[markers_alveolar_PVMvsMock_filtered$avg_log2FC <= -0.5,]
+```
+
+## 3A) volcano plot MAV1vs mock
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_MAV1vsMock = process_markers(markers_alveolar_MAV1vsMock)
+volcano_MAV1vsMock <- ggplot(data = volcano_MAV1vsMock,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_MAV1vsMock$avg_log2FC)),
+                                  ceiling(max(volcano_MAV1vsMock$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100) 
+volcano_MAV1vsMock
+ggsave("volcano_MAV1vsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_MAV1vsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+## 3B) volcano plot MuHV4 vs mock
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_MuHV4vsMock = process_markers(markers_alveolar_MuHV4vsMock)
+volcano_MuHV4vsMock <- ggplot(data = volcano_MuHV4vsMock,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_MuHV4vsMock$avg_log2FC)),
+                                  ceiling(max(volcano_MuHV4vsMock$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_MuHV4vsMock
+ggsave("volcano_MuHV4vsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_MuHV4vsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+
+```
+
+## 3C) volcano plot PR8 vs Mock
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_PR8vsMock = process_markers(markers_alveolar_PR8vsMock)
+volcano_PR8vsMock <- ggplot(data = volcano_PR8vsMock,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_PR8vsMock$avg_log2FC)),
+                                  ceiling(max(volcano_PR8vsMock$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_PR8vsMock
+ggsave("volcano_PR8vsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_PR8vsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+## 3D) volcano plot PVM vs Mock
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_PVMvsMock = process_markers(markers_alveolar_PVMvsMock)
+volcano_PVMvsMock <- ggplot(data = volcano_PVMvsMock,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_PVMvsMock$avg_log2FC)),
+                                  ceiling(max(volcano_PVMvsMock$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 1000)
+volcano_PVMvsMock
+ggsave("volcano_PVMvsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_PVMvsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+# ORA is focused on the enrichment of predefined gene sets within a list of differentially expressed genes, while GSEA considers the overall expression pattern of genes in relation to predefined gene sets
+
+# 4) Gene Set Enrichment Analysis for differentially expressed genes in Virus vs Mock
+
+## 4A) prepare the rnk file
+
+```{r}
+MAV1vsMock_ordered = prepare_rnk(data = markers_alveolar_MAV1vsMock)
+
+write.table(MAV1vsMock_ordered, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MAV1vsMock_ordered.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MAV1vsMock_ordered.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MAV1vsMock_ordered.txt")
+```
+
+```{r}
+MuHV4vsMock_ordered = prepare_rnk(markers_alveolar_MuHV4vsMock) 
+
+write.table(MuHV4vsMock_ordered, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MuHV4vsMock_ordered.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MuHV4vsMock_ordered.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MuHV4vsMock_ordered.txt")
+
+```
+
+```{r}
+PR8vsMock_ordered = prepare_rnk(markers_alveolar_PR8vsMock)
+
+write.table(PR8vsMock_ordered, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PR8vsMock_ordered.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PR8vsMock_ordered.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PR8vsMock_ordered.txt")
+```
+
+```{r}
+PVMvsMock_ordered = prepare_rnk(markers_alveolar_PVMvsMock)
+
+
+write.table(PVMvsMock_ordered, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PVMvsMock_ordered.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PVMvsMock_ordered.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PVMvsMock_ordered.txt")
+```
+
+### the resulting txt files are then converted to .rnk files by saving them as such
+
+### see folder CaseStudy_DEA/Enrichment/results_VirusvsMock/
+
+# 5) Over Representation Analysis (ORA) for differentially expressed genes in Virus vs Mock
+
+## 5A) prepare files for ORA
+
+```{r}
+ora_mavmockneg = prepare_ora(negative_MAV1vsMock)
+write.table(ora_mavmockneg, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_oraneg.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_oraneg.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_oraneg.txt")
+
+```
+
+```{r}
+ora_mavmockpos = prepare_ora(positive_MAV1vsMock)
+write.table(ora_mavmockpos, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_orapos.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_orapos.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_orapos.txt")
+```
+
+```{r}
+ora_muhv4mockneg = prepare_ora(negative_MuHv4vsMock)
+write.table(ora_muhv4mockneg, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_oraneg.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_oraneg.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_oraneg.txt")
+```
+
+```{r}
+ora_muhv4mockpos = prepare_ora(positive_MuHv4vsMock)
+write.table(ora_muhv4mockpos, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_orapos.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_orapos.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_orapos.txt")
+```
+
+```{r}
+ora_pr8mockneg = prepare_ora(negative_PR8vsMock)
+write.table(ora_pr8mockneg, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_oraneg.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_oraneg.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_oraneg.txt")
+```
+
+```{r}
+ora_pr8mockpos = prepare_ora(positive_PR8vsMock)
+write.table(ora_pr8mockpos, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_orapos.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_orapos.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_orapos.txt")
+```
+
+```{r}
+ora_pvmmockneg = prepare_ora(negative_PVMvsMock)
+write.table(ora_pvmmockneg, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_oraneg.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_oraneg.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_oraneg.txt")
+```
+
+```{r}
+ora_pvmmockpos = prepare_ora(positive_PVMvsMock)
+write.table(ora_pvmmockpos, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_orapos.txt")
+remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_orapos.txt")
+remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_orapos.txt")
+```
+
+# webgestaltr done for ORA with wikipathway database and mouse genome as reference rest standard parameters
+
+# 6) Differential expression analysis Mock Ms4a3 vs virus Ms4a3
+
+```{r}
+Idents(seurat_d60_1_alveolar) = "sampletag_name"
+markers_alveolar_MuHV4_Ms4a3<- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "MuHV4_Ms4a3_pos",
+                                 ident.2 =  "MuHV4_Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+
+markers_alveolar_PR8_Ms4a3 <- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "PR8_Ms4a3_pos",
+                                 ident.2 =  "PR8_Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+
+markers_alveolar_PVM_Ms4a3 <- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "PVM_Ms4a3_pos",
+                                  ident.2 =  "PVM_Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+
+markers_alveolar_MAV1_Ms4a3 <- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "MAV1_Ms4a3_pos",
+                                 ident.2 =  "MAV1_Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+
+markers_alveolar_Mock_Ms4a3 <- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "Mock_Ms4a3_pos",
+                                 ident.2 =  "Mock_Ms4a3_neg",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+
+```
+
+```{r}
+markers_alveolar_MuHV4_Ms4a3_filtered = markers_alveolar_MuHV4_Ms4a3[abs(markers_alveolar_MuHV4_Ms4a3$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_MuHV4_Ms4a3_filtered$p_val_adj <= 0.05)
+markers_alveolar_MuHV4_Ms4a3_filtered <- markers_alveolar_MuHV4_Ms4a3_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_MuHV4_Ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_MuHV4_Ms4a3.xlsx")
+write_xlsx(markers_alveolar_MuHV4_Ms4a3_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_MuHV4_Ms4a3_filtered.xlsx")
+```
+
+```{r}
+positive_Ms4a3_MuHV4 = markers_alveolar_MuHV4_Ms4a3_filtered[markers_alveolar_MuHV4_Ms4a3_filtered$avg_log2FC >= 0.5,]
+negative_Ms4a3_MuHV4 = markers_alveolar_MuHV4_Ms4a3_filtered[markers_alveolar_MuHV4_Ms4a3_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+markers_alveolar_MAV1_Ms4a3_filtered = markers_alveolar_MAV1_Ms4a3[abs(markers_alveolar_MAV1_Ms4a3$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_MAV1_Ms4a3_filtered$p_val_adj <= 0.05)
+markers_alveolar_MAV1_Ms4a3_filtered <- markers_alveolar_MAV1_Ms4a3_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_MAV1_Ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_MAV1_Ms4a3.xlsx")
+write_xlsx(markers_alveolar_MAV1_Ms4a3_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_MAV1_Ms4a3_filtered.xlsx")
+```
+
+```{r}
+positive_Ms4a3_MAV1 = markers_alveolar_MAV1_Ms4a3_filtered[markers_alveolar_MAV1_Ms4a3_filtered$avg_log2FC >= 0.5,]
+negative_Ms4a3_MAV1 = markers_alveolar_MAV1_Ms4a3_filtered[markers_alveolar_MAV1_Ms4a3_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+markers_alveolar_Mock_Ms4a3_filtered = markers_alveolar_Mock_Ms4a3[abs(markers_alveolar_Mock_Ms4a3$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_Mock_Ms4a3_filtered$p_val_adj <= 0.05)
+markers_alveolar_Mock_Ms4a3_filtered <- markers_alveolar_Mock_Ms4a3_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_Mock_Ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_Mock_Ms4a3.xlsx")
+write_xlsx(markers_alveolar_Mock_Ms4a3_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_Mock_Ms4a3_filtered.xlsx")
+```
+
+```{r}
+positive_Ms4a3_mock = markers_alveolar_Mock_Ms4a3_filtered[markers_alveolar_Mock_Ms4a3_filtered$avg_log2FC >= 0.5,]
+negative_Ms4a3_mock = markers_alveolar_Mock_Ms4a3_filtered[markers_alveolar_Mock_Ms4a3_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+markers_alveolar_PR8_Ms4a3_filtered = markers_alveolar_PR8_Ms4a3[abs(markers_alveolar_PR8_Ms4a3$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_PR8_Ms4a3_filtered$p_val_adj <= 0.05)
+markers_alveolar_PR8_Ms4a3_filtered <- markers_alveolar_PR8_Ms4a3_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_PR8_Ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_PR8_Ms4a3.xlsx")
+write_xlsx(markers_alveolar_PR8_Ms4a3_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_PR8_Ms4a3_filtered.xlsx")
+```
+
+```{r}
+positive_Ms4a3_PR8 = markers_alveolar_PR8_Ms4a3_filtered[markers_alveolar_PR8_Ms4a3_filtered$avg_log2FC >= 0.5,]
+negative_Ms4a3_PR8 = markers_alveolar_PR8_Ms4a3_filtered[markers_alveolar_PR8_Ms4a3_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+markers_alveolar_PVM_Ms4a3_filtered = markers_alveolar_PVM_Ms4a3[abs(markers_alveolar_PVM_Ms4a3$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_alveolar_PVM_Ms4a3_filtered$p_val_adj <= 0.05)
+markers_alveolar_PVM_Ms4a3_filtered <- markers_alveolar_PVM_Ms4a3_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_alveolar_PVM_Ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_PVM_Ms4a3.xlsx")
+write_xlsx(markers_alveolar_PVM_Ms4a3_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_alveolar_PVM_Ms4a3_filtered.xlsx")
+```
+
+```{r}
+positive_Ms4a3_PVM = markers_alveolar_PVM_Ms4a3_filtered[markers_alveolar_PVM_Ms4a3_filtered$avg_log2FC >= 0.5,]
+negative_Ms4a3_PVM = markers_alveolar_PVM_Ms4a3_filtered[markers_alveolar_PVM_Ms4a3_filtered$avg_log2FC <= -0.5,]
+```
+
+## 5A) volcano plot MAV1 Ms4a3
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_MAV1_Ms4a3 = process_markers(markers_alveolar_MAV1_Ms4a3)
+volcano_MAV1_Ms4a3 <- ggplot(data = volcano_MAV1_Ms4a3,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_MAV1_Ms4a3$avg_log2FC)),
+                                  ceiling(max(volcano_MAV1_Ms4a3$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100) 
+volcano_MAV1_Ms4a3
+ggsave("volcano_MAV1_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_MAV1_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+## 5B) volcano plot MuHV4 Ms4a3
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_MuHV4_Ms4a3 = process_markers(markers_alveolar_MuHV4_Ms4a3)
+volcano_MuHV4_Ms4a3 <- ggplot(data = volcano_MuHV4_Ms4a3,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_MuHV4_Ms4a3$avg_log2FC)),
+                                  ceiling(max(volcano_MuHV4_Ms4a3$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_MuHV4_Ms4a3
+ggsave("volcano_MuHV4_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_MuHV4_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+## 5C) volcano plot PR8 Ms4a3
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_PR8_Ms4a3 = process_markers(markers_alveolar_PR8_Ms4a3)
+volcano_PR8_Ms4a3 <- ggplot(data = volcano_PR8_Ms4a3,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_PR8_Ms4a3$avg_log2FC)),
+                                  ceiling(max(volcano_PR8_Ms4a3$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_PR8_Ms4a3
+ggsave("volcano_PR8_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_PR8_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+## 5D) volcano plot PVM Ms4a3
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_PVM_Ms4a3 = process_markers(markers_alveolar_PVM_Ms4a3)
+volcano_PVM_Ms4a3 <- ggplot(data = volcano_PVM_Ms4a3,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_PVM_Ms4a3$avg_log2FC)),
+                                  ceiling(max(volcano_PVM_Ms4a3$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_PVM_Ms4a3
+ggsave("volcano_PVM_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_PVM_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+## 5E) volcano plot Mock Ms4a3
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_Mock_Ms4a3 = process_markers(markers_alveolar_Mock_Ms4a3)
+volcano_Mock_Ms4a3 <- ggplot(data = volcano_Mock_Ms4a3,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_Mock_Ms4a3$avg_log2FC)),
+                                  ceiling(max(volcano_Mock_Ms4a3$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_Mock_Ms4a3
+ggsave("volcano_Mock_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_Mock_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+# 7) Differential expression analysis virus types
+
+```{r}
+muhv4_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "MuHV4")
+mav1_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "MAV1")
+pr8_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "PR8")
+pvm_rows <- which(seurat_d60_1_alveolar@meta.data$virus %in% "PVM")
+mock_rows <- which(seurat_d60_1_alveolar@meta.data$virus == "Mock")  # Identify Mock rows
+
+# Create logical vectors
+is_dna_virus <- logical(length(seurat_d60_1_alveolar@meta.data$virus))
+is_rna_virus <- logical(length(seurat_d60_1_alveolar@meta.data$virus))
+is_mock <- logical(length(seurat_d60_1_alveolar@meta.data$virus))  # New vector for Mock
+
+# Assign TRUE to corresponding elements in logical vectors
+is_dna_virus[muhv4_rows] <- TRUE
+is_dna_virus[mav1_rows] <- TRUE
+
+is_rna_virus[pr8_rows] <- TRUE
+is_rna_virus[pvm_rows] <- TRUE
+
+is_mock[mock_rows] <- TRUE  # Assign TRUE to Mock rows
+
+# Combine classifications (modify if needed for more categories)
+virus_classification <- ifelse(is_dna_virus, "DNA_virus",
+                               ifelse(is_rna_virus, "RNA_virus", "Mock"))
+
+# Add the new metadata column
+seurat_d60_1_alveolar <- AddMetaData(seurat_d60_1_alveolar, metadata = virus_classification, col.name = "virus_classification")
+```
+
+```{r}
+Idents(seurat_d60_1_alveolar) = "virus_classification"
+markers_DNA_vs_mock<- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "DNA_virus",
+                                 ident.2 = "Mock",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+
+markers_RNA_vs_mock<- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "RNA_virus",
+                                 ident.2 = "Mock",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+
+markers_DNA_vs_RNA<- FindMarkers(seurat_d60_1_alveolar,
+                                 ident.1 =  "DNA_virus",
+                                 ident.2 = "RNA_virus",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+```{r}
+markers_DNA_vs_mock_filter = markers_DNA_vs_mock[abs(markers_DNA_vs_mock$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_DNA <- which(markers_DNA_vs_mock$p_val_adj <= 0.05)
+markers_DNA_vs_mock_filter <- markers_DNA_vs_mock_filter[nonsignficant_p_adj_DNA, ]
+
+write_xlsx(markers_DNA_vs_mock_filter, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_DNA_vs_mock_filter.xlsx")
+write_xlsx(markers_DNA_vs_mock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_DNA_vs_mock.xlsx")
+```
+
+```{r}
+positive_DNAMock = markers_DNA_vs_mock_filter[markers_DNA_vs_mock_filter$avg_log2FC >= 0.5,]
+negative_DNAMock = markers_DNA_vs_mock_filter[markers_DNA_vs_mock_filter$avg_log2FC <= -0.5,]
+```
+
+```{r}
+
+markers_RNA_vs_mock_filter = markers_RNA_vs_mock[abs(markers_RNA_vs_mock$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_RNA <- which(markers_RNA_vs_mock$p_val_adj <= 0.05)
+markers_RNA_vs_mock_filter <- markers_RNA_vs_mock_filter[nonsignficant_p_adj_RNA, ]
+
+write_xlsx(markers_RNA_vs_mock_filter, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_RNA_vs_mock_filter.xlsx")
+write_xlsx(markers_RNA_vs_mock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_RNA_vs_mock.xlsx")
+```
+
+```{r}
+positive_RNAMock = markers_RNA_vs_mock_filter[markers_RNA_vs_mock_filter$avg_log2FC >= 0.5,]
+negative_RNAMock = markers_RNA_vs_mock_filter[markers_RNA_vs_mock_filter$avg_log2FC <= -0.5,]
+```
+
+```{r}
+markers_DNA_vs_RNA_filter = markers_DNA_vs_RNA[abs(markers_DNA_vs_RNA$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_DNARNA <- which(markers_DNA_vs_RNA$p_val_adj <= 0.05)
+markers_DNA_vs_RNA_filter <- markers_DNA_vs_RNA_filter[nonsignficant_p_adj_DNARNA, ]
+
+write_xlsx(markers_DNA_vs_RNA_filter, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_DNA_vs_RNA_filter.xlsx")
+write_xlsx(markers_DNA_vs_RNA, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_DNA_vs_RNA.xlsx")
+```
+
+```{r}
+positive_DNARNA = markers_DNA_vs_RNA_filter[markers_DNA_vs_RNA_filter$avg_log2FC >= 0.5,]
+negative_DNARNA = markers_DNA_vs_RNA_filter[markers_DNA_vs_RNA_filter$avg_log2FC <= -0.5,]
+```
+
+## 7A) volcano plot DNA vs Mock
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_alveolar_DNAvsmock = process_markers(markers_DNA_vs_mock)
+volcano_alveolar_DNAvsmock <- ggplot(data = volcano_alveolar_DNAvsmock,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_alveolar_DNAvsmock$avg_log2FC)),
+                                  ceiling(max(volcano_alveolar_DNAvsmock$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_alveolar_DNAvsmock
+ggsave("volcano_DNAvsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_DNAvsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+## 7B) volcano plot DNA vs RNA
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_alveolar_DNAvsRNA = process_markers(markers_DNA_vs_RNA)
+volcano_alveolar_DNAvsRNA <- ggplot(data = volcano_alveolar_DNAvsRNA,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_alveolar_DNAvsRNA$avg_log2FC)),
+                                  ceiling(max(volcano_alveolar_DNAvsRNA$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_alveolar_DNAvsRNA
+ggsave("volcano_DNAvsRNA.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_DNAvsRNA.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+## 7C) volcano plot RNA vs Mock
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+
+volcano_alveolar_RNAvsmock = process_markers(markers_RNA_vs_mock)
+volcano_alveolar_RNAvsmock <- ggplot(data = volcano_alveolar_RNAvsmock,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_alveolar_RNAvsmock$avg_log2FC)),
+                                  ceiling(max(volcano_alveolar_RNAvsmock$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+
+
+volcano_alveolar_RNAvsmock
+
+ggsave("volcano_RNAvsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_RNAvsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
