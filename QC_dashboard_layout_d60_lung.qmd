@@ -1,0 +1,1035 @@
+---
+title: "QC Experiment 1, day 60, lung"
+format: 
+  dashboard:
+    orientation: columns
+    
+
+---
+```{r setup}
+#| warning: false
+#| echo: false
+set.seed(2023)
+library("easypackages")
+
+
+libraries("Seurat", "tidyverse", "tidyseurat","ggExtra",
+          "viridis", "ggridges","patchwork","Matrix",
+          "ggpp","ggpubr","ggmosaic", "DT", "lemon"#, "gridExtra"
+)
+
+# EXPERIMENT 1
+#source(file="dataset_QC_setup_chunk_exp1_bal.R")
+source(file="dataset_QC_setup_chunk_exp1_lung.R")
+
+
+# EXPERIMENT 2
+#source(file="dataset_QC_setup_chunk_exp2_bal.R")
+#source(file="dataset_QC_setup_chunk_exp2_lung.R")
+
+
+# seurat_obj[["RNA"]] <- JoinLayers(seurat_obj[["RNA"]])
+# options(Seurat.seurat_object.assay.version = "v5")
+# meta_data <- seurat_obj[[]]
+# 
+# seurat_obj.v5 <- CreateSeuratObject(counts = seurat_obj[["RNA"]]$counts, meta.data = meta_data)
+# #seurat_obj.v5[[]] <- meta_data
+# #seurat_obj.v5$orig.ident <- meta_data$orig.ident
+# protein <- CreateAssay5Object(counts = seurat_obj[["protein"]]$counts[c("siglec-f-siglecf-amm2013-p-ab-o","i-a-i-e-h2-ab-ad-aq-ed-ek-amm2019-p-ab-o","cd274-cd274-amm2038-p-ab-o","cd11c-hl3-itgax-amm2008-p-ab-o","ly-6g-ly6g-amm2009-p-ab-o","ly-6a-ly-6e-ly6a-ly6e-amm2026-p-ab-o"),])
+# sampletags <- CreateAssay5Object(counts = seurat_obj[["sampletags"]]$counts)
+# seurat_obj.v5[["protein"]] <- protein
+# seurat_obj.v5[["sampletags"]] <- sampletags
+# 
+# 
+# seurat_obj <- seurat_obj.v5
+# seurat_obj.v5 <- NULL
+# gc()
+options(Seurat.object.assay.version = "v5")
+
+seurat_obj[["RNA"]] <- as(object = seurat_obj[["RNA"]], Class = "Assay5")
+
+counts_protein <- seurat_obj[["protein"]]$counts[c("siglec-f-siglecf-amm2013-p-ab-o","i-a-i-e-h2-ab-ad-aq-ed-ek-amm2019-p-ab-o","cd274-cd274-amm2038-p-ab-o","cd11c-hl3-itgax-amm2008-p-ab-o","ly-6g-ly6g-amm2009-p-ab-o","ly-6a-ly-6e-ly6a-ly6e-amm2026-p-ab-o"),]
+
+rownames(counts_protein) <- c("Siglecf-AbSeq","H2-ia-ie-AbSeq","Cd274-AbSeq","Cd11c","Ly-6g-AbSeq","Ly-6a-AbSeq")
+
+seurat_obj[["protein"]] <- CreateAssay5Object(counts = counts_protein)
+
+
+```
+
+
+# {.sidebar }
+
+
+Thresholds applied to library:
+
+|                       |                **lower**               |  **upper**                                           |
+|-----------------------|----------------------------------------|------------------------------------------------------|
+| **nCount quantile**   | `{r} lower_nCount_RNA_thresh_quantile` | `{r} upper_nCount_RNA_thresh_quantile`               |
+| **nCount RNA**        | `{r} lower_nCount_RNA_thresh         ` | `{r} upper_nCount_RNA_thresh_non_scientific`               |
+
+
+|                         |                **lower**               |  **upper**                                           |
+|-------------------------|----------------------------------------|------------------------------------------------------|
+| **quantile**            | none                                   |  `{r} upper_mito_thresh_quantile`                    |
+| **mitochondrial genes** | none                                   |`{r} upper_mito_thresh`                               |        
+
+
+|                       |                                        |  
+|-----------------------|----------------------------------------|
+| **deleted clusters** | `{r} deleted_clusters`                  |    
+
+
+# global 
+
+## Column {width=35%}
+
+### Row {.tabset}
+
+
+```{r}
+#| title: UMAP
+DimPlot(seurat_obj,label = T)+ggtitle("UMAP of first 10 Principal Components")
+
+```
+        
+```{r}
+#| title: UMAP filtered
+
+
+filtered_seurat_obj <- seurat_obj |>
+  filter(
+    !(seurat_clusters %in% deleted_clusters) &
+      nCount_RNA < upper_nCount_RNA_thresh &
+      nCount_RNA > lower_nCount_RNA_thresh &
+      sampletag_multiplets == "single_hashtag"
+  )
+
+filtered_seurat_obj |> DimPlot(label = T)
+
+```
+
+
+```{r include=FALSE}
+#| title: filtering_info_and_save_seurat_obj
+grouping_table <-
+  seurat_obj |> select(.cell,
+                       nCount_RNA,
+                       sampletag_multiplets,
+                       percent_mito,
+                       orig_cluster_specification) |> as_tibble()
+
+
+#this should be RNA correct
+grouping_table <- grouping_table |>
+  mutate(
+    is_cell = ifelse(
+      nCount_RNA < upper_nCount_RNA_thresh &
+        nCount_RNA > lower_nCount_RNA_thresh,
+      "is_cell",
+      "not_cell"
+    )
+  ) 
+
+
+  
+grouping_table <- grouping_table |> 
+  mutate(
+    is_cell_and_RNAcorrect =
+      ifelse(
+        is_cell=="is_cell" &
+          sampletag_multiplets == "single_hashtag",
+        "is_cell_and_RNAcorrect",
+        "not_cell_or_RNA_correct"
+      )
+) |>
+  mutate(filter_step=ifelse(is_cell_and_RNAcorrect=="is_cell_and_RNAcorrect",2,NA) )
+
+
+grouping_table <- grouping_table |> 
+  mutate(
+    is_cell_and_RNAcorrect_lowMito = ifelse(
+      is_cell_and_RNAcorrect == "is_cell_and_RNAcorrect" &
+        percent_mito < upper_mito_thresh,
+      "is_cell_and_RNAcorrect_lowMito",
+      "not_cell_and_RNAcorrect_lowMito"
+    )
+  ) ##|> mutate(filter_step=3)
+
+grouping_table <- grouping_table |> 
+  mutate(primary_filtered_clusters=ifelse(is_cell_and_RNAcorrect_lowMito == "is_cell_and_RNAcorrect_lowMito",
+                as.numeric(orig_cluster_specification),
+                "not_cell_and_RNAcorrect_lowMito"
+                )
+    )
+
+filtered_1 <- grouping_table |> group_by(is_cell) |> summarise(n=n()) |> mutate(filter_step=1)
+filtered_2 <-grouping_table |> filter(is_cell=="is_cell") |> group_by(is_cell_and_RNAcorrect) |>  summarise(n=n()) |> mutate(filter_step=2)
+gc()
+
+filtered_3 <-grouping_table|> filter(is_cell_and_RNAcorrect=="is_cell_and_RNAcorrect") |>group_by(is_cell_and_RNAcorrect_lowMito) |>  summarise(n=n()) |> mutate(filter_step=3)
+
+filtered_4 <-grouping_table|> filter(is_cell_and_RNAcorrect_lowMito=="is_cell_and_RNAcorrect_lowMito")  |>group_by(primary_filtered_clusters) |>  summarise(n=n()) |> mutate(filter_step=4)
+
+n_after_filtering <-
+  bind_rows(filtered_1,filtered_2,filtered_3,filtered_4) |> relocate(n,filter_step) |>   pivot_longer(is_cell:primary_filtered_clusters) 
+
+
+filtered_seurat_obj@misc[[paste0(obj_identifier, "_n_after_filtering")]] <- n_after_filtering
+filtered_seurat_obj@misc[[paste0(obj_identifier, "_grouping_table")]] <- grouping_table
+
+
+write_rds(filtered_seurat_obj, file = file_path_output)
+```
+
+
+
+```{r include=FALSE}
+#| title: filtering_info_and_save_seurat_obj
+grouping_table <-
+  seurat_obj |> select(.cell,
+                       nCount_RNA,
+                       sampletag_multiplets,
+                       percent_mito,
+                       orig_cluster_specification, seurat_clusters) |> as_tibble() |> select(-(PC_1:PC_50))
+```
+
+```{r include=FALSE}
+
+#filter by hashtag for :is single hashtag
+grouping_table <- grouping_table |> 
+  mutate(
+    is_single_hashtag =
+      ifelse(
+          sampletag_multiplets == "single_hashtag",
+        "single_hashtag",
+        "not_single_hashtag"
+      ))
+
+#filter by RNA to exclude doublets and empty wells to cocnclude:is single cell
+grouping_table <- grouping_table |>
+  mutate(
+    is_single_cell = ifelse(
+      nCount_RNA < upper_nCount_RNA_thresh &
+        nCount_RNA > lower_nCount_RNA_thresh &
+        sampletag_multiplets == "single_hashtag",
+      "is_single_cell",
+      "not_single_cell"
+    )
+  ) 
+
+#are single cells -> add percent mitochondrial gene threshold
+
+grouping_table <- grouping_table |> 
+  mutate(
+    is_single_live_cell = ifelse(
+      is_single_cell == "is_single_cell" &
+        percent_mito < upper_mito_thresh,
+      "is_single_live_cell",
+      "not_single_live_cell"
+    )
+  )
+
+
+#for live viable cells are they macs??
+grouping_table <- grouping_table |> 
+  mutate(is_single_live_macrophage=ifelse(is_single_live_cell == "is_single_live_cell" &
+                !(seurat_clusters %in% deleted_clusters),"is_single_live_macrophage",
+                "not_single_live_macrophage" ))
+
+
+filtered_seurat_obj@misc[[paste0(obj_identifier, "_grouping_table")]] <- grouping_table
+
+
+write_rds(filtered_seurat_obj, file = file_path_output)
+```
+
+
+```{r}
+#| title: n after filtering
+
+
+geom_col_cust <- function(x) x + geom_col()+theme_bw()+ theme(axis.text.x = element_text(angle = 45, hjust = 1))+ylim(0,20000)
+
+p1 <- filtered_1 |> ggplot(aes(x = filter_step, y = n, fill = is_cell)) |> geom_col_cust()
+
+
+p2 <- filtered_2 |> ggplot(aes(x = filter_step, y = n, fill = is_cell_and_RNAcorrect)) |> geom_col_cust()
+
+p3 <- filtered_3|> ggplot(aes(x = filter_step , y = n, fill = is_cell_and_RNAcorrect_lowMito)) |> geom_col_cust()
+
+
+p4 <- filtered_4 |> ggplot(aes(x = filter_step, y = n, fill = primary_filtered_clusters)) |> geom_col_cust()
+
+
+p1 + p2 + p3 + p4
+
+
+
+```
+
+```{r}
+#| title: n after filtering 2
+
+n_after_filtering |> filter(!is.na(value)) |> ggplot(aes(x = name, y = n, fill = value)) + geom_col()+theme_bw()+ theme(axis.text.x = element_text(angle = 45, hjust = 1))#+facet_wrap(~name)+ them
+```
+
+### Row {.tabset}
+```{r}
+#| title: sample tags
+seurat_obj |> count(sampletag_name) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),2)) |>
+  ggplot(aes(sampletag_name, y=n, fill=sampletag_name)) +
+  geom_col()+ 
+  geom_text(aes(label=percent, x=sampletag_name, y=n))+
+  theme_minimal()+
+  theme_1+ ggtitle("sampletag_name")
+```
+
+```{r}
+#| title: clusters
+
+seurat_obj |> count(RNA_snn_res.0.5) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),2)) |>
+  ggplot(aes(RNA_snn_res.0.5, y=n, fill=RNA_snn_res.0.5)) +
+  geom_col()+ 
+  geom_text(aes(label=percent, x=RNA_snn_res.0.5, y=n))+
+  theme_minimal()+
+  theme_1+
+  ggtitle("seurat_slusters RNA_snn_res.0.5")
+
+```
+
+
+```{r}
+#| title: Ms4a3
+
+seurat_obj |> count(sampletag_Ms4a3) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),2)) |>
+  ggplot(aes(sampletag_Ms4a3, y=n, fill=sampletag_Ms4a3)) +
+  geom_col()+ 
+  geom_text(aes(label=percent, x=sampletag_Ms4a3, y=n))+
+  theme_minimal()+
+  theme_1+
+  ggtitle("seurat_slusters sampletag_Ms4a3")
+```
+
+
+```{r}
+#| title: singlets
+seurat_obj |> count(sampletag_multiplets) |>
+  mutate(percent=round(100*(n/ncol(seurat_obj)),2)) |>
+  ggplot(aes(sampletag_multiplets, y=n, fill=sampletag_multiplets)) +
+  geom_col()+ 
+  geom_text(aes(label=percent, x=sampletag_multiplets, y=n))+
+  theme_minimal()+
+  theme_1+
+  ggtitle("seurat_slusters sampletag_multiplets")
+```
+
+## Column {width=40%}
+### Row {.tabset}
+```{r}
+#| title: nCount marginal
+multiplet_n_count_RNA_n_Feature<- seurat_obj |>
+  ggplot(aes(nCount_RNA, nFeature_RNA, color=sampletag_multiplets)) +
+  geom_point(size=0.5) +theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000)) +scale_color_manual(values = c( "grey","red","green"))+   geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+
+  geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")
+
+ggMarginal(multiplet_n_count_RNA_n_Feature +
+             theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3)  
+```
+
+
+```{r message=FALSE}
+#| title: nCount marginal filtered clusters 1-7
+
+multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj |>mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |>  filter(seurat_clusters_num %in% c(0:7))  |> ggplot(aes(nCount_RNA, nFeature_RNA, color=seurat_clusters)) +  
+  geom_point(size=0.5) +
+  theme_bw() +
+  xlim(c(-100,70000)) +
+  ylim(c(-1000,8000)) +
+  #scale_color_manual(values = c( "grey","red","green"))  +  
+  geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+ guides(colour = guide_legend(override.aes = list(size=7)))
+
+ggMarginal(multiplet_n_count_RNA_n_Feature_filtered +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3) 
+max_num_cluster <-  filtered_seurat_obj|> mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |> pull(seurat_clusters_num) |> max()
+eval_filtered_15 <-  max_num_cluster>=15
+
+```
+
+
+```{r include=eval_filtered_15, message=FALSE}
+#| title: nCount marginal filtered clusters 8-15
+
+multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj|> mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |>  filter(seurat_clusters_num %in% c(8:15)) |>   ggplot(aes(nCount_RNA, nFeature_RNA, color=seurat_clusters)) + 
+  geom_point(size=0.5) +
+  theme_bw() +
+  xlim(c(-100,70000)) +
+  ylim(c(-1000,8000)) +
+  #scale_color_manual(values = c( "grey","red","green"))  +  
+  geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+ guides(colour = guide_legend(override.aes = list(size=7)))
+
+ggMarginal(multiplet_n_count_RNA_n_Feature_filtered +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3) 
+
+
+
+max_num_cluster <-  filtered_seurat_obj|> mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |> pull(seurat_clusters_num) |> max()
+eval_filtered_15 <-  max_num_cluster>=15
+
+```
+
+
+
+```{r include=eval_filtered_15, message=FALSE, eval=eval_filtered_15}
+#| title: nCount marginal filtered clusters >15
+if (eval_filtered_15) {
+  multiplet_n_count_RNA_n_Feature_filtered<- filtered_seurat_obj|> mutate(seurat_clusters_num =as.numeric(as.character(seurat_clusters))) |>  filter(seurat_clusters_num >15) |>   ggplot(aes(nCount_RNA, nFeature_RNA, color=seurat_clusters)) + 
+  geom_point(size=0.5) +
+  theme_bw() +
+  xlim(c(-100,70000)) +
+  ylim(c(-1000,8000)) +
+  #scale_color_manual(values = c( "grey","red","green"))  +  
+  geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+ guides(colour = guide_legend(override.aes = list(size=7)))
+
+ggMarginal(multiplet_n_count_RNA_n_Feature_filtered +theme(legend.position = "bottom") , type = "density", groupColour = TRUE, groupFill = TRUE,size = 3)
+  
+  
+}
+
+
+
+```
+
+```{r}
+#| title: nCount boxplot unflitered
+
+seurat_obj |> ggplot(aes(nCount_RNA, seurat_clusters, fill=seurat_clusters)) + geom_boxplot()+ theme_bw()
+
+```
+
+```{r}
+#| title: nCount RNA boxplot filtered
+
+filtered_seurat_obj |> ggplot(aes(nCount_RNA, seurat_clusters, fill=seurat_clusters)) + geom_boxplot()+ theme_bw()
+
+```
+```{r}
+#| title: nCount RNA per condition unfiltered
+
+seurat_obj |> ggplot(aes(nCount_RNA, sampletag_name, fill=sampletag_name)) + geom_boxplot()+ theme_bw()
+
+```
+```{r}
+#| title: nCount RNA per condition filtered
+
+sorted <- seurat_obj$sampletag_name |> unique() |> as.character()|> sort()
+
+filtered_seurat_obj |> mutate(sampletag_name=factor(sampletag_name, levels=sorted  )) |> 
+  ggplot(aes(nCount_RNA, sampletag_name, fill=sampletag_name)) +
+  geom_boxplot()+ theme_bw()
+
+```
+
+```{r}
+#| title: fraction multiplets, by nCOunt RNA quantile
+ seurat_obj |>  
+  mutate(ncount_bin=cut_number(nCount_RNA,50)) |> 
+  separate(ncount_bin,sep = ",",into=c("throw","ncount_bin")) |>
+  mutate(ncount_bin=as.numeric(str_remove(ncount_bin,"]"))) |> 
+  group_by(ncount_bin) |>
+  count(sampletag_multiplets) |> 
+  mutate(percentage= 100*n/sum(n)) |> 
+  ungroup() |> 
+  ggplot(aes(ncount_bin, percentage, color=sampletag_multiplets)) + 
+  geom_point(size=3) +
+  theme_1+scale_color_manual(values = c( "grey","red","green"))+theme(legend.position = "right")
+
+```
+
+```{r}
+#| title: fraction multiplets, by nCount RNA absolut
+ seurat_obj |>  
+  mutate(ncount_bin=cut_width(x=nCount_RNA,width=1000, boundary = 0)) |> 
+  separate(ncount_bin,sep = ",",into=c("throw","ncount_bin")) |>
+  mutate(ncount_bin=as.numeric(str_remove(ncount_bin,"]"))) |> 
+  group_by(ncount_bin) |>
+  count(sampletag_multiplets) |> 
+  mutate(percentage= 100*n/sum(n)) |> 
+  ungroup() |> 
+  ggplot(aes(ncount_bin, percentage, color=sampletag_multiplets)) + 
+  geom_point(size=3) +
+  theme_1+
+  theme_1+scale_color_manual(values = c( "grey","red","green"))
+```
+
+
+
+```{r}
+#| title: mito
+
+# 
+plot_percent_mito_nFeature_RNA_dens <-  seurat_obj |> ggplot(aes(nCount_RNA, percent_mito)) + geom_density_2d() +theme_bw() +theme(legend.position = "none")+
+        xlim(c(-1000,xlim_max)) +ylim(c(-0,ylim_max))
+
+plot_percent_mito_nFeature_RNA_point <- seurat_obj |> ggplot(aes(nCount_RNA, percent_mito)) + geom_point(size=0.5) +theme_bw() +
+        xlim(c(-1000,xlim_max)) +ylim(c(-0,6)) +
+        geom_hline(aes(yintercept = upper_mito_thresh),linetype = "dashed")+
+        geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+
+  geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")+
+        geom_text(aes(xlim_max, upper_mito_thresh, label = as.character(upper_mito_thresh_quantile)), nudge_y =upper_mito_thresh/23)+
+        geom_text(aes(lower_nCount_RNA_thresh,ylim_max, label = as.character(lower_nCount_RNA_thresh_quantile)), nudge_x =upper_nCount_RNA_thresh/23)+        geom_text(aes(upper_nCount_RNA_thresh,ylim_max, label = as.character(upper_nCount_RNA_thresh_quantile)), nudge_x =upper_nCount_RNA_thresh/20)
+
+        
+ plot_percent_mito_nFeature_RNA_dens
+
+quantile_table <- tibble(
+mito_quantiles=seurat_obj$percent_mito |>
+        quantile(probs = (seq(0.93,0.99,by=0.01))),
+nCount_quantiles=seurat_obj$nCount_RNA |>
+        quantile(probs = (seq(0.93,0.99,by=0.01)))
+)
+
+quantile_table <- tibble(quantile_=c(
+        seq(0.01,0.06,by=0.01),seq(0.93,0.99,by=0.01)) ) |> mutate(
+        per_mito=round(seurat_obj$percent_mito |> quantile(probs = quantile_),2),
+        nCount_RNA=round(seurat_obj$nCount_RNA |> quantile(probs = quantile_),2))
+
+
+plot_percent_mito_nFeature_RNA_point <- plot_percent_mito_nFeature_RNA_point + annotate(geom = 'table',
+           x=70000,
+           y=6,
+           size = 2,
+           label=list(round(quantile_table, 2))) 
+
+
+ggMarginal(plot_percent_mito_nFeature_RNA_point +
+                   theme(legend.position = "none") , type = "density")
+                   
+```
+
+```{r}
+#| title: nCount density
+multiplet_n_count_RNA_n_Feature_density<- seurat_obj |>  ggplot(aes(nCount_RNA, nFeature_RNA, color=sampletag_multiplets
+                                                                    )) +geom_density_2d()+theme_bw() +xlim(c(-100,70000)) +ylim(c(-1000,8000)) +    geom_vline(aes(xintercept = lower_nCount_RNA_thresh),linetype = "dashed")+    geom_vline(aes(xintercept = upper_nCount_RNA_thresh),linetype = "dashed")
+
+multiplet_n_count_RNA_n_Feature_density
+```
+
+
+
+### Row {.tabset}
+```{r}
+#| title: Elbow Plot
+ElbowPlot(seurat_obj)
+```
+
+```{r} 
+# showing the PC plots 
+# #| title: PC 1/2
+# DimPlot(seurat_obj, reduction = "pca")
+# ```
+# ```{r}
+# #| title: PC  3/4
+# DimPlot(seurat_obj, reduction = "pca", dims = c(3,4))
+# ```
+# ```{r}
+# #| title: PC  4/5
+# DimPlot(seurat_obj, reduction = "pca", dims = c(4,5))
+# ```
+# ```{r}
+# #| title: PC  6/7
+# DimPlot(seurat_obj, reduction = "pca", dims = c(6,7))
+# ```
+# ```{r}
+# #| title: PC  8/9
+# DimPlot(seurat_obj, reduction = "pca", dims = c(8,9))
+```
+
+## Column {.tabset}
+```{r}
+#| fig-width: 12
+#| fig-height: 12
+#| echo: false
+#| title: all cells
+
+seurat_obj <- seurat_obj |>
+  mutate(rna_group=ifelse(nCount_RNA<lower_nCount_RNA_thresh,"low_RNA",
+                                    ifelse(nCount_RNA>upper_nCount_RNA_thresh,"high_RNA",
+                                           "norm_RNA"
+                                    )),
+                     mito_group=ifelse(percent_mito>upper_mito_thresh,"high_mito","norm_mito")) |> 
+  mutate(rna_mito=as_factor(paste(rna_group,mito_group, sep="..."))) #|> 
+
+seurat_obj |> 
+  ggplot()+
+  geom_mosaic(aes(x=product(rna_mito,sampletag_multiplets),fill=rna_mito, alpha=sampletag_multiplets))+theme_1+theme(axis.text  = element_blank())+
+  theme(legend.position = "right",axis.title = element_text(size=22),
+        legend.text=element_text(size=22),
+        axis.text = element_text(size = 22),
+        axis.text.y = element_blank()
+        )+
+  scale_fill_discrete(guide= guide_legend(reverse=TRUE))
+
+```
+
+
+```{r}
+#| fig-width: 7
+#| fig-height: 15
+#| title: seurat clusters
+#| warning: false
+cluster_mosaic_plot <- seurat_obj  |> 
+        ggplot()+
+        geom_mosaic(aes(x=product(rna_mito,sampletag_multiplets),
+                        fill=rna_mito, alpha=sampletag_multiplets))+
+        theme_1+
+        theme(axis.text  = element_blank(),
+              axis.text.x = element_blank())+facet_wrap(~seurat_clusters,ncol = 3)#+ theme(strip.text = element_text(size=22))
+
+cluster_mosaic_plot
+
+```
+
+```{r}
+#| title: cell cycle
+
+
+# A list of cell cycle markers, from Tirosh et al, 2015, is loaded with Seurat.  We can
+# segregate this list into markers of G2/M phase and markers of S phase
+s.genes <- cc.genes$s.genes |> str_to_title()
+g2m.genes <- cc.genes$g2m.genes|> str_to_title()
+
+seurat_obj<- CellCycleScoring(seurat_obj, s.features = s.genes, g2m.features = g2m.genes)
+
+DimPlot(seurat_obj, group.by = "Phase")
+
+```
+```{r}
+#| title: cell cycle
+cluster_cell_cycle_mosaic_plot_all <- seurat_obj  |> 
+        ggplot()+
+        geom_mosaic(aes(x=product(Phase,sampletag_multiplets),
+                        fill=Phase, alpha=sampletag_multiplets))+
+        theme_1+
+        theme(axis.text  = element_blank(),
+              axis.text.x = element_blank(),
+              legend.position = "bottom")
+cluster_cell_cycle_mosaic_plot_all 
+```
+
+```{r}
+#| title: cell cycle
+#| fig-width: 7
+#| fig-height: 15
+#| warning: false
+cluster_cell_cycle_mosaic_plot <- seurat_obj  |> 
+        ggplot()+
+        geom_mosaic(aes(x=product(Phase,sampletag_multiplets),
+                        fill=Phase, alpha=sampletag_multiplets))+
+        theme_1+
+        theme(axis.text  = element_blank(),
+              axis.text.x = element_blank())+facet_wrap(~seurat_clusters,ncol = 3)
+cluster_cell_cycle_mosaic_plot 
+```
+
+```{r}
+#| fig-width: 7
+#| fig-height: 15
+#| title: condition
+#| warning: false
+
+seurat_obj  |> 
+        ggplot()+
+        geom_mosaic(aes(x=product(rna_mito,sampletag_multiplets),
+                        fill=rna_mito, alpha=sampletag_multiplets))+
+        theme_1+
+        theme(axis.text  = element_blank(),
+              axis.text.x = element_blank())+
+                      facet_wrap(~sampletag_name,
+                                 ncol = 3) + theme(strip.text = element_text(size=22))
+```
+# gene-level
+
+## Column 
+
+### Row {,.tabset}
+```{r}
+seurat_obj <- BuildClusterTree(seurat_obj)
+PlotClusterTree(seurat_obj, direction = "downwards")
+```
+
+### Row {}
+```{r}
+#| title: Data
+
+de_genes_tbl |> mutate(cluster=as_factor(cluster)) |>
+  relocate(cluster) |> 
+  datatable(
+    colnames = c("cluster ","gene","pval", "avg_log2FC", "pct.1", "pct.2","p_val_adj"),
+    filter = 'top',
+    options = list(dom = 'tp',
+     paging = TRUE,
+    #   lengthMenu = c(5, 10, 25),
+    #   pageLength = 10, 
+      scrollY = TRUE
+     ),
+  )
+```
+## Column 
+
+### Row{.tabset}
+```{r}
+#| warning: false
+#| echo: false
+#load packages
+
+feature_umap <- function(genes, title_="", caption_=""){
+
+  
+  
+        seurat_obj |> join_features(genes, assay="RNA") |> mutate(.feature=factor(.feature,levels=genes)) |> ggplot(aes(umap_1,umap_2,color=.abundance_RNA))+geom_point() +
+  scale_color_viridis_c()+ theme_void()+coord_fixed()+
+  facet_wrap(~.feature, ncol = 4) +
+    labs(title =title_,
+         caption =caption_ )+
+    theme(plot.caption = element_text(size=6, face="bold"))
+}
+
+# clus_0_genes <-  c(de_genes_tbl |> filter(cluster==0) |> slice_max(avg_log2FC,n = 5) |> pull(gene), c("H2-Ab1"))
+# title_feature_umap_clus_0 <- "Macrophage, MHC complex"
+# caption_feature_umap_clus_0 <-"" 
+```
+
+
+```{r, cluster_0_feature_umap, eval= eval_0, include=eval_0}
+#| title: cluster 0
+#| fig-height: 10
+feature_umap(clus_0_genes, title_= title_feature_umap_clus_0, caption_ = caption_feature_umap_clus_1) 
+
+genes=clus_0_genes
+```
+
+```{r, cluster_1_feature_umap, eval= eval_1, include=eval_1}
+#| title: cluster 1
+feature_umap(genes=clus_1_genes,title_feature_umap_clus_1, caption=caption_feature_umap_clus_1)
+```
+
+```{r, cluster_2_feature_umap, eval= eval_2, include=eval_2}
+#| title: cluster 2
+feature_umap(clus_2_genes,title_feature_umap_clus_2, caption=caption_feature_umap_clus_2)
+```
+
+```{r, cluster_3_feature_umap, eval= eval_3, include=eval_3}
+#| title: cluster 3
+feature_umap(clus_3_genes,title_feature_umap_clus_3, caption=caption_feature_umap_clus_3)
+```
+
+```{r, cluster_4_feature_umap, eval= eval_4, include=eval_4}
+#| title: cluster 4
+feature_umap(clus_4_genes,title_feature_umap_clus_4, caption=caption_feature_umap_clus_4)
+```
+
+```{r, cluster_5_feature_umap, eval= eval_5, include=eval_5}
+#| title: cluster 5
+
+feature_umap(clus_5_genes,title_feature_umap_clus_5, caption=caption_feature_umap_clus_5)
+```
+
+```{r, cluster_6_feature_umap, eval= eval_6, include=eval_6}
+#| title: cluster 6
+feature_umap(clus_6_genes,title_feature_umap_clus_6, caption=caption_feature_umap_clus_6)
+```
+
+```{r, cluster_7_feature_umap, eval= eval_7, include=eval_7}
+#| title: cluster 7
+
+feature_umap(clus_7_genes,title_feature_umap_clus_7, caption=caption_feature_umap_clus_7)
+```
+```{r, cluster_8_feature_umap, eval= eval_8, include=eval_8}
+#| title: cluster 8
+feature_umap(clus_8_genes,title_feature_umap_clus_8, caption=caption_feature_umap_clus_8)
+
+```
+```{r, cluster_9_feature_umap, eval= eval_9, include=eval_9}
+#| title: cluster 9
+
+feature_umap(clus_9_genes,title_feature_umap_clus_9, caption=caption_feature_umap_clus_9)
+```
+```{r, cluster_10_feature_umap, eval= eval_10, include=eval_10}
+#| title: cluster 10
+
+feature_umap(clus_10_genes,title_feature_umap_clus_10, caption=caption_feature_umap_clus_10)
+```
+
+```{r, cluster_10_extra, eval= eval_10_extra, include= eval_10_extra}
+#| title: cluster 10 mt graph
+
+clus=10
+seurat_obj |> mutate(cluster_10=ifelse(RNA_snn_res.0.5==clus, paste("cluster", as.character(clus)), "other"))|> 
+  arrange(desc(cluster_10)) |> 
+  ggplot(aes(nCount_RNA,percent_mito, color=cluster_10)) +geom_point()
+```
+
+
+```{r, cluster_11_feature_umap, eval= eval_11, include=eval_11}
+#| title: cluster 11
+
+feature_umap(clus_11_genes,title_feature_umap_clus_11, caption=caption_feature_umap_clus_11)
+
+```
+
+```{r, cluster_12_feature_umap, eval= eval_12, include=eval_12}
+#| title: cluster 12
+
+#feature_umap(clus_12_genes,title_feature_umap_clus_12, caption=caption_feature_umap_clus_12)
+
+```
+
+```{r, cluster_13_feature_umap, eval= eval_13, include=eval_13}
+#| title: cluster 13
+
+feature_umap(clus_13_genes,title_feature_umap_clus_13, caption=caption_feature_umap_clus_13)
+
+```
+
+```{r, cluster_14_feature_umap, eval= eval_14, include=eval_14}
+#| title: cluster 14
+
+feature_umap(clus_14_genes,title_feature_umap_clus_14, caption=caption_feature_umap_clus_14)
+```
+
+```{r, cluster_15_feature_umap, eval= eval_15, include=eval_15}
+#| title: cluster 15
+
+feature_umap(clus_15_genes,title_feature_umap_clus_15, caption=caption_feature_umap_clus_15)
+```
+
+
+
+
+```{r, cluster_16_feature_umap, eval= eval_16, include=eval_16}
+#| title: cluster 16
+
+feature_umap(clus_16_genes,title_feature_umap_clus_16, caption=caption_feature_umap_clus_16)
+```
+
+```{r, cluster_16_extra, eval= eval_16_extra}
+#| title: cluster 16 expr
+
+
+# seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==16, "cluster 16", "other")) |> 
+#   join_features(clus_16_genes) |> dplyr::mutate(.feature=factor(.feature, levels=clus_16_genes)) |> 
+#   ggplot(aes(cluster_highlight,.abundance_RNA), color=cluster_highlight) + 
+#   geom_violin()+geom_jitter()+
+#   theme_minimal()+
+#   facet_wrap(~.feature)
+
+```
+
+
+```{r, cluster_17_feature_umap, eval= eval_17, include=eval_17}
+#| title: cluster 17
+
+feature_umap(clus_17_genes,title_feature_umap_clus_17, caption=caption_feature_umap_clus_17)
+```
+
+```{r, cluster_18_feature_umap, eval= eval_18, include=eval_18}
+#| title: cluster 18
+
+feature_umap(clus_18_genes,title_feature_umap_clus_18, caption=caption_feature_umap_clus_18)
+
+```
+
+```{r, cluster_19_feature_umap, eval= eval_19, include=eval_19}
+#| title: cluster 19
+
+feature_umap(clus_19_genes,title_feature_umap_clus_19, caption=caption_feature_umap_clus_19)
+```
+
+```{r, cluster_20_feature_umap, eval= eval_20, include=eval_20}
+#| title: cluster 20
+
+feature_umap(clus_20_genes,title_feature_umap_clus_20, caption=caption_feature_umap_clus_20)
+```
+
+```{r, cluster_21_feature_umap, eval= eval_21, include=eval_21}
+#| title: cluster 21
+
+feature_umap(clus_21_genes,title_feature_umap_clus_21, caption=caption_feature_umap_clus_21)
+```
+### Row {.tabset}
+```{r}
+#| title: cluster 0
+
+clus_highlight <- function(clus){
+  seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==clus, paste("cluster", as.character(clus)), "other")) |>
+  ggplot(aes(umap_1,umap_2,color=cluster_highlight ))+geom_point() +theme_minimal()+ theme(legend.position = "none")
+  
+}
+
+clus_highlight(0)
+```
+```{r}
+#| title: cluster 1
+
+clus_highlight(1)
+
+```
+
+```{r}
+#| title: cluster 2
+
+clus_highlight(2)
+
+```
+```{r}
+#| title: cluster 3
+
+clus_highlight(3)
+
+```
+```{r}
+#| title: cluster 4
+
+clus_highlight(4)
+
+```
+```{r}
+#| title: cluster 5
+
+clus_highlight(5)
+
+```
+```{r}
+#| title: cluster 6
+
+clus_highlight(6)
+
+```
+```{r}
+#| title: cluster 7
+
+clus_highlight(7)
+
+```
+
+```{r}
+#| title: cluster 8
+
+clus_highlight(8)
+
+```
+```{r}
+#| title: cluster 9
+
+clus_highlight(9)
+
+```
+
+```{r}
+#| title: cluster 10
+
+clus_highlight(10)
+
+```
+
+```{r}
+#| title: cluster 11
+
+clus_highlight(11)
+
+```
+
+
+
+
+```{r}
+#| title: cluster 12
+
+clus_highlight(12)
+
+```
+
+```{r}
+#| title: cluster 13
+
+clus_highlight(13)
+
+```
+
+```{r}
+#| title: cluster 14
+
+clus_highlight(14)
+
+```
+
+```{r}
+#| title: cluster 15
+
+clus_highlight(15)
+
+```
+
+```{r}
+#| title: cluster 16
+
+clus_highlight(16)
+
+```
+
+```{r}
+#| title: cluster 17
+
+clus_highlight(17)
+
+```
+
+
+```{r}
+#| title: cluster 17
+clus_highlight(17)
+```
+```{r}
+#| title: cluster 18
+clus_highlight(18)
+```
+```{r}
+#| title: cluster 19
+clus_highlight(19)
+```
+```{r}
+#| title: cluster 20
+clus_highlight(20)
+```
+```{r}
+#| title: cluster 21
+
+clus_highlight(21)
+
+```
+
+
+
+# Protein
+
+```{r}
+library(ggridges)
+DefaultAssay(seurat_obj) <- "protein"
+seurat_obj <- NormalizeData(seurat_obj, method="CLR")
+
+seurat_obj |> join_features(assay="protein", all=T, slot="counts") |>
+  group_by(.feature) |> summarise(
+    mean_protein=mean(.abundance_protein),
+    var_protein=var(.abundance_protein)) |>
+  ggplot(aes(mean_protein,var_protein))+geom_point()
+
+seurat_obj |> join_features(assay="protein", all=T, slot="counts") |> group_by(seurat_clusters) |> ggplot(aes(log10(.abundance_protein+1),y=seurat_clusters))+geom_density_ridges()+facet_grid(~.feature)+theme_bw()
+
+seurat_obj |> join_features(assay="protein", all=T, slot="data") |> group_by(seurat_clusters) |> ggplot(aes(.abundance_protein,y=seurat_clusters))+geom_density_ridges()+facet_grid(~.feature)+theme_bw()
+```
+```{r}
+
+```
+
