@@ -1,5 +1,5 @@
 ---
-title: "QC Experiment 1, day 60, lung"
+title: "QC Experiment 2, day 8, bal"
 format: 
   dashboard:
     orientation: columns
@@ -18,13 +18,11 @@ libraries("Seurat", "tidyverse", "tidyseurat","ggExtra",
           "ggpp","ggpubr","ggmosaic", "DT", "lemon"#, "gridExtra"
 )
 
-# EXPERIMENT 1
-#source(file="dataset_QC_setup_chunk_exp1_bal.R")
-source(file="dataset_QC_setup_chunk_exp1_lung.R")
 
 
-# EXPERIMENT 2
-#source(file="dataset_QC_setup_chunk_exp2_bal.R")
+
+
+source(file="dataset_QC_setup_chunk_exp2_bal.R")
 #source(file="dataset_QC_setup_chunk_exp2_lung.R")
 
 
@@ -89,6 +87,7 @@ filtered_seurat_obj <- seurat_obj |>
 filtered_seurat_obj |> DimPlot(label = T)
 
 ```
+
 ```{r}
 #| title: UMAP filtered + cell cycle 
 
@@ -616,7 +615,7 @@ cluster_mosaic_plot
 #               axis.text.x = element_blank())+facet_wrap(~seurat_clusters,ncol = 3)
 # cluster_cell_cycle_mosaic_plot 
 ```
-
+ 
 ```{r}
 #| fig-width: 7
 #| fig-height: 15
@@ -801,13 +800,13 @@ feature_umap(clus_16_genes,title_feature_umap_clus_16, caption=caption_feature_u
 ```{r, cluster_16_extra, eval= eval_16_extra}
 #| title: cluster 16 expr
 
-# 
-# seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==16, "cluster 16", "other")) |>
-#   join_features(clus_16_genes) |> dplyr::mutate(.feature=factor(.feature, levels=clus_16_genes)) |>
-#   ggplot(aes(cluster_highlight,.abundance_RNA), color=cluster_highlight) +
-#   geom_violin()+geom_jitter()+
-#   theme_minimal()+
-#   facet_wrap(~.feature)
+
+seurat_obj |> mutate(cluster_highlight=ifelse(RNA_snn_res.0.5==16, "cluster 16", "other")) |>
+  join_features(clus_16_genes) |> dplyr::mutate(.feature=factor(.feature, levels=clus_16_genes)) |>
+  ggplot(aes(cluster_highlight,.abundance_RNA), color=cluster_highlight) +
+  geom_violin()+geom_jitter()+
+  theme_minimal()+
+  facet_wrap(~.feature)
 
 ```
 
