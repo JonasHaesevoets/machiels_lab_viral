@@ -12,20 +12,20 @@ set.seed(2023)
 
 #libraries("Seurat", "dplyr", "janitor", "forcats","tidyseurat", "Matrix", "vroom", "tidyfst", "readr")
 
-# List of packages to install
-packages_to_install <- c("easypackages","tidyverse", "Seurat", "dplyr", "janitor", "forcats","tidyseurat", "Matrix", "vroom", "tidyfst", "readr", "stringr", "tibble")
-
-# Function to install a package if not already installed
-install_if_not_installed <- function(package) {
-  if (!(package %in% installed.packages()[,"Package"])) {
-    install.packages(package, dependencies = TRUE)
-  }
-}
-
-# Loop through packages and install if not already installed
-for (pkg in packages_to_install) {
-  install_if_not_installed(pkg)
-}
+# # List of packages to install
+# packages_to_install <- c("easypackages","tidyverse", "Seurat", "dplyr", "janitor", "forcats","tidyseurat", "Matrix", "vroom", "tidyfst", "readr", "stringr", "tibble")
+# 
+# # Function to install a package if not already installed
+# install_if_not_installed <- function(package) {
+#   if (!(package %in% installed.packages()[,"Package"])) {
+#     install.packages(package, dependencies = TRUE)
+#   }
+# }
+# 
+# # Loop through packages and install if not already installed
+# for (pkg in packages_to_install) {
+#   install_if_not_installed(pkg)
+# }
 
 easypackages::libraries("Seurat", "dplyr", "janitor", "forcats","tidyseurat", "Matrix", "vroom", "tidyfst", "readr", "stringr", "tidyverse")
 
@@ -54,12 +54,12 @@ file_names_tbl <- tribble(
 
         "lung", #cell_id_A
         "bal",#cell_id_B
-        "output_lung_d8\\Combined_BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
+        "output_lung_d8/Combined_BD-Analysis-BMachiels-Lung_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
         "seurat_obj_experiment_2_combined_lung_raw_dbec", #~name_for_seurat_file_A; file path for the intermediate data output of the script
-        "output_bal_d8\\Combined_BD-Analysis-BMachiels-Bal_DBEC_MolsPerCell.csv",#~dbec_file_path_B,
+        "output_bal_d8/Combined_BD-Analysis-BMachiels-Bal_DBEC_MolsPerCell.csv",#~dbec_file_path_B,
         "seurat_obj_experiment_2_combined_bal_raw_dbec",#name_for_seurat_file_B
-        "output_lung_d8\\BD-Analysis-BMachiels-Lung_Sample_Tag_ReadsPerCell.csv",#~sample_tag_reads_per_cell_A,
-        "output_bal_d8\\BD-Analysis-BMachiels-Bal_Sample_Tag_ReadsPerCell.csv",#sample_tag_reads_per_cell_B,
+        "output_lung_d8/BD-Analysis-BMachiels-Lung_Sample_Tag_ReadsPerCell.csv",#~sample_tag_reads_per_cell_A,
+        "output_bal_d8/BD-Analysis-BMachiels-Bal_Sample_Tag_ReadsPerCell.csv",#sample_tag_reads_per_cell_B,
 
         #experiment 1
         "viral.experiment.1", #name_for_merged_seurat_file
@@ -67,12 +67,12 @@ file_names_tbl <- tribble(
 
         "lung", #cell_id_A
         "bal",#cell_id_B
-        "2023-10-02_output_lung\\Output_Lung\\Combined_BD-Analysis-BMachiels_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
+        "2023-10-02_output_lung/Output_Lung/Combined_BD-Analysis-BMachiels_DBEC_MolsPerCell.csv",#dbec_file_path_A this is where the relevant count data is stored, "dbec" corrected,contains both ab-seq and transcriptome
         "seurat_obj_experiment_1_combined_lung_raw_dbec", #~name_for_seurat_file_A; file path for the intermediate data output of the script
-        "2023-10-02_output_bal\\Output_BAL\\Combined_BD-Analysis-BMachiels_DBEC_MolsPerCell.csv",#~dbec_file_path_B,
+        "2023-10-02_output_bal/Output_BAL/Combined_BD-Analysis-BMachiels_DBEC_MolsPerCell.csv",#~dbec_file_path_B,
         "seurat_obj_experiment_1_combined_bal_raw_dbec",#name_for_seurat_file_B
-        "2023-10-02_output_lung\\Output_Lung\\BD-Analysis-BMachiels_Sample_Tag_ReadsPerCell.csv",#~sample_tag_reads_per_cell_A,
-        "2023-10-02_output_bal\\Output_BAL\\BD-Analysis-BMachiels_Sample_Tag_ReadsPerCell.csv"#sample_tag_reads_per_cell_B,
+        "2023-10-02_output_lung/Output_Lung/BD-Analysis-BMachiels_Sample_Tag_ReadsPerCell.csv",#~sample_tag_reads_per_cell_A,
+        "2023-10-02_output_bal/Output_BAL/BD-Analysis-BMachiels_Sample_Tag_ReadsPerCell.csv"#sample_tag_reads_per_cell_B,
 
 )
 
