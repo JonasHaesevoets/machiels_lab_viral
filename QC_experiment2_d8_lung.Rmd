@@ -1,5 +1,5 @@
 ---
-title: "QC Experiment 1, day 60, bal"
+title: "QC Experiment 2, day 8, lung"
 format: 
   html:
     code-fold: true
@@ -10,9 +10,9 @@ execute:
   message: false
 ---
 
-# DANIEL: 7485 from 14000
+# DANIEL: 5533 from 11000
 
-# 1 Load in data, packages + initialize functions
+# 1) Load in data, packages + initialize functions
 
 ```{r, echo=FALSE}
 library("easypackages")
@@ -32,13 +32,13 @@ file_names_tibble <- tribble(
     ~path_sample_tag_calls,
     ~write_processed_seurat_obj_path,
 
-    "Lung",
+    "lung",
     #library_name
-    paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_lung_raw_dbec.rds"),
+    paste0(file_path$intermediate_data,"seurat_obj_experiment_2_combined_lung_raw_dbec.rds"),
     #raw_seurat_obj_path
-    paste0(file_path$raw_data_root,"2023-10-02_output_lung/Output_Lung/","BD-Analysis-BMachiels_Sample_Tag_Calls.csv"),
+    paste0(file_path$raw_data_root,"output_lung_d8/","BD-Analysis-BMachiels-lung_Sample_Tag_Calls.csv"),
     #path_sample_tag_calls
-    paste0(file_path$intermediate_data,"seurat_obj_experiment_1_lung_workflowed.rds"),
+    paste0(file_path$intermediate_data,"seurat_obj_experiment_2_lung_workflowed.rds"),
     #write_processed_seurat_obj_path
 )
 ```
@@ -84,7 +84,7 @@ seurat_sampletag_name <- function(seurat_obj, sample_tag_calls){
 ```
 
 ```{r, echo=FALSE}
-seurat_d60_lung_raw = read_rds(file_names_tibble$raw_seurat_obj_path)
+seurat_d8_lung_raw = read_rds(file_names_tibble$raw_seurat_obj_path)
 for (line in 1:nrow(file_names_tibble)) {
 sample_tag_calls <- read_csv(file_names_tibble[[line,"path_sample_tag_calls"]], skip = 7) |>
     mutate(Cell_Index=as.character(Cell_Index))
@@ -107,9 +107,9 @@ nFeature RNA = #genes detected / cell =nGenes
 
 ```{r, echo=FALSE}
 
-seurat_d60_lung_raw = seurat_sampletag_name(seurat_obj = seurat_d60_lung_raw, sample_tag_calls = sample_tag_calls)
-seurat_d60_lung_raw$amountUMI = seurat_d60_lung_raw$nCount_RNA
-seurat_d60_lung_raw$amountGenes = seurat_d60_lung_raw$nFeature_RNA
+seurat_d8_lung_raw = seurat_sampletag_name(seurat_obj = seurat_d8_lung_raw, sample_tag_calls = sample_tag_calls)
+seurat_d8_lung_raw$amountUMI = seurat_d8_lung_raw$nCount_RNA
+seurat_d8_lung_raw$amountGenes = seurat_d8_lung_raw$nFeature_RNA
 ```
 
 ## 2.1 Calculate the complexity (amount genes detected per UMI)
@@ -123,15 +123,15 @@ a lower degree corresponds to cells suferring from technical issues during manip
 a lower degree corresponds to cells of poor quality like stressed damaged or dying cells
 
 ```{r, echo=FALSE}
-seurat_d60_lung_raw$log10GenesPerUMI = log10(seurat_d60_lung_raw$nFeature_RNA) / log10(seurat_d60_lung_raw$nCount_RNA)
+seurat_d8_lung_raw$log10GenesPerUMI = log10(seurat_d8_lung_raw$nFeature_RNA) / log10(seurat_d8_lung_raw$nCount_RNA)
 
 ```
 
 ## 2.2 Calculate the mitochondrial ratio
 
 ```{r, echo=FALSE}
-seurat_d60_lung_raw$mitoRatio <- PercentageFeatureSet(object = seurat_d60_lung_raw, pattern = "^mt-")
-seurat_d60_lung_raw$mitoRatio <- seurat_d60_lung_raw@meta.data$mitoRatio / 100
+seurat_d8_lung_raw$mitoRatio <- PercentageFeatureSet(object = seurat_d8_lung_raw, pattern = "^mt-")
+seurat_d8_lung_raw$mitoRatio <- seurat_d8_lung_raw@meta.data$mitoRatio / 100
 ```
 
 # 3 Assessment and filtering of the general QC metrics
@@ -141,18 +141,18 @@ seurat_d60_lung_raw$mitoRatio <- seurat_d60_lung_raw@meta.data$mitoRatio / 100
 Make sure the seurat object only contains singlets i.e. filtering doublets and undetermined cells out
 
 ```{r, echo=FALSE}
-seurat_d60_lung_raw = dplyr::filter(seurat_d60_lung_raw, sampletag_multiplets == "single_hashtag")
-seurat_d60_lung_raw
+seurat_d8_lung_raw = dplyr::filter(seurat_d8_lung_raw, sampletag_multiplets == "single_hashtag")
+seurat_d8_lung_raw
 ```
 
-### after filtering for singlets only 12084 cells out of 14000 were retained
+### after filtering for singlets only 10052 cells out of 11000 were retained
 
 ## 3.2 Visualize the distribution of the amount of cells amongst the conditions
 
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(x=condition, fill=condition)) + 
   	geom_bar() +
     scale_y_continuous(breaks=c(0,500,1000,1500,2000,2500,3000,3500)) + 
@@ -170,7 +170,7 @@ Before doing any subsequent filtering we see a quite substantial higher amount o
 #| fig-width: 10
 #| fig-height: 8
 
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(x=sampletag_name, fill=sampletag_name)) + 
   	geom_bar(stat = "count") +
     scale_y_continuous(breaks=c(0,500,1000,1500,2000,2500,3000,3500)) +
@@ -185,7 +185,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(x=sampletag_Ms4a3, fill=sampletag_Ms4a3)) + 
   	geom_bar() +
   	theme_classic() +
@@ -201,7 +201,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(color=condition, x=amountUMI, fill= condition)) + 
   	geom_density(alpha = 0.2) + 
   	theme_classic() +
@@ -214,7 +214,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(color=sampletag_name, x=amountUMI, fill= sampletag_name)) + 
   	geom_density(alpha = 0.2) + 
   	theme_classic() +
@@ -227,7 +227,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(color=sampletag_Ms4a3, x=amountUMI, fill= sampletag_Ms4a3)) + 
   	geom_density(alpha = 0.2) + 
   	theme_classic() +
@@ -242,7 +242,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(color=condition, x=amountGenes, fill= condition)) + 
   	geom_density(alpha = 0.2) + 
   	theme_classic() +
@@ -255,7 +255,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(color=sampletag_name, x=amountGenes, fill= sampletag_name)) + 
   	geom_density(alpha = 0.2) + 
   	theme_classic() +
@@ -268,7 +268,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(color=sampletag_Ms4a3, x=amountGenes, fill= sampletag_Ms4a3)) + 
   	geom_density(alpha = 0.2) + 
   	theme_classic() +
@@ -287,7 +287,7 @@ From this we see only cells in the bottom left, these cells are likely of bad qu
 ```{r}
 #| fig-width: 10
 #| fig-height: 10
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(x=amountUMI, y=amountGenes, color=mitoRatio)) + 
   	geom_point() + 
 	  scale_colour_gradient(low = "green", high = "red") +
@@ -308,7 +308,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 10
-seurat_d60_lung_raw %>%
+seurat_d8_lung_raw %>%
   ggplot(aes(x = sampletag_name, y = amountGenes, fill = sampletag_name)) +
   geom_boxplot(outlier.shape = "triangle") +  # Hide outliers initially
   theme_classic() +
@@ -322,7 +322,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 10
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   	ggplot(aes(x=sampletag_name, y=amountUMI, fill=sampletag_name)) + 
   	geom_boxplot(outlier.shape = "triangle") + 
   	theme_classic() +
@@ -336,7 +336,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   ggplot(aes(color=condition, x=log10GenesPerUMI, fill= condition)) + 
   geom_density(alpha = 0.2) + 
   theme_classic()
@@ -347,7 +347,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   ggplot(aes(color=sampletag_name, x=log10GenesPerUMI, fill= sampletag_name)) + 
   geom_density(alpha = 0.2) + 
   theme_classic()
@@ -358,7 +358,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   ggplot(aes(color=sampletag_Ms4a3, x=log10GenesPerUMI, fill= sampletag_Ms4a3)) + 
   geom_density(alpha = 0.2) + 
   theme_classic()
@@ -369,7 +369,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   ggplot(aes(color=condition, x=mitoRatio, fill= condition)) + 
   geom_density(alpha = 0.2) +
   theme_classic() 
@@ -380,7 +380,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   ggplot(aes(color=sampletag_name, x=mitoRatio, fill= sampletag_name)) + 
   geom_density(alpha = 0.2) +
   theme_classic() 
@@ -392,7 +392,7 @@ seurat_d60_lung_raw %>%
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_raw %>% 
+seurat_d8_lung_raw %>% 
   ggplot(aes(color=sampletag_Ms4a3, x=mitoRatio, fill= sampletag_Ms4a3)) + 
   geom_density(alpha = 0.2) +
   theme_classic() 
@@ -401,7 +401,7 @@ seurat_d60_lung_raw %>%
 # 4 Filtering of poor quality cells
 
 ```{r}
-seurat_d60_lung_filtered = dplyr::filter(seurat_d60_lung_raw, 
+seurat_d8_lung_filtered = dplyr::filter(seurat_d8_lung_raw, 
                                 (mitoRatio < 0.2) &
                                 (amountGenes > 1200) &
                                 (amountUMI > 5000) &
@@ -409,14 +409,14 @@ seurat_d60_lung_filtered = dplyr::filter(seurat_d60_lung_raw,
 
 ```
 
-# 9833 out of 14000 cells were retained
+# 9182 out of 11000 cells were retained
 
 ## 4.1 Visualize the distribution of the amount of cells amongst the conditions after cell level filtering
 
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_filtered %>% 
+seurat_d8_lung_filtered %>% 
   	ggplot(aes(x=condition, fill=condition)) + 
   	geom_bar() +
     scale_y_continuous(breaks=c(0,500,1000,1500,2000,2500,3000,3500)) + 
@@ -432,7 +432,7 @@ seurat_d60_lung_filtered %>%
 #| fig-width: 10
 #| fig-height: 8
 
-seurat_d60_lung_filtered %>% 
+seurat_d8_lung_filtered %>% 
   	ggplot(aes(x=sampletag_name, fill=sampletag_name)) + 
   	geom_bar(stat = "count") +
     scale_y_continuous(breaks=c(0,500,1000,1500,2000,2500,3000,3500)) +
@@ -445,7 +445,7 @@ seurat_d60_lung_filtered %>%
 ## 4.3 Visualize the distribution of the amount of cells amongst Ms4a3 after cell level filtering
 
 ```{r}
-seurat_d60_lung_filtered %>% 
+seurat_d8_lung_filtered %>% 
   	ggplot(aes(x=sampletag_Ms4a3, fill=sampletag_Ms4a3)) + 
   	geom_bar(stat = "count") +
   	theme_classic() +
@@ -459,7 +459,7 @@ seurat_d60_lung_filtered %>%
 We do not want to retain genes that are only expressed exclusively in a very low amount of cells as well
 
 ```{r}
-countsDataset <- GetAssayData(object = seurat_d60_lung_filtered, slot = "counts")
+countsDataset <- GetAssayData(object = seurat_d8_lung_filtered, slot = "counts")
 
 nonzero <- countsDataset > 0
 # only retain genes who are expressed in 5 or more cells so we retain rare possible muts
@@ -469,20 +469,20 @@ keep_genes <- Matrix::rowSums(nonzero) >= 5
 filtered_counts <- countsDataset[keep_genes, ]
 
 #create a new object filtered1 because otherwise you lose the other assay data
-seurat_d60_lung_filtered1 <- CreateSeuratObject(counts = filtered_counts, meta.data = seurat_d60_lung_filtered@meta.data)
+seurat_d8_lung_filtered1 <- CreateSeuratObject(counts = filtered_counts, meta.data = seurat_d8_lung_filtered@meta.data)
 # copy them back from the object where the genes werent filtered
-seurat_d60_lung_filtered1@assays$protein = seurat_d60_lung_filtered@assays$protein
-seurat_d60_lung_filtered1@assays$sampletags = seurat_d60_lung_filtered@assays$sampletags
+seurat_d8_lung_filtered1@assays$protein = seurat_d8_lung_filtered@assays$protein
+seurat_d8_lung_filtered1@assays$sampletags = seurat_d8_lung_filtered@assays$sampletags
 ```
 
-# After QC we retain 21827 genes and 14228 cells from 27314 genes and 18000 cells
+# After QC we retain 21934 genes and 9182 cells from 27314 genes and 11000 cells
 
 # 6 Normalization
 
 ## 6.1 Normalize the counts
 
 ```{r}
-seurat_d60_lung_filtered_normalized = NormalizeData(seurat_d60_lung_filtered1)
+seurat_d8_lung_filtered_normalized = NormalizeData(seurat_d8_lung_filtered1)
 ```
 
 ## 6.2 Check for effect of cell cycle
@@ -544,7 +544,7 @@ g2m_genes <- cell_cycle_markers %>%
 
 ```{r}
 # Perform cell cycle scoring
-seurat_d60_lung_filtered_normalized <- CellCycleScoring(seurat_d60_lung_filtered_normalized,
+seurat_d8_lung_filtered_normalized <- CellCycleScoring(seurat_d8_lung_filtered_normalized,
  g2m.features = g2m_genes,
  s.features = s_genes)
 
@@ -556,29 +556,29 @@ seurat_d60_lung_filtered_normalized <- CellCycleScoring(seurat_d60_lung_filtered
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-VlnPlot(seurat_d60_lung_filtered_normalized, features = c("S.Score", "G2M.Score"), group.by = "sampletag_name")
+VlnPlot(seurat_d8_lung_filtered_normalized, features = c("S.Score", "G2M.Score"), group.by = "sampletag_name")
 ```
 
-The violin plot shows clear evidence (altough a bit less pronounced then in d60 bal) of a substantial amount of cycling genes in this case. Further investigate this with a PCA plot
+The violin plot shows clear evidence of a substantial amount of cycling genes in this case. Further investigate this with a PCA plot
 
 ### 6.2.5 PCA plot to assess effect cell cycle
 
 To do PCA we have to do 2 things, first choose the most variable genes (features) and then scale the data. This order is important because, highly expressed genes exhibit the highest amount of variation and we don't want our 'highly variable genes' only to reflect high expression, we need to scale the data to scale variation with expression level.
 
 ```{r}
-seurat_d60_lung_filtered_normalized <- FindVariableFeatures(seurat_d60_lung_filtered_normalized, 
+seurat_d8_lung_filtered_normalized <- FindVariableFeatures(seurat_d8_lung_filtered_normalized, 
                      selection.method = "vst",
                      nfeatures = 2000, 
                      verbose = FALSE)
-seurat_d60_lung_filtered_normalized = ScaleData(seurat_d60_lung_filtered_normalized)
-seurat_d60_lung_filtered_normalized = RunPCA(seurat_d60_lung_filtered_normalized)
+seurat_d8_lung_filtered_normalized = ScaleData(seurat_d8_lung_filtered_normalized)
+seurat_d8_lung_filtered_normalized = RunPCA(seurat_d8_lung_filtered_normalized)
 
 ```
 
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-DimPlot(seurat_d60_lung_filtered_normalized,
+DimPlot(seurat_d8_lung_filtered_normalized,
         reduction = "pca",
         group.by= "Phase",
         split.by = "Phase")
@@ -587,25 +587,37 @@ DimPlot(seurat_d60_lung_filtered_normalized,
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-DimPlot(seurat_d60_lung_filtered_normalized,
+DimPlot(seurat_d8_lung_filtered_normalized,
         reduction = "pca",
         group.by= "Phase")
 ```
 
-# effect of cell cycle, less pronounced then in d60 bal
+# Clear effect of cell cycle
 
-### 6.2.6 Regress out effect of cell cycle
+### 6.2.5 Regress out effect of cell cycle
 
 ```{r}
-seurat_d60_lung_filtered_normalized <- ScaleData(seurat_d60_lung_filtered_normalized, vars.to.regress = c("S.Score", "G2M.Score"))
+seurat_d8_lung_filtered_normalized <- ScaleData(seurat_d8_lung_filtered_normalized, vars.to.regress = c("S.Score", "G2M.Score"))
+
+```
+
+```{r}
+seurat_d8_lung_filtered_normalized = RunPCA(seurat_d8_lung_filtered_normalized)
 
 ```
 
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-seurat_d60_lung_filtered_normalized = RunPCA(seurat_d60_lung_filtered_normalized)
-DimPlot(seurat_d60_lung_filtered_normalized,
+DimPlot(seurat_d8_lung_filtered_normalized,
+        reduction = "pca",
+        group.by= "Phase", split.by = "Phase")
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 8
+DimPlot(seurat_d8_lung_filtered_normalized,
         reduction = "pca",
         group.by= "Phase")
 ```
@@ -615,13 +627,13 @@ DimPlot(seurat_d60_lung_filtered_normalized,
 ```{r}
 y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
 
-seurat_d60_lung_filtered_normalized$gender <- seurat_d60_lung_filtered_normalized |> 
+seurat_d8_lung_filtered_normalized$gender <- seurat_d8_lung_filtered_normalized |> 
   join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
   #as_tibble() |> 
   rowwise() |> 
   mutate(max_male_genes=max(c_across(Ddx3y:Kdm5d))
   ) |> 
-  mutate(sex_classifier_2=case_when(
+  mutate(gender=case_when(
     (Xist==0)&(max_male_genes==0)~"no_expression_of_specific_genes",
     (Xist>0)&(max_male_genes==0)~"female",
     (Xist==0)&(max_male_genes>0)~"male",
@@ -633,13 +645,15 @@ seurat_d60_lung_filtered_normalized$gender <- seurat_d60_lung_filtered_normalize
 ```{r}
 #| fig-width: 10
 #| fig-height: 8
-DimPlot(seurat_d60_lung_filtered_normalized,
+DimPlot(seurat_d8_lung_filtered_normalized,
         reduction = "pca",
         group.by= "gender", split.by = "gender")
 ```
 
 ```{r}
-DimPlot(seurat_d60_lung_filtered_normalized,
+#| fig-width: 10
+#| fig-height: 8
+DimPlot(seurat_d8_lung_filtered_normalized,
         reduction = "pca",
         group.by= "gender")
 ```
