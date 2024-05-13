@@ -1,5 +1,5 @@
 ---
-title: "QC Experiment 1, day 60, bal"
+title: "QC Experiment 1, day 60, lung"
 format: 
   html:
     code-fold: true
@@ -77,6 +77,7 @@ seurat_sampletag_name <- function(seurat_obj, sample_tag_calls){
     seurat_obj$virus <- tibble(sampletag_name=seurat_obj |> pull(sampletag_name)) |>       
     separate(sampletag_name,into = c("virus")) |> pull("virus")
     #sort the factors in their desired format
+    seurat_obj@meta.data$sampletag_Ms4a3 = factor(seurat_obj@meta.data$sampletag_Ms4a3,     levels = c("Ms4a3_pos", "Ms4a3_neg"))
     seurat_obj@meta.data$sampletag_name = factor(seurat_obj@meta.data$sampletag_name,     levels = c("Multiplet", "Undetermined", "Mock_Ms4a3_neg", "Mock_Ms4a3_pos",                      "MuHV4_Ms4a3_neg", "MuHV4_Ms4a3_pos", "MAV1_Ms4a3_neg",                               "MAV1_Ms4a3_pos", "PR8_Ms4a3_neg", "PR8_Ms4a3_pos", "PVM_Ms4a3_neg",                  "PVM_Ms4a3_pos"))
     
     return(seurat_obj)
@@ -103,7 +104,7 @@ Another subpopulation of single cell samples that need to be filtered out are th
 
 nCount RNA = #UniqueMolecularIdentifiers / Cell = amountUMI
 
-nFeature RNA = #genes detected / cell =nGenes
+nFeature RNA = #genes detected / cell =amountGenes
 
 ```{r, echo=FALSE}
 
@@ -593,53 +594,3 @@ DimPlot(seurat_d60_lung_filtered_normalized,
 ```
 
 # effect of cell cycle, less pronounced then in d60 bal
-
-### 6.2.6 Regress out effect of cell cycle
-
-```{r}
-seurat_d60_lung_filtered_normalized <- ScaleData(seurat_d60_lung_filtered_normalized, vars.to.regress = c("S.Score", "G2M.Score"))
-
-```
-
-```{r}
-#| fig-width: 10
-#| fig-height: 8
-seurat_d60_lung_filtered_normalized = RunPCA(seurat_d60_lung_filtered_normalized)
-DimPlot(seurat_d60_lung_filtered_normalized,
-        reduction = "pca",
-        group.by= "Phase")
-```
-
-## 6.3 Check for effect of sex
-
-```{r}
-y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
-
-seurat_d60_lung_filtered_normalized$gender <- seurat_d60_lung_filtered_normalized |> 
-  join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
-  #as_tibble() |> 
-  rowwise() |> 
-  mutate(max_male_genes=max(c_across(Ddx3y:Kdm5d))
-  ) |> 
-  mutate(sex_classifier_2=case_when(
-    (Xist==0)&(max_male_genes==0)~"no_expression_of_specific_genes",
-    (Xist>0)&(max_male_genes==0)~"female",
-    (Xist==0)&(max_male_genes>0)~"male",
-    (Xist>0)&(max_male_genes>0)~"detection_of_male_and_female_genes",
-    TRUE~"something is wrong")) |> 
-  pull(gender)
-```
-
-```{r}
-#| fig-width: 10
-#| fig-height: 8
-DimPlot(seurat_d60_lung_filtered_normalized,
-        reduction = "pca",
-        group.by= "gender", split.by = "gender")
-```
-
-```{r}
-DimPlot(seurat_d60_lung_filtered_normalized,
-        reduction = "pca",
-        group.by= "gender")
-```

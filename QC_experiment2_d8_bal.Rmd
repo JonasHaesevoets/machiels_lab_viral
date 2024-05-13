@@ -77,6 +77,7 @@ seurat_sampletag_name <- function(seurat_obj, sample_tag_calls){
     seurat_obj$virus <- tibble(sampletag_name=seurat_obj |> pull(sampletag_name)) |>       
     separate(sampletag_name,into = c("virus")) |> pull("virus")
     #sort the factors in their desired format
+    seurat_obj@meta.data$sampletag_Ms4a3 = factor(seurat_obj@meta.data$sampletag_Ms4a3,     levels = c("Ms4a3_pos", "Ms4a3_neg"))
     seurat_obj@meta.data$sampletag_name = factor(seurat_obj@meta.data$sampletag_name,     levels = c("Multiplet", "Undetermined", "Mock_Ms4a3_neg", "Mock_Ms4a3_pos",                      "MuHV4_Ms4a3_neg", "MuHV4_Ms4a3_pos", "MAV1_Ms4a3_neg",                               "MAV1_Ms4a3_pos", "PR8_Ms4a3_neg", "PR8_Ms4a3_pos", "PVM_Ms4a3_neg",                  "PVM_Ms4a3_pos"))
     
     return(seurat_obj)
@@ -186,12 +187,12 @@ seurat_d8_bal_raw %>%
 #| fig-width: 10
 #| fig-height: 8
 seurat_d8_bal_raw %>% 
-  	ggplot(aes(x=sampletag_Ms4a3, fill=sampletag_Ms4a3)) + 
-  	geom_bar() +
+  ggplot(aes(x=sampletag_Ms4a3, fill=sampletag_Ms4a3)) + 
+  	geom_bar(stat = "count") +
   	theme_classic() +
   	theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
   	theme(plot.title = element_text(hjust=0.5, face="bold")) +
-  	ggtitle("Amount cells in the different conditions for Ms4a3")
+  	ggtitle("Amount cells in the different conditions and Ms4a3")
 ```
 
 ### More Ms4a3 negative cells compared to Ms4a3 positive. apparently a lot more PVM Ms4a3- cells compared to the rest
@@ -218,8 +219,7 @@ seurat_d8_bal_raw %>%
   	ggplot(aes(color=sampletag_name, x=amountUMI, fill= sampletag_name)) + 
   	geom_density(alpha = 0.2) + 
   	theme_classic() +
-  	ylab("Cell density") +
-  	geom_vline(xintercept = 500)
+  	ylab("Cell density") 
 ```
 
 ## 3.6 Density and plot showing amount of UMI per cell amongst Ms4a3 status
@@ -594,67 +594,4 @@ DimPlot(seurat_d8_bal_filtered_normalized,
 
 # Clear effect of cell cycle
 
-### 6.2.5 Regress out effect of cell cycle
 
-```{r}
-seurat_d8_bal_filtered_normalized <- ScaleData(seurat_d8_bal_filtered_normalized, vars.to.regress = c("S.Score", "G2M.Score"))
-
-```
-
-```{r}
-
-seurat_d8_bal_filtered_normalized = RunPCA(seurat_d8_bal_filtered_normalized)
-
-```
-
-```{r}
-#| fig-width: 10
-#| fig-height: 8
-DimPlot(seurat_d8_bal_filtered_normalized,
-        reduction = "pca",
-        group.by= "Phase", split.by = "Phase")
-```
-
-```{r}
-#| fig-width: 10
-#| fig-height: 8
-DimPlot(seurat_d8_bal_filtered_normalized,
-        reduction = "pca",
-        group.by= "Phase")
-```
-
-## 6.3 Check for effect of sex
-
-```{r}
-y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
-
-seurat_d8_bal_filtered_normalized$gender <- seurat_d8_bal_filtered_normalized |> 
-  join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
-  #as_tibble() |> 
-  rowwise() |> 
-  mutate(max_male_genes=max(c_across(Ddx3y:Kdm5d))
-  ) |> 
-  mutate(gender=case_when(
-    (Xist==0)&(max_male_genes==0)~"no_expression_of_specific_genes",
-    (Xist>0)&(max_male_genes==0)~"female",
-    (Xist==0)&(max_male_genes>0)~"male",
-    (Xist>0)&(max_male_genes>0)~"detection_of_male_and_female_genes",
-    TRUE~"something is wrong")) |> 
-  pull(gender)
-```
-
-```{r}
-#| fig-width: 10
-#| fig-height: 8
-DimPlot(seurat_d8_bal_filtered_normalized,
-        reduction = "pca",
-        group.by= "gender", split.by = "gender")
-```
-
-```{r}
-#| fig-width: 10
-#| fig-height: 8
-DimPlot(seurat_d8_bal_filtered_normalized,
-        reduction = "pca",
-        group.by= "gender")
-```
