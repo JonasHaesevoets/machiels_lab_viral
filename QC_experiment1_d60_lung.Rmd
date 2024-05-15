@@ -594,3 +594,7 @@ DimPlot(seurat_d60_lung_filtered_normalized,
 ```
 
 # effect of cell cycle, less pronounced then in d60 bal
+
+```{r}
+seurat_d60_lung_filtered_normalized |> write_rds("intermediate_data/seurat_obj_experiment_1_lung_afterQCdashboard.rds")
+```

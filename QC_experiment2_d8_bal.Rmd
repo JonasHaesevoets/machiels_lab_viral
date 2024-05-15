@@ -594,4 +594,6 @@ DimPlot(seurat_d8_bal_filtered_normalized,
 
 # Clear effect of cell cycle
 
-
+```{r}
+seurat_d8_bal_filtered_normalized |> write_rds("intermediate_data/seurat_obj_experiment_2_bal_afterQCdashboard.rds")
+```

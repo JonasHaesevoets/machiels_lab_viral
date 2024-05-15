@@ -1,5 +1,7 @@
 library(easypackages)
-libraries("tidyverse", "Seurat", "tidyseurat", "tibble")
+# remotes::install_version(package = 'uwot', version = package_version('0.1.16'))
+
+libraries("tidyverse", "Seurat", "tidyseurat", "tibble", 'scCustomize')
 
 ####set up file paths
 
@@ -13,7 +15,6 @@ file_path$raw_data_root <- "../../Documents/machiels_lab_viral/raw_data/machiels
 #sample_tag_calls path
 #write path markers table
 
-
 file_names_tibble <- tribble(
     ~library_name,
     ~raw_seurat_obj_path,
@@ -24,34 +25,30 @@ file_names_tibble <- tribble(
     
     "Lung_d8",#library_name
     paste0(file_path$intermediate_data,"seurat_obj_experiment_2_combined_lung_raw_dbec.rds"),#raw_seurat_obj_path
-    paste0(file_path$raw_data_root,"output_lung_d8\\","BD-Analysis-BMachiels-Lung_Sample_Tag_Calls.csv"),#path_sample_tag_calls
+    paste0(file_path$raw_data_root,"output_lung_d8/","BD-Analysis-BMachiels-Lung_Sample_Tag_Calls.csv"),#path_sample_tag_calls
     paste0(file_path$intermediate_data,"seurat_obj_experiment_2_lung_workflowed.rds"),#write_processed_seurat_obj_path
     paste0(file_path$intermediate_data, "experiment_2_workflowed.Lung"),#write_markers_path
 
     
     "BAL_d8",#library_name
     paste0(file_path$intermediate_data,"seurat_obj_experiment_2_combined_bal_raw_dbec.rds"),#raw_seurat_obj_path
-    paste0(file_path$raw_data_root,"output_bal_d8\\","BD-Analysis-BMachiels-Bal_Sample_Tag_Calls.csv"),#path_sample_tag_calls
+    paste0(file_path$raw_data_root,"output_bal_d8/","BD-Analysis-BMachiels-Bal_Sample_Tag_Calls.csv"),#path_sample_tag_calls
     paste0(file_path$intermediate_data,"seurat_obj_experiment_2_bal_workflowed.rds"),#write_processed_seurat_obj_path
     paste0(file_path$intermediate_data, "experiment_2_workflowed.BAL"),#write_markers_path
     
     
     "Lung",#library_name
     paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_lung_raw_dbec.rds"),#raw_seurat_obj_path
-    paste0(file_path$raw_data_root,"2023-10-02_output_lung\\Output_Lung\\","BD-Analysis-BMachiels_Sample_Tag_Calls.csv"),#path_sample_tag_calls
+    paste0(file_path$raw_data_root,"2023-10-02_output_lung/Output_Lung/","BD-Analysis-BMachiels_Sample_Tag_Calls.csv"),#path_sample_tag_calls
     paste0(file_path$intermediate_data,"seurat_obj_experiment_1_lung_workflowed.rds"),#write_processed_seurat_obj_path
     paste0(file_path$intermediate_data, "experiment_1_workflowed.Lung"),#write_markers_path
 
 
     "BAL",#library_name
     paste0(file_path$intermediate_data,"seurat_obj_experiment_1_combined_bal_raw_dbec.rds"),#raw_seurat_obj_path
-    paste0(file_path$raw_data_root,"2023-10-02_output_bal\\Output_BAL\\","BD-Analysis-BMachiels_Sample_Tag_Calls.csv"),#path_sample_tag_calls
+    paste0(file_path$raw_data_root,"2023-10-02_output_bal/Output_BAL\\","BD-Analysis-BMachiels_Sample_Tag_Calls.csv"),#path_sample_tag_calls
     paste0(file_path$intermediate_data,"seurat_obj_experiment_1_bal_workflowed.rds"),#write_processed_seurat_obj_path
     paste0(file_path$intermediate_data, "experiment_1_workflowed.BAL")#write_markers_path
-
-
-
-    
 )
 
 
@@ -59,19 +56,6 @@ path_raw_specific_dataset <- "2023-10-02_output_bal\\Output_BAL\\"
 
 
 seurat_basic_workflow <- function(seurat_obj, sample_tag_calls){
-  
-    seurat_obj <- seurat_obj |> PercentageFeatureSet("^Rp[sl]", col.name = "percent_ribo") # Check if all genes are included
-    seurat_obj[["percent_mito"]] <- PercentageFeatureSet(seurat_obj, pattern = "^Mt")
-    seurat_obj <- NormalizeData(seurat_obj, normalization.method = "LogNormalize", scale.factor = 10000)
-    seurat_obj <- FindVariableFeatures(seurat_obj, selection.method = "vst", nfeatures = 2000)
-    all.genes <- rownames(seurat_obj)
-    seurat_obj <- ScaleData(seurat_obj, features = all.genes)
-    seurat_obj <- RunPCA(seurat_obj, features = VariableFeatures(object = seurat_obj))
-    seurat_obj <- FindNeighbors(seurat_obj, dims = 1:10)
-    seurat_obj <- FindClusters(seurat_obj, resolution = 0.5)
-    seurat_obj <- RunUMAP(seurat_obj, dims = 1:10)
-    
-    #renaming of the sampletag
     seurat_obj$sampletag_name <- sample_tag_calls  |>
         right_join(tibble(Cell_Index=colnames(seurat_obj))) |> 
         mutate(Sample_Name=str_replace(Sample_Name,pattern="\\-", replacement = "_")) |> 
