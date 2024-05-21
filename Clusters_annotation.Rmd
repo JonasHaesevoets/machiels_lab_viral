@@ -103,8 +103,7 @@ select_top_genes <- function(df, n = 20) {
 ## 2.1 UMAP plot full object
 
 ```{r}
-obj.v5 |> DimPlot(group.by = "seurat_clusters", label=T) 
-ggsave("clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration")
+obj.v5 |> DimPlot(group.by = "seurat_clusters")
 ```
 
 ## 2.2 Density plot showing embeddings of the different sample types
@@ -334,7 +333,7 @@ p4 <- obj.v5 |>  as_tibble()  |> filter(sample_tag_ms4a3_pos_gabbr2!= "Gabbr2_po
   (p3+theme(strip.text.x = element_blank()))/
   p4 +
   plot_layout(guides = 'collect')
-ggsave(filename = "cluster frequencies per group.png",path ="../../Documents/machiels_lab_viral/Case_study_annotation/exploration" ,  height = 20, width = 30, units = "cm")
+ggsave(filename = "cluster frequencies per group.png",path ="../../Documents/machiels_lab_viral/Case_study_annotation/exploration" ,  height = 20, width = 30)
 ```
 
 ## 2.8 **Z-scores of cluster frequencies: heatmap**
@@ -732,13 +731,14 @@ for (i in genes_AM) {
 # 3) find markers for the clusters
 
 ```{r}
+Idents(obj.v5) = "seurat_clusters"
 markers_all <- FindAllMarkers(obj.v5,
                           assay = "RNA",
                           logfc.threshold = 0.5,
                           test.use = "wilcox",
                           min.pct = 0.2)
 markers_all = select_top_genes(markers_all, n = 20)
-write_xlsx(markers_all, path = "../../Documents/machiels_lab_viral/Case_study_annotation/markers/markers.xlsx")
+write_xlsx(markers_all, path = "../../Documents/machiels_lab_viral/Case_study_annotation/markers/markers_v2.xlsx")
 ```
 
 # 4) Cluster annotation with singleR with ImmGenData
@@ -842,6 +842,75 @@ DimPlot(obj.v5, reduction = "umap_harmony", group.by = "scmap_cluster_labs", lab
 ggsave("annotation_tabulamuris_scmap.png", width = 25, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/singleR/tabulamuris_scmap")
 ```
 
+# 6) Filtering of unwanted celltypes
+
 ```{r}
-obj.v5 |> write_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+Idents(obj.v5) = "seurat_clusters"
+obj.v5<- FindSubCluster(object = obj.v5, cluster = "1", graph.name = "RNA_snn", subcluster.name = "cluster_1_subclusters", resolution = 0.19, algorithm = 1)
+
+
+
+
+obj.v5 <- FindSubCluster(object = obj.v5, cluster = "5", graph.name = "RNA_snn", resolution = 0.15, algorithm = 1, subcluster.name = "cluster_5_subclusters")
+
+
+
+obj.v5 |> DimPlot(group.by = "cluster_1_subclusters", label=T) 
+obj.v5 |> DimPlot(group.by = "cluster_5_subclusters", label=T) 
+
+
+
+```
+
+```{r}
+# Extract metadata
+metadata <- obj.v5@meta.data
+
+# Replace the value 5 in 'cluster_1_subclusters' with values from 'cluster_5_subclusters' if they start with '5_'
+metadata <- metadata %>%
+  mutate(cluster_1_subclusters = if_else(cluster_1_subclusters == "5" & str_starts(cluster_5_subclusters, "5_"),
+                                         cluster_5_subclusters,
+                                         cluster_1_subclusters))
+
+# Assign the modified metadata back to the Seurat object
+obj.v5@meta.data <- metadata
+```
+
+```{r}
+obj.v5$cluster_1_subclusters = factor(obj.v5$cluster_1_subclusters, levels = c("0", "1_0", "1_1", "1_2", "1_3", "2", "3", "4", "5_0", "5_1","5_2","5_3", "5_4", "5_5", "6", "7", "8","9", "10", "11", "12", "13", "14"))
+obj.v5$seurat_clusters = obj.v5$cluster_1_subclusters
+
+```
+
+```{r}
+obj.v5 |> DimPlot(group.by = "seurat_clusters", label=T) 
+ggsave("clusters_originalIntegratedSeuratObject_cluster1_recluster.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration", height = 12, width = 12)
+```
+
+```{r}
+Idents(obj.v5) = "seurat_clusters"
+DotPlot_scCustom(seurat_object = obj.v5, features = c("Trac", "Cd4", "Cd8a", "Marco", "Siglecf"))
+ggsave("dotplot_markers.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration", height = 12, width = 12, bg = "white")
+```
+
+```{r}
+colors <- c(
+  "#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00",
+  "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5",
+  "#FC8D62", "#8DA0CB", "#E78AC3", "#A6D854", "#FFD92F",
+  "#E5C494", "#B3B3B3", "#1F78B4", "#33A02C", "#FB9A99",
+  "#E31A1C", "#FDBF6F", "#CAB2D6"
+)
+Stacked_VlnPlot(seurat_object = obj.v5, features = c("Trac", "Cd4", "Cd8a", "Marco", "Siglecf"), x_lab_rotate = TRUE,
+    colors_use = colors)
+ggsave("violinplot_markers.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration", height = 12, width = 12)
+```
+
+```{r}
+obj.v5 <- subset(obj.v5, idents = c(6,7,9, 10,11,12,13,14), invert = TRUE)
+```
+
+```{r}
+obj.v5 |> DimPlot(group.by = "cluster_1_subclusters", label=T) 
+ggsave("UMAP_subclustered_1_5_filtered.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration" , width = 10, height = 10)
 ```
