@@ -598,3 +598,37 @@ DimPlot(seurat_d60_lung_filtered_normalized,
 ```{r}
 seurat_d60_lung_filtered_normalized |> write_rds("intermediate_data/seurat_obj_experiment_1_lung_afterQCdashboard.rds")
 ```
+## 6.3 Check for effect of sex
+
+```{r}
+y_chromosome_genes<-   c("Ddx3y", "Eif2s3y", "Kdm5d")
+seurat_d60_lung_filtered_normalized$gender <- seurat_d60_lung_filtered_normalized |> 
+  join_features(features=c(y_chromosome_genes, "Xist"), slot="data", shape="wide") |>
+  #as_tibble() |> 
+  rowwise() |> 
+  mutate(max_male_genes=max(c_across(Ddx3y:Kdm5d))
+  ) |> 
+  mutate(gender=case_when(
+    (Xist==0)&(max_male_genes==0)~"no_expression_of_specific_genes",
+    (Xist>0)&(max_male_genes==0)~"female",
+    (Xist==0)&(max_male_genes>0)~"male",
+    (Xist>0)&(max_male_genes>0)~"detection_of_male_and_female_genes",
+    TRUE~"something is wrong")) |> 
+  pull(gender)
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 8
+DimPlot(seurat_d60_lung_filtered_normalized,
+        reduction = "pca",
+        group.by= "gender", split.by = "gender")
+```
+
+```{r}
+DimPlot(seurat_d60_lung_filtered_normalized,
+        reduction = "pca",
+        group.by= "gender")
+```
+
+
