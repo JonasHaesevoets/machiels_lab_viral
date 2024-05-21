@@ -1,0 +1,847 @@
+---
+title: "Cluster annotation"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+# 1) load in the data,packages and custom functions
+
+```{r, echo=FALSE}
+easypackages::libraries("Seurat","tidyverse","SingleR", "ggridges", "viridis", "ggh4x", "celldex", "scCustomize", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi", "clusterProfiler", "enrichplot", "ExperimentHub", "scuttle", 'scmap',"cowplot",
+                        'clusterProfiler',
+                        'org.Mm.eg.db',
+                        'tidyseurat',
+                        'enrichplot',
+                        'xlsx')
+obj.v5 = read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+DefaultAssay(obj.v5) <- "RNA"
+
+
+# The palette with grey:
+cbp1 <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# The palette with black:
+cbp2 <- c("#000000", "#E69F00", "#56B4E9", "#009E73",
+          "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+```
+
+#### This function takes a Seurat object or data frame (`seurat_tbl`) as input, calculates counts based on various factors, converts certain columns to factors, filters out specific conditions, calculates proportions of samples in a cluster, and then calculates z-scores of frequencies per cluster. Finally, it returns a modified data frame with these calculated values.
+
+```{r}
+make_zscore_and_freq_data <- function(seurat_tbl) {
+  # Calculate counts of observations based on various factors
+  # Parameters:
+  #   seurat_tbl: A Seurat object or data frame containing the data
+  # Returns:
+  #   A modified data frame with z-scores and frequencies calculated
+  
+  seurat_tbl |> 
+    dplyr::count(day_mock, sample_type, condition, sample_tag_ms4a3_pos_gabbr2, seurat_clusters, .drop = FALSE) |> 
+    # Make columns factors
+    mutate(
+      day_mock = factor(day_mock, levels = c("Mock", "d8", "d60")),
+      sample_type = factor(sample_type, levels = c("lung", "bal")),
+      condition = as_factor(condition),
+      sampletag_Ms4a3 = as_factor(sample_tag_ms4a3_pos_gabbr2),
+      seurat_clusters = as_factor(seurat_clusters)
+    ) |> 
+    # Filter out specific conditions on Mock day
+    filter(!(day_mock == "Mock" & (condition %in% c("PR8", "MuHV4", "PVM", "MAV1")))) |> 
+    # Calculate proportions of samples in a given cluster
+    group_by(day_mock, sample_type, condition, sample_tag_ms4a3_pos_gabbr2) |> 
+    mutate(freq_cluster = n / sum(n)) |> 
+    # Calculate z-score of frequencies per cluster
+    group_by(seurat_clusters) |> 
+    mutate(cluster_frequency_zscore = (freq_cluster - mean(freq_cluster)) / sd(freq_cluster))
+}
+
+```
+
+#### This function takes a data frame (`x`) containing the necessary columns for plotting and creates a heatmap using ggplot2. It maps `condition` to the x-axis, `seurat_clusters` to the y-axis, and `cluster_frequency_zscore` to the fill color. The heatmap is then faceted based on `sample_tag_ms4a3_pos_gabbr2`, `sample_type`, and `day_mock`. Axis text on the x-axis is rotated by 45 degrees for better readability. Finally, the color gradient for the fill is set to blue (low values), white (mid values), and red (high values).
+
+```{r}
+frequency_heatmap <- function(x){ 
+  x |>   ggplot(aes(condition,
+                    seurat_clusters,
+                    fill=cluster_frequency_zscore)) +
+  geom_tile()+ 
+  #scale_fill_viridis()+theme_bw() +
+  ggh4x::facet_nested_wrap(
+    vars(sample_tag_ms4a3_pos_gabbr2,
+         sample_type,
+         day_mock),
+    nrow = 1,
+    drop = TRUE,
+    scales = "free_x"#,
+    #space="free"
+    )+
+    theme_bw()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))+
+    scale_fill_gradient2( low = "blue", mid = "white", high = "red")}
+```
+
+#### this function selects the n amount of top differentially expressed genes in descending order in terms of avg_log2 fold change
+
+```{r}
+select_top_genes <- function(df, n = 20) {
+  top_genes <- by(df, df$cluster, function(cluster_df) {
+    cluster_df[order(cluster_df$avg_log2FC, decreasing = TRUE), ][1:n, ]
+  })
+  do.call(rbind, top_genes)
+}
+```
+
+# 2) Data exploration
+
+## 2.1 UMAP plot full object
+
+```{r}
+obj.v5 |> DimPlot(group.by = "seurat_clusters", label=T) 
+ggsave("clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration")
+```
+
+## 2.2 Density plot showing embeddings of the different sample types
+
+```{r}
+#| fig-width: 18
+#| fig-height: 10
+obj.v5  |>
+  ggplot(aes(umapharmony_1,umapharmony_2,
+             color=day_mock_sample_type_mockTissueIncluded)) +
+  geom_point(aes(color="cell")) +
+  geom_density_2d(bins=20,linewidth=1) +
+  scale_color_manual(values = cbp1 )+
+  theme_bw() +
+  ggtitle("local density of sample in umap embedding")+
+  facet_wrap(~day_mock_sample_type_mockTissueIncluded)
+ggsave("Density_tissueDays_clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration" , width = 18, height = 10)
+```
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+samples <- obj.v5$day_mock_sample_type_mockTissueIncluded |> unique()
+umap_sampletype_mock_point_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(day_mock_sample_type_mockTissueIncluded==sample)
+  obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(day_mock_sample_type_mockTissueIncluded!=sample)
+  
+  umap_sampletype_mock_point_plotlist[[sample]] <- obj.v5 |> 
+    ggplot() +
+    geom_point(data= obj.v5_not_sample,aes(umapharmony_1,umapharmony_2),color="grey")+
+    geom_point(data= obj.v5_filtered_for_sample,aes(umapharmony_1,umapharmony_2),
+               color="red",
+               alpha=0.4,
+               #plot points without outer border without alpha
+               stroke = 0,
+               shape=16)+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+ggarrange(plotlist = umap_sampletype_mock_point_plotlist)
+ggsave("tissueDays_clusters_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration", width = 18, height = 10)
+```
+
+## 2.3 Density plot showing embeddings of the different Ms4a3 conditions
+
+```{r}
+#| fig-width: 12
+#| fig-height: 10
+samples <- obj.v5$sampletag_Ms4a3 |> unique()
+umap_sampletag_Ms4a3_point_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_Ms4a3==sample)
+  obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_Ms4a3!=sample)
+  
+  umap_sampletag_Ms4a3_point_plotlist[[sample]] <- obj.v5 |> 
+    ggplot() +
+    geom_point(data= obj.v5_not_sample,aes(umapharmony_1,umapharmony_2),color="grey")+
+    geom_point(data= obj.v5_filtered_for_sample,aes(umapharmony_1,umapharmony_2),
+               color="red",
+               alpha=0.4,
+               #plot points without outer border without alpha
+               stroke = 0,
+               shape=16)+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+ggarrange(plotlist = umap_sampletag_Ms4a3_point_plotlist)
+ggsave("Ms4a3Embeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration")
+```
+
+```{r}
+#| fig-width: 12
+#| fig-height: 10
+samples <- obj.v5$sampletag_Ms4a3 |> unique()
+umap_sampletag_Ms4a3_dens_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_Ms4a3==sample)
+  umap_sampletag_Ms4a3_dens_plotlist[[sample]] <- obj.v5 |> 
+    ggplot(aes(umapharmony_1,umapharmony_2) ) +
+    geom_point()+
+    stat_density_2d(data= obj.v5_filtered_for_sample, 
+                    aes(x= umapharmony_1,
+                        y=umapharmony_2,
+                        fill = after_stat(level)), geom = "polygon",contour_var = "ndensity"
+                    )+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+#densities have to be adjusted, overlap
+#https://stackoverflow.com/questions/76533721/plot-only-top-layers-of-ggplot-stat-density-2d-geom-density-2d-in-r
+
+ggarrange(plotlist =umap_sampletag_Ms4a3_dens_plotlist)
+ggsave("Density_Ms4a3Embeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration")
+```
+
+## 2.4 Density plot showing embeddings of the different conditions
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+samples <- obj.v5$condition |> unique()
+umap_condition_plotlist <- list()
+for (sample in samples) {
+  obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(condition==sample)
+  obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(condition!=sample)
+  
+  umap_condition_plotlist[[sample]] <- obj.v5 |> 
+    ggplot() +
+    geom_point(data= obj.v5_not_sample,aes(umapharmony_1,umapharmony_2),color="grey")+
+    geom_point(data= obj.v5_filtered_for_sample,aes(umapharmony_1,umapharmony_2),
+               color="red",
+               alpha=0.4,
+               #plot points without outer border without alpha
+               stroke = 0,
+               shape=16)+
+    theme_bw()+
+    scale_fill_continuous(type = "viridis")+
+    ggtitle(sample)+theme_bw()
+}
+
+ggarrange(plotlist = umap_condition_plotlist)
+ggsave("conditionsEmbeddings_originalIntegratedSeuratObject.png", path ="../../Documents/machiels_lab_viral/Case_study_annotation/exploration" , height = 18, width = 18)
+```
+
+## 2.5 Density plot showing embeddings of the different conditions and Ms4a3 together
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+# samples <- obj.v5$sampletag_name 
+# umap_sampletag_name_plotlist <- list()
+# for (sample in samples) {
+#   obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_name==sample)
+#   obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_name!=sample)
+#   
+#   umap_sampletag_name_plotlist[[sample]] <- obj.v5 |> 
+#     ggplot() +
+#     geom_point(data= obj.v5_not_sample,
+#                aes(umapharmony_1,umapharmony_2),
+#                color="grey")+
+#     geom_point(data= obj.v5_filtered_for_sample,
+#                aes(umapharmony_1,umapharmony_2),
+#                color="red",
+#                alpha=0.4,
+#                #plot points without outer border without alpha
+#                stroke = 0,
+#                shape=16)+
+#     theme_bw()+
+#     scale_fill_continuous(type = "viridis")+
+#     ggtitle(sample)+theme_bw()
+# }
+# 
+# ggarrange(plotlist = umap_sampletag_name_plotlist)
+# ggsave("sample_Embeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration", height = 18, width = 18)
+```
+
+## 2.6 Heatmaps for abseq data on expression of CD11c and SiglecF
+
+```{r}
+obj.v5 |>
+  join_features(c("Siglecf-AbSeq", "Cd11c"),assay="adt", slot="scale.data")  |> 
+group_by(.feature,seurat_clusters) |>
+  summarise(mean_scaled_dsb=mean(.abundance_adt)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,seurat_clusters, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("ADT_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration")
+```
+
+## 2.6 Heatmaps for RNA data on alveolar markers
+
+```{r}
+obj.v5 |>
+  join_features(c("Pparg", "Chil3", "Fabp5", "Flt1", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79", "Itgax", "SiglecF"),assay="RNA", slot="scale.data")  |> 
+group_by(.feature,seurat_clusters) |>
+  summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
+  group_by(.feature) |> 
+  mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
+  mutate(zscore_mean_scaled_dsb=ifelse(zscore_mean_scaled_dsb>2,2,
+                                       ifelse(zscore_mean_scaled_dsb<(-2),-2,zscore_mean_scaled_dsb))) |> 
+  ggplot(aes(.feature,seurat_clusters, fill=zscore_mean_scaled_dsb)) +
+  geom_tile()+ scale_fill_viridis() + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +ggtitle("mean dsb-normalized protein counts, z-score of cluster averages per marker")
+ggsave("RNA_mean dsb-normalized protein counts, z-score of cluster averages per marker.png", path  = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration")
+```
+
+## 2.7 cluster frequencies per group
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+p1 <- obj.v5 |>  as_tibble()  |> filter(sample_tag_ms4a3_pos_gabbr2!= "Gabbr2_pos_Ms4a3_neg") |>  make_zscore_and_freq_data() |>
+  mutate(individual_sample=paste(day_mock,
+                                 sample_type,
+                                 condition,
+                                 sample_tag_ms4a3_pos_gabbr2,
+                                 sep = "_")) |> 
+  ggplot(aes(individual_sample,freq_cluster,color=condition)) + geom_point()+   facet_wrap(~seurat_clusters, scales = "free", nrow=1) +theme(axis.text.x = element_blank(), axis.title = element_blank())
+p1
+
+p2 <- obj.v5 |>  as_tibble()  |> filter(sample_tag_ms4a3_pos_gabbr2!= "Gabbr2_pos_Ms4a3_neg") |>  make_zscore_and_freq_data() |>
+  mutate(individual_sample=paste(day_mock,sample_type, condition,sample_tag_ms4a3_pos_gabbr2, sep = "_")) |> 
+  ggplot(aes(individual_sample,freq_cluster,color=day_mock)) + geom_point()+  facet_wrap(~seurat_clusters, scales = "free", nrow=1)+ theme(axis.text.x = element_blank(), axis.title = element_blank())
+
+p3 <- obj.v5 |>  as_tibble()  |> filter(sample_tag_ms4a3_pos_gabbr2!= "Gabbr2_pos_Ms4a3_neg") |>  make_zscore_and_freq_data() |>
+  mutate(individual_sample=paste(day_mock,sample_type, condition,sample_tag_ms4a3_pos_gabbr2, sep = "_")) |> 
+  ggplot(aes(individual_sample,freq_cluster,color=sample_type)) + geom_point()+
+ facet_wrap(~seurat_clusters, scales = "free", nrow=1) +theme(axis.text.x = element_blank(), axis.title = element_blank())
+
+p4 <- obj.v5 |>  as_tibble()  |> filter(sample_tag_ms4a3_pos_gabbr2!= "Gabbr2_pos_Ms4a3_neg") |>  make_zscore_and_freq_data() |>
+  mutate(individual_sample=paste(day_mock,sample_type, condition,sample_tag_ms4a3_pos_gabbr2, sep = "_")) |> 
+  ggplot(aes(individual_sample,freq_cluster,color=sample_tag_ms4a3_pos_gabbr2)) + geom_point()+scale_color_brewer()+ facet_wrap(~seurat_clusters, scales = "free", nrow=1, strip.position="bottom") + #x_axis_text_90+
+   theme_classic()+
+  theme(axis.text.x = element_blank(), axis.title = element_blank())
+
+(p1 + theme(strip.text.x = element_blank()))/
+  (p2+theme(strip.text.x = element_blank()))/
+  (p3+theme(strip.text.x = element_blank()))/
+  p4 +
+  plot_layout(guides = 'collect')
+ggsave(filename = "cluster frequencies per group.png",path ="../../Documents/machiels_lab_viral/Case_study_annotation/exploration" ,  height = 20, width = 30, units = "cm")
+```
+
+## 2.8 **Z-scores of cluster frequencies: heatmap**
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+obj.v5 |> 
+  as_tibble() |>  # Convert obj.v5 to a tibble
+  separate(orig.ident, sep = "__", into = c("day", "sample_type"), remove = FALSE) |> 
+  mutate(day=str_replace_all(day,c("viral.experiment.1"="d60",
+                                   "viral.experiment.2"="d8") )) |> 
+  mutate(day=ifelse(condition=="Mock",condition,day)) |> 
+  mutate(day=factor(day, levels=c("Mock", "d8","d60")),
+         sample_type=as_factor(sample_type),
+         condition=as_factor(condition),
+         sampletag_Ms4a3=as_factor(sampletag_Ms4a3),
+         seurat_clusters=as_factor(seurat_clusters)
+         ) |> 
+  dplyr::group_by(day,sample_type, condition,sampletag_Ms4a3,seurat_clusters) |> 
+  dplyr::count(day,sample_type, condition,sampletag_Ms4a3,seurat_clusters, .drop = FALSE) |> 
+  mutate(sample=paste(day,sample_type,condition,sampletag_Ms4a3)) |> 
+  group_by(sample) |> 
+  filter(!(day=="Mock"&(condition %in%c("PR8","MuHV4", "PVM", "MAV1")))) |> 
+  mutate(freq_cluster=n/sum(n)) |> 
+  mutate(condition=as.character(condition)) |> 
+  na.omit() |>  # This is where the error occurs, likely because the object isn't a data frame or tibble
+  group_by(seurat_clusters) |> 
+  mutate(cluster_mean_freq=mean(freq_cluster)) |> 
+  mutate(cluster_mean_freq_zscore=(freq_cluster-cluster_mean_freq)/sd(freq_cluster)) |> 
+  ggplot(aes(condition,seurat_clusters, fill=cluster_mean_freq_zscore)) +
+  geom_tile()+ 
+  ggh4x::facet_nested_wrap(
+    vars(sampletag_Ms4a3,sample_type ,day), nrow = 1,drop = TRUE,scales = "free_x"
+  )+theme_bw()+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))   + scale_fill_gradient2(  low = "blue",
+  mid = "white",
+  high = "red")+ggtitle("proportions of cells from a given sample distributed across clusters ",
+                        "Ms4a3 classification as sorted")
+
+ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration",  height = 20, width = 30, units = "cm")
+```
+
+## 2.9 dimplot conditions
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+DimPlot_scCustom(obj.v5, split.by = "condition",colors_use = c("purple", "cyan", "lightgreen", "red", "orange", "blue", "pink", "green", "violet","grey", "lightblue", "darkgreen", "yellow", "gold", "magenta"))
+ggsave("dimplot_virus.png", width = 25, height = 30, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/dimplot")
+```
+
+## 2.10 dimplot Ms4a3
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+DimPlot_scCustom(obj.v5, split.by = "sampletag_Ms4a3",colors_use = c("purple", "cyan", "lightgreen", "red", "orange", "blue", "pink", "green", "violet","grey", "lightblue", "darkgreen", "yellow", "gold", "magenta"))
+ggsave("dimplot_Ms4a3.png", width = 25, height = 30, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/dimplot")
+```
+
+## 2.11 dimplot tissue
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+DimPlot_scCustom(obj.v5, split.by = "sample_type",colors_use = c("purple", "cyan", "lightgreen", "red", "orange", "blue", "pink", "green", "violet","grey", "lightblue", "darkgreen", "yellow", "gold", "magenta"))
+ggsave("dimplot_tissue.png", width = 25, height = 30, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/dimplot")
+```
+
+## 2.12 dimplot day
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+DimPlot_scCustom(obj.v5, split.by = "day_factor",colors_use = c("purple", "cyan", "lightgreen", "red", "orange", "blue", "pink", "green", "violet","grey", "lightblue", "darkgreen", "yellow", "gold", "magenta"))
+ggsave("dimplot_day.png", width = 25, height = 30, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/dimplot")
+```
+
+## 2.13 dimplot tissue split by condition
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+DimPlot_scCustom(obj.v5, split.by = "condition", group.by = "sample_type",colors_use = c("blue", "orange"))
+ggsave("dimplot_virusGroupedTissue.png", width = 40, height = 30, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration" )
+```
+
+## 2.14 dimplot Ms4a3 split by condition
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+DimPlot_scCustom(obj.v5, split.by = "condition", group.by = "sampletag_Ms4a3", colors_use = c("darkgrey", "red") )
+ggsave("dimplot_virusGroupedMs4a3.png", width = 40, height = 30, units = "cm", path ="../../Documents/machiels_lab_viral/Case_study_annotation/exploration"  )
+```
+
+## 2.15 AbSeq exploration of H2-ab1 Itgax SiglecF and CD274 for Ms4a3 + -
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+DefaultAssay(obj.v5) = "adt"
+umap_am_alveolar_d60 <- list()
+pallet = viridis(n = 10, option = "D")
+genes_AM <- c("H2-ia-ie-AbSeq", "Cd11c", "Siglecf-AbSeq", "Cd274-AbSeq")
+
+# Define a function to create and save the plot
+create_and_save_plot <- function(gene) {
+  plot <- FeaturePlot_scCustom(obj.v5, 
+                              features = gene, 
+                              label = TRUE, 
+                              label.size = 5, 
+                              split.by = "sampletag_Ms4a3", 
+                              colors_use = pallet, 
+                              label_feature_yaxis = FALSE)
+  
+  # Generate a unique filename based on the gene name
+  filename <- paste0(gene, "_featureplot_splitby_Ms4a3.png")
+  
+  # Save the plot with specific path and dimensions
+  ggsave(plot = plot, 
+         filename = filename, 
+         width = 30, 
+         height = 20, 
+         units = "cm", 
+         path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/abseq/Ms4a3")
+}
+
+# Loop through genes and create/save plots
+for (i in genes_AM) {
+  create_and_save_plot(i)
+}
+```
+
+## 2.16 AbSeq exploration of H2-ab1 Itgax SiglecF and CD274 for tissue
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+DefaultAssay(obj.v5) = "adt"
+umap_am_alveolar_d60 <- list()
+genes_AM <- c("H2-ia-ie-AbSeq", "Cd11c", "Siglecf-AbSeq", "Cd274-AbSeq")
+
+# Define a function to create and save the plot
+create_and_save_plot <- function(gene) {
+  plot <- FeaturePlot_scCustom(obj.v5, 
+                              features = gene, 
+                              label = TRUE, 
+                              label.size = 5, 
+                              split.by = "sample_type", 
+                              label_feature_yaxis = FALSE)
+  
+  # Generate a unique filename based on the gene name
+  filename <- paste0(gene, "_featureplot_splitby_tissue.png")
+  
+  # Save the plot with specific path and dimensions
+  ggsave(plot = plot, 
+         filename = filename, 
+         width = 30, 
+         height = 20, 
+         units = "cm", 
+         path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/abseq/tissue")
+}
+
+# Loop through genes and create/save plots
+for (i in genes_AM) {
+  create_and_save_plot(i)
+}
+```
+
+## 2.17 AbSeq exploration of H2-ab1 Itgax SiglecF and CD274 for condition
+
+```{r}
+#| fig-width: 15
+#| fig-height: 15
+DefaultAssay(obj.v5) = "adt"
+umap_am_alveolar_d60 <- list()
+genes_AM <- c("H2-ia-ie-AbSeq", "Cd11c", "Siglecf-AbSeq", "Cd274-AbSeq")
+
+# Define a function to create and save the plot
+create_and_save_plot <- function(gene) {
+  plot <- FeaturePlot_scCustom(obj.v5, 
+                              features = gene, 
+                              label = TRUE, 
+                              label.size = 5, 
+                              split.by = "condition", 
+                              label_feature_yaxis = FALSE)
+  
+  # Generate a unique filename based on the gene name
+  filename <- paste0(gene, "_featureplot_splitby_condition.png")
+  
+  # Save the plot with specific path and dimensions
+  ggsave(plot = plot, 
+         filename = filename, 
+         width = 30, 
+         height = 15, 
+         units = "cm", 
+         path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/abseq/condition")
+}
+
+# Loop through genes and create/save plots
+for (i in genes_AM) {
+  create_and_save_plot(i)
+}
+```
+
+## 2.18 AbSeq exploration of H2-ab1 Itgax SiglecF and CD274 for day
+
+```{r}
+#| fig-width: 15
+#| fig-height: 15
+DefaultAssay(obj.v5) = "adt"
+umap_am_alveolar_d60 <- list()
+genes_AM <- c("H2-ia-ie-AbSeq", "Cd11c", "Siglecf-AbSeq", "Cd274-AbSeq")
+
+# Define a function to create and save the plot
+create_and_save_plot <- function(gene) {
+  plot <- FeaturePlot_scCustom(obj.v5, 
+                              features = gene, 
+                              label = TRUE, 
+                              label.size = 5, 
+                              split.by = "day_factor", 
+                              label_feature_yaxis = FALSE)
+  
+  # Generate a unique filename based on the gene name
+  filename <- paste0(gene, "_featureplot_splitby_day.png")
+  
+  # Save the plot with specific path and dimensions
+  ggsave(plot = plot, 
+         filename = filename, 
+         width = 30, 
+         height = 15, 
+         units = "cm", 
+         path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/abseq/day")
+}
+
+# Loop through genes and create/save plots
+for (i in genes_AM) {
+  create_and_save_plot(i)
+}
+```
+
+## 2.19 RNA exploration of H2-ab1 Itgax SiglecF and CD274 for Ms4a3 + -
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+DefaultAssay(obj.v5) = "RNA"
+umap_am_alveolar_d60 <- list()
+pallet = viridis(n = 10, option = "D")
+genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
+
+# Define a function to create and save the plot
+create_and_save_plot <- function(gene) {
+  plot <- FeaturePlot_scCustom(obj.v5, 
+                              features = gene, 
+                              label = TRUE, 
+                              label.size = 5, 
+                              split.by = "sampletag_Ms4a3", 
+                              colors_use = pallet, 
+                              label_feature_yaxis = FALSE)
+  
+  # Generate a unique filename based on the gene name
+  filename <- paste0(gene, "_featureplot_splitby_Ms4a3.png")
+  
+  # Save the plot with specific path and dimensions
+  ggsave(plot = plot, 
+         filename = filename, 
+         width = 30, 
+         height = 20, 
+         units = "cm", 
+         path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/RNA/Ms4a3")
+}
+
+# Loop through genes and create/save plots
+for (i in genes_AM) {
+  create_and_save_plot(i)
+}
+```
+
+## 2.20 RNA exploration of H2-ab1 Itgax SiglecF and CD274 for tissue
+
+```{r}
+#| fig-width: 10
+#| fig-height: 10
+DefaultAssay(obj.v5) = "RNA"
+umap_am_alveolar_d60 <- list()
+pallet = viridis(n = 10, option = "D")
+genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
+
+# Define a function to create and save the plot
+create_and_save_plot <- function(gene) {
+  plot <- FeaturePlot_scCustom(obj.v5, 
+                              features = gene, 
+                              label = TRUE, 
+                              label.size = 5, 
+                              split.by = "sample_type", 
+                              colors_use = pallet, 
+                              label_feature_yaxis = FALSE)
+  
+  # Generate a unique filename based on the gene name
+  filename <- paste0(gene, "_featureplot_splitby_tissue.png")
+  
+  # Save the plot with specific path and dimensions
+  ggsave(plot = plot, 
+         filename = filename, 
+         width = 30, 
+         height = 20, 
+         units = "cm", 
+         path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/RNA/tissue")
+}
+
+# Loop through genes and create/save plots
+for (i in genes_AM) {
+  create_and_save_plot(i)
+}
+```
+
+## 2.21 RNA exploration of H2-ab1 Itgax SiglecF and CD274 for condition
+
+```{r}
+#| fig-width: 15
+#| fig-height: 15
+DefaultAssay(obj.v5) = "RNA"
+umap_am_alveolar_d60 <- list()
+pallet = viridis(n = 10, option = "D")
+genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
+
+# Define a function to create and save the plot
+create_and_save_plot <- function(gene) {
+  plot <- FeaturePlot_scCustom(obj.v5, 
+                              features = gene, 
+                              label = TRUE, 
+                              label.size = 5, 
+                              split.by = "condition", 
+                              colors_use = pallet, 
+                              label_feature_yaxis = FALSE)
+  
+  # Generate a unique filename based on the gene name
+  filename <- paste0(gene, "_featureplot_splitby_condition.png")
+  
+  # Save the plot with specific path and dimensions
+  ggsave(plot = plot, 
+         filename = filename, 
+         width = 40, 
+         height = 20, 
+         units = "cm", 
+         path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/RNA/condition")
+}
+
+# Loop through genes and create/save plots
+for (i in genes_AM) {
+  create_and_save_plot(i)
+}
+```
+
+## 2.21 RNA exploration of H2-ab1 Itgax SiglecF and CD274 for day
+
+```{r}
+#| fig-width: 15
+#| fig-height: 15
+DefaultAssay(obj.v5) = "RNA"
+umap_am_alveolar_d60 <- list()
+pallet = viridis(n = 10, option = "D")
+genes_AM <- c("H2-Ab1", "Itgax", "Pparg", "Siglecf", "Cd274")
+
+# Define a function to create and save the plot
+create_and_save_plot <- function(gene) {
+  plot <- FeaturePlot_scCustom(obj.v5, 
+                              features = gene, 
+                              label = TRUE, 
+                              label.size = 5, 
+                              split.by = "day_factor", 
+                              colors_use = pallet, 
+                              label_feature_yaxis = FALSE)
+  
+  # Generate a unique filename based on the gene name
+  filename <- paste0(gene, "_featureplot_splitby_day.png")
+  
+  # Save the plot with specific path and dimensions
+  ggsave(plot = plot, 
+         filename = filename, 
+         width = 30, 
+         height = 20, 
+         units = "cm", 
+         path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/RNA/day")
+}
+
+# Loop through genes and create/save plots
+for (i in genes_AM) {
+  create_and_save_plot(i)
+}
+```
+
+# 3) find markers for the clusters
+
+```{r}
+markers_all <- FindAllMarkers(obj.v5,
+                          assay = "RNA",
+                          logfc.threshold = 0.5,
+                          test.use = "wilcox",
+                          min.pct = 0.2)
+markers_all = select_top_genes(markers_all, n = 20)
+write_xlsx(markers_all, path = "../../Documents/machiels_lab_viral/Case_study_annotation/markers/markers.xlsx")
+```
+
+# 4) Cluster annotation with singleR with ImmGenData
+
+This reference uses mouse bulk RNA-seq data from immunologic genome project
+
+```{r}
+DimPlot(obj.v5, reduction = "umap_harmony", label = TRUE)
+```
+
+sce \<- SingleCellExperiment(assays = list(counts = obj.v5\$data, logcounts = obj.v5\$scale.data))
+
+```{r, echo =FALSE}
+reference_igp = celldex::ImmGenData()
+colData(reference_igp)
+
+```
+
+```{r}
+#change the seurat object to a single cell experiment object for input in SingleR
+sce = as.SingleCellExperiment(x = obj.v5, assay = c("RNA"))
+# need log normalized counts as input for SingleR
+sce = logNormCounts(sce)
+# run SingleR
+results_igp = SingleR(test = sce, ref = reference_igp, labels = reference_igp$label.main)
+```
+
+```{r}
+# add singleR labels to the seurat object's metadata structure
+obj.v5$singleR_igp = results_igp$labels
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+DimPlot(obj.v5, reduction = "umap_harmony", group.by = "singleR_igp", label = TRUE)
+ggsave("annotation_igp.png", width = 15, height = 10, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/singleR/igp")
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+ DimPlot_scCustom(obj.v5, reduction = "umap_harmony", group.by = "singleR_igp", label = TRUE, split.by = "seurat_clusters", repel = TRUE, ggplot_default_colors = TRUE, num_columns = 3, split_seurat = TRUE)
+ggsave("annotation_igp_per_cluster.png", width = 40, height = 50, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/singleR/igp")
+```
+
+# 5) Cluster annotation with singleR with tabula muris
+
+scRNA seq database where we used the data from lung as reference aka tabula muris (<https://tabula-muris.ds.czbiohub.org/>)
+
+```{r}
+# load in the databas and select for the lung tissue data
+EH <- ExperimentHub()
+REF <- EH[['EH1617']]
+REF <- REF[,!is.na(REF$cell_ontology_class)]
+lung_ref <- REF[,REF$tissue == 'Lung']
+# log normalize the counts as before 
+lung_ref <- logNormCounts(lung_ref)
+# run SingleR
+results_tabulamuris <- SingleR(test = sce, ref = lung_ref, labels = lung_ref$cell_ontology_class)
+
+
+
+
+```
+
+```{r}
+#| fig-width: 15
+#| fig-height: 20
+#visualize the celltypes of the different clusters
+obj.v5$singleR_tabulamuris = results_tabulamuris$labels
+DimPlot(obj.v5, reduction = "umap_harmony", group.by = "singleR_tabulamuris", label = TRUE)
+ggsave("annotation_tabulamuris.png", width = 25, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/singleR/tabulamuris")
+```
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+DimPlot_scCustom(obj.v5, reduction = "umap_harmony", group.by = "singleR_tabulamuris", label = TRUE, split.by = "seurat_clusters")
+```
+
+## 5.1 scMAP
+
+```{r}
+#| fig-width: 10
+#| fig-height: 15
+
+rowData(lung_ref)$feature_symbol <- rownames(lung_ref)
+lung_ref <- lung_ref[!duplicated(rownames(lung_ref)), ]
+lung_ref <- selectFeatures(lung_ref, suppress_plot = FALSE)
+
+colData(lung_ref)$cell_type1 <- lung_ref$`cell_ontology_class`
+lung_ref <- indexCluster(lung_ref)
+
+rowData(sce)$feature_symbol <- rownames(sce)
+
+SC.RES <- scmapCluster(projection = sce, index_list = list(TabulaMurisData_Lung = metadata(lung_ref)$scmap_cluster_index))
+
+obj.v5$scmap_cluster_labs <- SC.RES
+DimPlot(obj.v5, reduction = "umap_harmony", group.by = "scmap_cluster_labs", label = TRUE)
+ggsave("annotation_tabulamuris_scmap.png", width = 25, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/Case_study_annotation/singleR/tabulamuris_scmap")
+```
+
+```{r}
+obj.v5 |> write_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+```
