@@ -1,0 +1,39 @@
+---
+title: "caseStudy_GenderCorrection"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+![](images/clipboard-1265961124.png)
+
+# 1) Load in data libraries and custom functions
+
+```{r, echo=FALSE}
+easypackages::libraries("DESeq2","Seurat","tidyverse", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi", "clusterProfiler", "enrichplot")
+obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
+DefaultAssay(obj.v5) <- "RNA"
+```
+
+## 1A) Transform the data so it only contains male and female
+
+```{r}
+obj.v5 = obj.v5 %>% filter(!str_detect(sex_classifier_2, "no_expression_of_specific_genes"))
+obj.v5 = obj.v5 %>% filter(!str_detect(sex_classifier_2, "detection_of_male_and_female_genes"))
+```
+
+## 2) Approach 1: regress out
+
+```{r}
+
+```
+
+```{r}
+%>% filter(!str_detect(sex_classifier_2, "no_expression_of_specific_genes"))
+%>% filter(!str_detect(sex_classifier_2, "detection_of_male_and_female_genes"))
+```
