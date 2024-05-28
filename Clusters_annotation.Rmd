@@ -843,7 +843,6 @@ ggsave("annotation_tabulamuris_scmap.png", width = 25, height = 20, units = "cm"
 ```
 
 ```{r}
-obj.v5 |>  write_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
 
 ```
 
@@ -916,7 +915,7 @@ ggsave("violinplot_markers.png", path = "../../Documents/machiels_lab_viral/Case
 ```
 
 ```{r}
-Idents(obj.v5)
+Idents(obj.v5) = "seurat_clusters"
 obj.v5 <- subset(obj.v5, idents = c("5_1", "6","7","9", "10","11","12","13","14"), invert = TRUE)
 ```
 
@@ -963,6 +962,10 @@ ggsave("umap_reclustering.png", path = "../../Documents/machiels_lab_viral/Case_
 ```{r}
 obj.v5 |> DimPlot(group.by = "seurat_clusters", label=T)
 Idents(obj.v5) = "seurat_clusters"
+```
+
+```{r}
+obj.v5 |> write_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central.rds")
 ```
 
 # 8) Annotation of reclustered clusters with SingleR using the tabulamuris database
@@ -1014,21 +1017,7 @@ obj.v5 <- subset(obj.v5, idents = c("T cell", "B cell", "natural killer cell", "
 ```{r}
 Idents(obj.v5) = "seurat_clusters"
 obj.v5 |> DimPlot(group.by = "seurat_clusters", label=T)
-ggsave("umap_reclustering_filteredforunwantedcells.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster" , width = 10, height = 10)
-```
 
-```{r}
-DimPlot(obj.v5, reduction = "umap_harmony", group.by = "singleR_tabulamuris", label = TRUE)
-ggsave("umap_reclustering_filteredforunwantedcells_annotated.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster" , width = 10, height = 10)
-```
-
-```{r}
-Idents(obj.v5) = "seurat_clusters"
-obj.v5<- FindSubCluster(object = obj.v5, cluster = "4", graph.name = "RNA_snn", subcluster.name = "cluster_4_subclusters", resolution = 0.19, algorithm = 1)
-```
-
-```{r}
-obj.v5 |> DimPlot(group.by = "cluster_4_subclusters", label=T) 
 ```
 
 ```{r}
@@ -1040,25 +1029,17 @@ obj.v5 |> DimPlot(group.by = "cluster_8_subclusters", label=T)
 ```
 
 ```{r}
-Idents(obj.v5) = "harmony_clusters_0.2"
-# Extract metadata
-metadata <- obj.v5@meta.data
-
-# Replace the value 8 in 'cluster_4_subclusters' with values from 'cluster_8_subclusters' if they start with '8_'
-metadata <- metadata %>%
-  mutate(cluster_4_subclusters = if_else(cluster_4_subclusters == "8" & str_starts(cluster_8_subclusters, "8_"),
-                                         cluster_8_subclusters,
-                                         cluster_4_subclusters))
-
-# Assign the modified metadata back to the Seurat object
-obj.v5@meta.data <- metadata
-
-
+obj.v5$seurat_clusters = obj.v5$cluster_8_subclusters
+Idents(obj.v5) = "seurat_clusters"
+obj.v5 <- subset(obj.v5, idents = c("4"), invert = TRUE)
+obj.v5$seurat_clusters = factor(obj.v5$seurat_clusters, levels = c("0", "1", "2", "3","5","6","7","8_0","8_1","8_2"))
+DimPlot(obj.v5, group.by = "seurat_clusters", label = T)
+ggsave("umap_reclustering_filteredforunwantedcells.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster" , width = 10, height = 10)
 ```
 
 ```{r}
-obj.v5$cluster_4_subclusters = factor(obj.v5$cluster_4_subclusters, levels = c("0", "1", "2", "3", "4_0", "4_1","4_2","4_3","4_4","5","6","7","8_0","8_1","8_2"))
-obj.v5$seurat_clusters = obj.v5$cluster_4_subclusters
+DimPlot(obj.v5, reduction = "umap_harmony", group.by = "singleR_tabulamuris", label = TRUE)
+ggsave("umap_reclustering_filteredforunwantedcells_annotated.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster" , width = 10, height = 10)
 ```
 
 # 9) Data exploration reclustered + filtered

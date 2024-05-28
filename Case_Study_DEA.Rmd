@@ -12,25 +12,32 @@ execute:
 
 # 1) load in data and libraries + initialize custom functions
 
-```{r}
+```{r, echo=FALSE}
 easypackages::libraries("Seurat","tidyverse","SingleR", "ggridges", "viridis", "ggh4x", "celldex", "scCustomize", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi", "clusterProfiler", "enrichplot", "ExperimentHub", "scuttle", 'scmap',"cowplot","msigdbr", "fgsea",
                         'clusterProfiler',
                         'org.Mm.eg.db',
                         'tidyseurat',
                         'enrichplot',
-                        'xlsx')
+                        'xlsx',
+                        'Seurat.utils', "enrichR")
 obj.v5 = read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_reclustered.rds")
 DefaultAssay(obj.v5) <- "RNA"
+obj.v5@assays$RNA
+
+
+
 ```
 
 ```{r}
-seurat_d60 = obj.v5 %>% filter(str_detect(day, "d60"))
+counts <- GetAssayData(seurat_d60, assay = "RNA", layer = "counts")
+counts <- counts[-(which(rownames(counts) %in% c("Xist", "Uty","Eif2s3y","Kdm5d","Ddx3y"))),]
+seurat_d60@assays$RNA$counts <- counts
+```
 
-counts <- GetAssayData(seurat_d60, assay = "RNA")
-counts <- counts[-(which(rownames(counts) %in% c("Ddx3y", "Eif2s3y", "Kdm5d", "Xist", "Uty"))),]
-seurat_d60 <- subset(seurat_d60, features = rownames(counts))
-
-
+```{r}
+counts <- GetAssayData(seurat_d60, assay = "RNA", layer = "data")
+counts <- counts[-(which(rownames(counts) %in% c("Xist", "Uty","Eif2s3y","Kdm5d","Ddx3y"))),]
+seurat_d60@assays$RNA$data <- counts
 ```
 
 ```{r}
@@ -54,6 +61,23 @@ process_markers <- function(data) {
   
   return(data)
 }
+```
+
+```{r}
+
+
+RNA <- seurat_d60@assays$RNA
+
+# Define the gene(s) you want to remove
+genes_to_remove <- c("Uty", "Xist")
+
+
+# Filter out the specified genes from each matrix
+RNA$data <- RNA$data[!rownames(RNA$data) %in% genes_to_remove, ]
+RNA$counts <- RNA$counts[!rownames(RNA$counts) %in% genes_to_remove, ]
+
+# Assign the modified RNA assay back to the Seurat object
+seurat_d60@assays$RNA <- RNA
 ```
 
 ```{r}
@@ -499,112 +523,7 @@ ggsave("volcano_PVMvsMock.png", path ="../../Documents/machiels_lab_viral/CaseSt
 ggsave("volcano_PVMvsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-# ORA is focused on the enrichment of predefined gene sets within a list of differentially expressed genes, while GSEA considers the overall expression pattern of genes in relation to predefined gene sets
-
-# 4) Gene Set Enrichment Analysis for differentially expressed genes in Virus vs Mock
-
-## 4A) prepare the rnk file
-
-```{r}
-MAV1vsMock_ordered = prepare_rnk(data = markers_MAV1vsMock)
-
-write.table(MAV1vsMock_ordered, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MAV1vsMock_ordered.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MAV1vsMock_ordered.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MAV1vsMock_ordered.txt")
-```
-
-```{r}
-MuHV4vsMock_ordered = prepare_rnk(markers_MuHV4vsMock) 
-
-write.table(MuHV4vsMock_ordered, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MuHV4vsMock_ordered.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MuHV4vsMock_ordered.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/MuHV4vsMock_ordered.txt")
-
-```
-
-```{r}
-PR8vsMock_ordered = prepare_rnk(markers_PR8vsMock)
-
-write.table(PR8vsMock_ordered, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PR8vsMock_ordered.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PR8vsMock_ordered.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PR8vsMock_ordered.txt")
-```
-
-```{r}
-PVMvsMock_ordered = prepare_rnk(markers_PVMvsMock)
-
-
-write.table(PVMvsMock_ordered, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PVMvsMock_ordered.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PVMvsMock_ordered.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/Enrichment/input_VirusvsMock/PVMvsMock_ordered.txt")
-```
-
-### the resulting txt files are then converted to .rnk files by saving them as such
-
-### see folder CaseStudy_DEA/Enrichment/results_VirusvsMock/
-
-# 5) Over Representation Analysis (ORA) for differentially expressed genes in Virus vs Mock
-
-## 5A) prepare files for ORA
-
-```{r}
-ora_mavmockneg = prepare_ora(negative_MAV1vsMock)
-write.table(ora_mavmockneg, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_oraneg.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_oraneg.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_oraneg.txt")
-
-```
-
-```{r}
-ora_mavmockpos = prepare_ora(positive_MAV1vsMock)
-write.table(ora_mavmockpos, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_orapos.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_orapos.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MAV1vsMock_orapos.txt")
-```
-
-```{r}
-ora_muhv4mockneg = prepare_ora(negative_MuHv4vsMock)
-write.table(ora_muhv4mockneg, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_oraneg.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_oraneg.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_oraneg.txt")
-```
-
-```{r}
-ora_muhv4mockpos = prepare_ora(positive_MuHv4vsMock)
-write.table(ora_muhv4mockpos, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_orapos.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_orapos.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/MuHV4vsMock_orapos.txt")
-```
-
-```{r}
-ora_pr8mockneg = prepare_ora(negative_PR8vsMock)
-write.table(ora_pr8mockneg, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_oraneg.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_oraneg.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_oraneg.txt")
-```
-
-```{r}
-ora_pr8mockpos = prepare_ora(positive_PR8vsMock)
-write.table(ora_pr8mockpos, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_orapos.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_orapos.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PR8vsMock_orapos.txt")
-```
-
-```{r}
-ora_pvmmockneg = prepare_ora(negative_PVMvsMock)
-write.table(ora_pvmmockneg, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_oraneg.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_oraneg.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_oraneg.txt")
-```
-
-```{r}
-ora_pvmmockpos = prepare_ora(positive_PVMvsMock)
-write.table(ora_pvmmockpos, file = "../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_orapos.txt")
-remove_numbers_and_quotes_between_genes_with_tabs("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_orapos.txt")
-remove_quotes("../../Documents/machiels_lab_viral/CaseStudy_DEA/ORA/input_VirusvsMock/PVMvsMock_orapos.txt")
-```
-
-# 6) Differential expression analysis
+# 4) Differential expression analysis
 
 ```{r}
 Idents(seurat_d60) = "sampletag_name"
@@ -715,7 +634,7 @@ positive_Ms4a3_PVM = markers_PVM_Ms4a3_filtered[markers_PVM_Ms4a3_filtered$avg_l
 negative_Ms4a3_PVM = markers_PVM_Ms4a3_filtered[markers_PVM_Ms4a3_filtered$avg_log2FC <= -0.5,]
 ```
 
-## 6A) volcano plot MAV1 Ms4a3
+## 4A) volcano plot MAV1 Ms4a3
 
 ```{r}
 #| fig-width: 18
@@ -733,7 +652,7 @@ ggsave("volcano_MAV1_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseS
 ggsave("volcano_MAV1_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-## 6B) volcano plot MuHV4 Ms4a3
+## 4B) volcano plot MuHV4 Ms4a3
 
 ```{r}
 #| fig-width: 18
@@ -751,7 +670,7 @@ ggsave("volcano_MuHV4_Ms4a3.png", path ="../../Documents/machiels_lab_viral/Case
 ggsave("volcano_MuHV4_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-## 6C) volcano plot PR8 Ms4a3
+## 4C) volcano plot PR8 Ms4a3
 
 ```{r}
 #| fig-width: 18
@@ -769,7 +688,7 @@ ggsave("volcano_PR8_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseSt
 ggsave("volcano_PR8_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-## 6D) volcano plot PVM Ms4a3
+## 4D) volcano plot PVM Ms4a3
 
 ```{r}
 #| fig-width: 18
@@ -787,7 +706,7 @@ ggsave("volcano_PVM_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseSt
 ggsave("volcano_PVM_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-## 6E) volcano plot Mock Ms4a3
+## 4E) volcano plot Mock Ms4a3
 
 ```{r}
 #| fig-width: 18
@@ -805,7 +724,7 @@ ggsave("volcano_Mock_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseS
 ggsave("volcano_Mock_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-# 7) Differential expression analysis virus types
+# 5) Differential expression analysis virus types
 
 ```{r}
 muhv4_rows <- which(seurat_d60@meta.data$virus %in% "MuHV4")
@@ -903,7 +822,7 @@ positive_DNARNA = markers_DNA_vs_RNA_filter[markers_DNA_vs_RNA_filter$avg_log2FC
 negative_DNARNA = markers_DNA_vs_RNA_filter[markers_DNA_vs_RNA_filter$avg_log2FC <= -0.5,]
 ```
 
-## 7A) volcano plot DNA vs Mock
+## 5A) volcano plot DNA vs Mock
 
 ```{r}
 #| fig-width: 18
@@ -921,7 +840,7 @@ ggsave("volcano_DNAvsMock.png", path ="../../Documents/machiels_lab_viral/CaseSt
 ggsave("volcano_DNAvsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-## 7B) volcano plot DNA vs RNA
+## 5B) volcano plot DNA vs RNA
 
 ```{r}
 #| fig-width: 18
@@ -939,7 +858,7 @@ ggsave("volcano_DNAvsRNA.png", path ="../../Documents/machiels_lab_viral/CaseStu
 ggsave("volcano_DNAvsRNA.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-## 7C) volcano plot RNA vs Mock
+## 5C) volcano plot RNA vs Mock
 
 ```{r}
 #| fig-width: 18
