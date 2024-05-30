@@ -995,11 +995,12 @@ ggsave("volcano_MuHV4_vs_Mock_Ms4a3_pos.svg", path ="../../Documents/machiels_la
 
 ```
 
+## 6D) Density plot showing embeddings of the different conditions and Ms4a3 together at d60
+
 ```{r}
 #| fig-width: 18
 #| fig-height: 18
-library(dplyr)
-library(ggplot2)
+
 
 # Convert obj.v5 to tibble once
 seurat_d60_tibble <- as_tibble(seurat_d60)
@@ -1045,4 +1046,57 @@ combined_plot
 
 ggsave("sample_Embeddings_originalIntegratedSeuratObject.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
 ggsave("sample_Embeddings_originalIntegratedSeuratObject.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+```
+
+## 6E) Density plot showing embeddings of the different conditions and Ms4a3 together at d60 only bal tissue
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+seurat_d60_bal_bal = seurat_d60_bal %>% filter(str_detect(sample_type, "bal"))
+
+# Convert obj.v5 to tibble once
+seurat_d60_bal_tibble <- as_tibble(seurat_d60_bal)
+
+# Get unique sample names
+samples <- unique(seurat_d60_bal_tibble$sampletag_name)
+
+# Pre-filter seurat_d60_bal for each sample and not_sample once
+filtered_samples <- lapply(samples, function(sample) {
+  list(
+    sample = sample,
+    seurat_d60_bal_filtered_for_sample = filter(seurat_d60_bal_tibble, sampletag_name == sample),
+    seurat_d60_bal_not_sample = filter(seurat_d60_bal_tibble, sampletag_name != sample)
+  )
+})
+
+umap_sampletag_name_plotlist <- list()
+for (filtered_sample in filtered_samples) {
+  sample <- filtered_sample$sample
+  seurat_d60_bal_filtered_for_sample <- filtered_sample$seurat_d60_bal_filtered_for_sample
+  seurat_d60_bal_not_sample <- filtered_sample$seurat_d60_bal_not_sample
+
+  umap_sampletag_name_plotlist[[sample]] <- ggplot() +
+    geom_point(data = seurat_d60_bal_not_sample,
+               aes(x = umapharmony_1, y = umapharmony_2),
+               color = "grey") +
+    geom_point(data = seurat_d60_bal_filtered_for_sample,
+               aes(x = umapharmony_1, y = umapharmony_2),
+               color = "red",
+               alpha = 0.4,
+               stroke = 0,
+               shape = 16) +
+    theme_bw() +
+    scale_fill_continuous(type = "viridis") +
+    ggtitle(sample) +
+    theme_bw()
+}
+
+
+combined_plot <- plot_grid(plotlist = umap_sampletag_name_plotlist, ncol = 5, nrow = 3, align = 'v', axis = 'l')
+
+combined_plot
+
+ggsave("sample_Embeddings_originalIntegratedSeuratObject_bal.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+ggsave("sample_Embeddings_originalIntegratedSeuratObject_bal.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
 ```
