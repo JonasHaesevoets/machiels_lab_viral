@@ -29,6 +29,8 @@ obj.v5@assays$RNA
 ```
 
 ```{r}
+seurat_d60 = obj.v5 %>% filter(str_detect(day, "d60"))
+
 counts <- GetAssayData(seurat_d60, assay = "RNA", layer = "counts")
 counts <- counts[-(which(rownames(counts) %in% c("Xist", "Uty","Eif2s3y","Kdm5d","Ddx3y"))),]
 seurat_d60@assays$RNA$counts <- counts
@@ -872,4 +874,175 @@ volcano_RNAvsmock
 
 ggsave("volcano_RNAvsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9) 
 ggsave("volcano_RNAvsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
+
+# 6) Questions Béné Presentation 30/5 
+
+## 6A) MuHV4 vs PVM
+
+```{r}
+Idents(seurat_d60) = "condition"
+markers_MuHV4vsPVM<- FindMarkers(seurat_d60 ,
+                                 ident.1 =  "MuHV4",
+                                 ident.2 =  "PVM",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> 
+                                 as_tibble(rownames="gene")
+markers_MuHV4vsPVM_filtered = markers_MuHV4vsPVM[abs(markers_MuHV4vsPVM$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_MuHV4vsPVM_filtered$p_val_adj <= 0.05)
+markers_MuHV4vsPVM_filtered <- markers_MuHV4vsPVM_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_MuHV4vsPVM, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4vsPVM.xlsx")
+write_xlsx(markers_MuHV4vsPVM_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4vsPVM_filtered.xlsx")
+
+positive_MuHV4vsPVM = markers_MuHV4vsPVM_filtered[markers_MuHV4vsPVM_filtered$avg_log2FC >= 0.5,]
+negative_MuHV4vsPVM = markers_MuHV4vsPVM_filtered[markers_MuHV4vsPVM_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_MuHV4vsPVM = process_markers2(markers_MuHV4vsPVM)
+volcano_MuHV4vsPVM <- ggplot(data = volcano_MuHV4vsPVM,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_MuHV4vsPVM$avg_log2FC)),
+                                  ceiling(max(volcano_MuHV4vsPVM$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_MuHV4vsPVM
+ggsave("volcano_MuHV4vsPVM.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_MuHV4vsPVM.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+```
+
+## 6B) MuHV4 Ms4a3+ vs PVM Ms4a3 +
+
+```{r}
+Idents(seurat_d60) = "sampletag_name"
+markers_MuHV4_vs_PVM_Ms4a3_pos<- FindMarkers(seurat_d60,
+                                 ident.1 =  "MuHV4_Ms4a3_pos",
+                                 ident.2 =  "PVM_Ms4a3_pos",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+```
+
+```{r}
+markers_MuHV4_vs_PVM_Ms4a3_pos_filtered = markers_MuHV4_vs_PVM_Ms4a3_pos[abs(markers_MuHV4_vs_PVM_Ms4a3_pos$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_MuHV4_vs_PVM_Ms4a3_pos_filtered$p_val_adj <= 0.05)
+markers_MuHV4_vs_PVM_Ms4a3_pos_filtered <- markers_MuHV4_vs_PVM_Ms4a3_pos_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_MuHV4_vs_PVM_Ms4a3_pos, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4_vs_PVM_Ms4a3_pos.xlsx")
+write_xlsx(markers_MuHV4_vs_PVM_Ms4a3_pos_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4_vs_PVM_Ms4a3_pos_filtered.xlsx")
+
+positive_MuHV4vsPVM = markers_MuHV4_vs_PVM_Ms4a3_pos_filtered[markers_MuHV4_vs_PVM_Ms4a3_pos_filtered$avg_log2FC >= 0.5,]
+negative_MuHV4vsPVM = markers_MuHV4_vs_PVM_Ms4a3_pos_filtered[markers_MuHV4_vs_PVM_Ms4a3_pos_filtered$avg_log2FC <= -0.5,]
+```
+
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_MuHV4_vs_PVM_Ms4a3_pos = process_markers2(markers_MuHV4_vs_PVM_Ms4a3_pos)
+volcano_MuHV4_vs_PVM_Ms4a3_pos <- ggplot(data = volcano_MuHV4_vs_PVM_Ms4a3_pos,
+                                                aes(x = avg_log2FC,
+                                                    y = -log10(p_val_adj), 
+                                                    col = diffexpressed, 
+                                                    label = delabel)) +          geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_MuHV4_vs_PVM_Ms4a3_pos$avg_log2FC)),
+                                  ceiling(max(volcano_MuHV4_vs_PVM_Ms4a3_pos$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_MuHV4_vs_PVM_Ms4a3_pos
+ggsave("volcano_MuHV4_vs_PVM_Ms4a3_pos.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_MuHV4_vs_PVM_Ms4a3_pos.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+```
+
+## 6C) MuHV4 Ms4a3+ vs Mock MuHV4 Ms4a3+
+
+```{r}
+Idents(seurat_d60) = "sampletag_name"
+markers_MuHV4_vs_Mock_Ms4a3_pos<- FindMarkers(seurat_d60,
+                                 ident.1 =  "MuHV4_Ms4a3_pos",
+                                 ident.2 =  "Mock_Ms4a3_pos",
+                                 test.use = "wilcox", 
+                                 assay = "RNA",
+                                 min.pct = 0.2) |> as_tibble(rownames="gene")
+
+markers_MuHV4_vs_Mock_Ms4a3_pos_filtered = markers_MuHV4_vs_Mock_Ms4a3_pos[abs(markers_MuHV4_vs_Mock_Ms4a3_pos$avg_log2FC) > 0.5,]
+nonsignficant_p_adj_Mock <- which(markers_MuHV4_vs_Mock_Ms4a3_pos_filtered$p_val_adj <= 0.05)
+markers_MuHV4_vs_Mock_Ms4a3_pos_filtered <- markers_MuHV4_vs_Mock_Ms4a3_pos_filtered[nonsignficant_p_adj_Mock, ]
+
+write_xlsx(markers_MuHV4_vs_Mock_Ms4a3_pos, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4_vs_Mock_Ms4a3_pos.xlsx")
+write_xlsx(markers_MuHV4_vs_Mock_Ms4a3_pos_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4_vs_Mock_Ms4a3_pos_filtered.xlsx")
+
+positive_MuHV4vsPVM = markers_MuHV4_vs_Mock_Ms4a3_pos_filtered[markers_MuHV4_vs_Mock_Ms4a3_pos_filtered$avg_log2FC >= 0.5,]
+negative_MuHV4vsPVM = markers_MuHV4_vs_Mock_Ms4a3_pos_filtered[markers_MuHV4_vs_Mock_Ms4a3_pos_filtered$avg_log2FC <= -0.5,]
+
+
+
+volcano_MuHV4_vs_Mock_Ms4a3_pos = process_markers2(markers_MuHV4_vs_Mock_Ms4a3_pos)
+volcano_MuHV4_vs_Mock_Ms4a3_pos <- ggplot(data = volcano_MuHV4_vs_Mock_Ms4a3_pos,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_MuHV4_vs_Mock_Ms4a3_pos$avg_log2FC)),
+                                  ceiling(max(volcano_MuHV4_vs_Mock_Ms4a3_pos$avg_log2FC)), by = 0.5)) +
+  geom_text_repel(max.overlaps = 100)
+volcano_MuHV4_vs_Mock_Ms4a3_pos
+ggsave("volcano_MuHV4_vs_Mock_Ms4a3_pos.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_MuHV4_vs_Mock_Ms4a3_pos.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+
+```
+
+```{r}
+#| fig-width: 18
+#| fig-height: 18
+library(dplyr)
+library(ggplot2)
+
+# Convert obj.v5 to tibble once
+seurat_d60_tibble <- as_tibble(seurat_d60)
+
+# Get unique sample names
+samples <- unique(seurat_d60_tibble$sampletag_name)
+
+# Pre-filter seurat_d60 for each sample and not_sample once
+filtered_samples <- lapply(samples, function(sample) {
+  list(
+    sample = sample,
+    seurat_d60_filtered_for_sample = filter(seurat_d60_tibble, sampletag_name == sample),
+    seurat_d60_not_sample = filter(seurat_d60_tibble, sampletag_name != sample)
+  )
+})
+
+umap_sampletag_name_plotlist <- list()
+for (filtered_sample in filtered_samples) {
+  sample <- filtered_sample$sample
+  seurat_d60_filtered_for_sample <- filtered_sample$seurat_d60_filtered_for_sample
+  seurat_d60_not_sample <- filtered_sample$seurat_d60_not_sample
+
+  umap_sampletag_name_plotlist[[sample]] <- ggplot() +
+    geom_point(data = seurat_d60_not_sample,
+               aes(x = umapharmony_1, y = umapharmony_2),
+               color = "grey") +
+    geom_point(data = seurat_d60_filtered_for_sample,
+               aes(x = umapharmony_1, y = umapharmony_2),
+               color = "red",
+               alpha = 0.4,
+               stroke = 0,
+               shape = 16) +
+    theme_bw() +
+    scale_fill_continuous(type = "viridis") +
+    ggtitle(sample) +
+    theme_bw()
+}
+
+
+combined_plot <- plot_grid(plotlist = umap_sampletag_name_plotlist, ncol = 5, nrow = 3, align = 'v', axis = 'l')
+
+combined_plot
+
+ggsave("sample_Embeddings_originalIntegratedSeuratObject.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
+ggsave("sample_Embeddings_originalIntegratedSeuratObject.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/questionsBene/", bg = 'white', width = 18, height = 9)
 ```

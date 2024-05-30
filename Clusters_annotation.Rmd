@@ -1191,31 +1191,51 @@ ggsave("conditionsEmbeddings_originalIntegratedSeuratObject.png", path ="../../D
 ```{r}
 #| fig-width: 18
 #| fig-height: 18
-# samples <- obj.v5$sampletag_name 
-# umap_sampletag_name_plotlist <- list()
-# for (sample in samples) {
-#   obj.v5_filtered_for_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_name==sample)
-#   obj.v5_not_sample <- obj.v5 |> as_tibble( ) |> filter(sampletag_name!=sample)
-#   
-#   umap_sampletag_name_plotlist[[sample]] <- obj.v5 |> 
-#     ggplot() +
-#     geom_point(data= obj.v5_not_sample,
-#                aes(umapharmony_1,umapharmony_2),
-#                color="grey")+
-#     geom_point(data= obj.v5_filtered_for_sample,
-#                aes(umapharmony_1,umapharmony_2),
-#                color="red",
-#                alpha=0.4,
-#                #plot points without outer border without alpha
-#                stroke = 0,
-#                shape=16)+
-#     theme_bw()+
-#     scale_fill_continuous(type = "viridis")+
-#     ggtitle(sample)+theme_bw()
-# }
-# 
-# ggarrange(plotlist = umap_sampletag_name_plotlist)
-# ggsave("sample_Embeddings_originalIntegratedSeuratObject.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration", height = 18, width = 18)
+library(dplyr)
+library(ggplot2)
+
+# Convert obj.v5 to tibble once
+obj.v5_tibble <- as_tibble(obj.v5)
+
+# Get unique sample names
+samples <- unique(obj.v5_tibble$sampletag_name)
+
+# Pre-filter obj.v5 for each sample and not_sample once
+filtered_samples <- lapply(samples, function(sample) {
+  list(
+    sample = sample,
+    obj.v5_filtered_for_sample = filter(obj.v5_tibble, sampletag_name == sample),
+    obj.v5_not_sample = filter(obj.v5_tibble, sampletag_name != sample)
+  )
+})
+
+umap_sampletag_name_plotlist <- list()
+for (filtered_sample in filtered_samples) {
+  sample <- filtered_sample$sample
+  obj.v5_filtered_for_sample <- filtered_sample$obj.v5_filtered_for_sample
+  obj.v5_not_sample <- filtered_sample$obj.v5_not_sample
+
+  umap_sampletag_name_plotlist[[sample]] <- ggplot() +
+    geom_point(data = obj.v5_not_sample,
+               aes(x = umapharmony_1, y = umapharmony_2),
+               color = "grey") +
+    geom_point(data = obj.v5_filtered_for_sample,
+               aes(x = umapharmony_1, y = umapharmony_2),
+               color = "red",
+               alpha = 0.4,
+               stroke = 0,
+               shape = 16) +
+    theme_bw() +
+    scale_fill_continuous(type = "viridis") +
+    ggtitle(sample) +
+    theme_bw()
+}
+
+
+combined_plot <- plot_grid(plotlist = umap_sampletag_name_plotlist, ncol = 5, nrow = 4, align = 'v', axis = 'l')
+
+combined_plot
+ggsave("sample_Embeddings_originalIntegratedSeuratObject.png", plot = combined_plot, path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/", height = 20, width = 18)
 ```
 
 ## 9.6 Heatmaps for abseq data on expression of CD11c and SiglecF
