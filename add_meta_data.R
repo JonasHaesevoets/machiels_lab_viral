@@ -3,6 +3,8 @@ obj.v5 <- read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_
 DefaultAssay(obj.v5) <- "RNA"
 
 # Filter metadata columns in obj.v5 starting with "RNA_snn"
+obj.v5$RNA_SNN_res_0.18 = obj.v5$RNA_snn_res.0.18
+obj.v5$RNA_snn_res.0.18 = NULL
 filtered_metadata <- obj.v5@meta.data[, !grepl("^RNA_snn", colnames(obj.v5@meta.data))]
 obj.v5@meta.data <- filtered_metadata
 print(colnames(obj.v5@meta.data))

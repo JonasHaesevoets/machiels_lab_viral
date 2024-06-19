@@ -1,0 +1,1588 @@
+---
+title: "GSEA:Gene Set Enrichment Analysis all at d60"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+# 1) Load in packages
+
+```{r, echo=FALSE}
+set.seed(2023)
+
+easypackages::libraries("tidyverse", "RColorBrewer", "fgsea", "GSA", "readxl","writexl", "clusterProfiler", "enrichplot", "ggplot2")
+```
+
+### function to convert the gmt file to an appropriate format
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = 
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+```{r}
+filter_and_convert_matrix <- function(genes_in_data) {
+  # Find the intersection of genes in data and hidden genes
+  hidden1 <- intersect(genes_in_data, hidden)
+  
+  # Filter the matrix to keep only the rows corresponding to the intersection and columns with more than 5 annotations
+  filtered_mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1, ]) > 5)]]
+  
+  # Convert the filtered matrix to list using the previously defined function
+  final_list <- matrix_to_list(filtered_mat)
+  
+  return(final_list)
+}
+```
+
+### function to rank the input genes
+
+```{r}
+ranker <- function(data) {
+  # Ensure input is a data frame
+  if (!is.data.frame(data)) {
+    stop("Input data must be a data frame.")
+  }
+  
+  # Extract genes and relevant columns
+  genes <- data$gene
+  avg_log2FC <- data$avg_log2FC
+  data$p_val_adj <- ifelse(data$p_val_adj == 0, 1e-500, data$p_val_adj)
+  p_val_adj <- data$p_val_adj
+
+  # Calculate rankings with robust handling of infinities
+  rankings <- ifelse(
+    is.infinite(sign(avg_log2FC) * (-log10(p_val_adj))),
+    avg_log2FC * pmax(-Inf, -log10(p_val_adj)),  # Replace inf with -Inf
+    avg_log2FC * (-log10(p_val_adj))
+  )
+  
+  # Set appropriate maximum and minimum rankings for interpretability
+  max_ranking <- max(rankings[is.finite(rankings)], na.rm = TRUE) * 10
+  min_ranking <- min(rankings[is.finite(rankings)], na.rm = TRUE) * 10
+  
+  # Replace extreme values with modified max/min while preserving NAs
+  rankings <- replace(rankings, rankings > max_ranking, max_ranking)
+  rankings <- replace(rankings, rankings < min_ranking, min_ranking)
+  
+  # Sort rankings in descending order
+  names(rankings) = genes
+  rankings <- sort(rankings, decreasing = TRUE)
+
+}
+```
+
+### 
+
+# 2) GSEA DNA vs RNA
+
+## 2.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+DNA_vs_RNA = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_DNA_vs_RNA.xlsx")
+
+```
+
+```{r}
+DNAvsRNA = ranker(DNA_vs_RNA)
+head(DNAvsRNA)
+```
+
+## 2.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = DNA_vs_RNA$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 2.3 Run GSEA with fgsea
+
+```{r}
+GSEAres_dna_vs_rna<- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = DNAvsRNA,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+
+
+```
+
+```{r}
+
+```
+
+## 2.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_dna_vs_rna[order(pval), ])
+sum(GSEAres_dna_vs_rna[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+# select the top 25 pathways associated with up / down regulated genes
+topPathwaysUp_dnavsrna <- GSEAres_dna_vs_rna[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_dnsvsrna <- GSEAres_dna_vs_rna[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_dnavsrna = c(topPathwaysUp_dnavsrna, rev(topPathwaysDown_dnsvsrna))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_dnavsrna], DNAvsRNA, GSEAres_dna_vs_rna, gseaParam = 1)
+ggsave("gsea_table_dnavsrna.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsrna/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_dnavsrna.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsrna/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_dnavsrna) {
+  plot <- plotEnrichment(final_list[[i]], DNAvsRNA) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsrna/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_dna_vs_rna_p <- GSEAres_dna_vs_rna %>% filter(pval < 0.05)
+
+# Select the top 10 pathways based on NES
+topPathways <- GSEAres_dna_vs_rna_p %>% top_n(25, wt = abs(NES))
+
+# Create a bar plot
+ggplot(topPathways, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsrna/", bg = 'white', width = 18, height = 18)
+```
+
+```{r}
+GSEAres_dna_vs_rna <- GSEAres_dna_vs_rna %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_dna_vs_rna, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsrna/fgsea_results.xlsx")
+
+```
+
+# 3) GSEA DNA vs Mock
+
+## 3.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+DNA_vs_Mock = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_DNA_vs_Mock.xlsx")
+
+```
+
+```{r}
+DNAvsMock = ranker(DNA_vs_Mock)
+head(DNAvsMock)
+```
+
+## 3.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = DNA_vs_Mock$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 3.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_dna_vs_mock <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = DNAvsMock,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+
+```
+
+## 3.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_dna_vs_mock[order(pval), ])
+sum(GSEAres_dna_vs_mock[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_dnavsmock <- GSEAres_dna_vs_mock[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_dnsvsmock <- GSEAres_dna_vs_mock[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_dnavsmock = c(topPathwaysUp_dnavsmock, rev(topPathwaysDown_dnsvsmock))
+
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_dnavsmock], DNAvsMock, GSEAres_dna_vs_mock, gseaParam = 1)
+ggsave("gsea_table_dnavsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsMock/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_dnavsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsMock/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_dnavsmock) {
+  plot <- plotEnrichment(final_list[[i]], DNAvsMock) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsMock/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_dna_vs_mock_p <- GSEAres_dna_vs_mock %>% filter(pval < 0.05)
+
+# Select the top 10 pathways based on NES
+topPathways <- GSEAres_dna_vs_mock_p %>% top_n(25, wt = abs(NES))
+
+# Create a bar plot
+ggplot(topPathways, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsMock/", bg = 'white', width = 18, height = 18)
+```
+
+```{r}
+GSEAres_dna_vs_mock <- GSEAres_dna_vs_mock %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_dna_vs_mock, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/dnavsMock/fgsea_results.xlsx")
+
+```
+
+# 4) GSEA RNA vs Mock
+
+## 4.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+RNA_vs_Mock = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_RNA_vs_Mock.xlsx")
+
+```
+
+```{r}
+RNAvsMock = ranker(RNA_vs_Mock)
+head(RNAvsMock)
+```
+
+## 4.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = RNA_vs_Mock$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 4.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_rna_vs_mock <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = RNAvsMock,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+# #write.csv(GSEAres_rna_vs_mock, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/RNAvsmock..csv")
+```
+
+## 4.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_rna_vs_mock[order(pval), ])
+sum(GSEAres_rna_vs_mock[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_rnavsmock <- GSEAres_rna_vs_mock[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_rnavsmock <- GSEAres_rna_vs_mock[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_rnavsmock= c(topPathwaysUp_rnavsmock, rev(topPathwaysDown_rnavsmock))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_rnavsmock], RNAvsMock, GSEAres_rna_vs_mock, gseaParam = 1)
+ggsave("gsea_table_rnavsmock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/rnavsmock/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_rnavsmock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/rnavsmock/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_rnavsmock) {
+  plot <- plotEnrichment(final_list[[i]], RNAvsMock) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/rnavsmock/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_rna_vs_mock_p <- GSEAres_rna_vs_mock %>% filter(pval < 0.05)
+
+
+
+# Create a bar plot
+ggplot(topPathways, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top  Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/rnavsMock/", bg = 'white', width = 18, height = 18)
+```
+
+```{r}
+GSEAres_rna_vs_mock <- GSEAres_rna_vs_mock %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_rna_vs_mock, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/rnavsmock/fgsea_results.xlsx")
+
+```
+# 5) GSEA MAV1 vs Mock
+
+## 5.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+MAV1_vs_Mock = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MAV1vsMock.xlsx")
+
+```
+
+```{r}
+MAV1vsMock = ranker(MAV1_vs_Mock)
+head(MAV1vsMock)
+```
+
+## 5.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = MAV1_vs_Mock$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 5.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_mav1vsmock <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = MAV1vsMock,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+# #write.csv(GSEAres_mav1vsmock, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/MAV1vsMock.xlsx")
+p.unadjusted <- GSEAres_mav1vsmock$pval
+p_adjusted <- p.adjust(p.unadjusted, method = "BH")
+```
+
+## 5.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_mav1vsmock[order(pval), ])
+sum(GSEAres_mav1vsmock[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_mav1vsmock <- GSEAres_mav1vsmock[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_mav1vsmock <- GSEAres_mav1vsmock[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_mav1vsmock= c(topPathwaysUp_mav1vsmock, rev(topPathwaysDown_mav1vsmock))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_mav1vsmock], MAV1vsMock, GSEAres_mav1vsmock, gseaParam = 1)
+ggsave("gsea_table_mav1vsmock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1vsmock/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_mav1vsmock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1vsmock/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_mav1vsmock) {
+  plot <- plotEnrichment(final_list[[i]], MAV1vsMock) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1vsmock/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_mav1vsmock_p <- GSEAres_mav1vsmock %>% filter(pval < 0.05)
+
+
+
+# Create a bar plot
+ggplot(GSEAres_mav1vsmock_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1vsmock/", bg = 'white', width = 25, height = 25)
+```
+
+```{r}
+GSEAres_mav1vsmock <- GSEAres_mav1vsmock %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_mav1vsmock, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1vsmock/fgsea_results.xlsx")
+
+```
+# 6) GSEA MuHV4 vs Mock
+
+## 6.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+MuHV4_vs_Mock = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4vsMock.xlsx")
+
+```
+
+```{r}
+MuHV4vsMock = ranker(MuHV4_vs_Mock)
+head(MuHV4vsMock)
+```
+
+## 6.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = MuHV4_vs_Mock$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+
+final_list <- matrix_to_list(mat)
+```
+
+## 6.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_muhv4vsmock <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = MuHV4vsMock,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1,  nperm = 50
+                 ) # for parallelisation
+
+p.unadjusted <- GSEAres_muhv4vsmock$pval
+p_adjusted <- p.adjust(p.unadjusted, method = "BH")
+# #write.csv(GSEAres_muhv4vsmock, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/MuHV4vsMock..csv")
+```
+
+## 6.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_muhv4vsmock[order(pval), ])
+sum(GSEAres_muhv4vsmock[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_muhv4vsmock<- GSEAres_muhv4vsmock[ES > 0 & pval < 0.05][head(order(pval), n = 50), pathway]
+topPathwaysDown_muhv4vsmock <- GSEAres_muhv4vsmock[ES < 0 & pval < 0.05][head(order(pval), n = 50), pathway]
+topPathways_muhv4vsmock= c(topPathwaysUp_muhv4vsmock, rev(topPathwaysDown_muhv4vsmock))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_muhv4vsmock], MuHV4vsMock, GSEAres_muhv4vsmock, gseaParam = 1)
+ggsave("gsea_table_muhv4vsmock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4vsmock/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_muhv4vsmock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4vsmock/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_muhv4vsmock) {
+  plot <- plotEnrichment(final_list[[i]], MuHV4vsMock) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4vsmock/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_muhv4vsmock_p <- GSEAres_muhv4vsmock %>% filter(pval < 0.05)
+
+
+
+# Create a bar plot
+ggplot(GSEAres_muhv4vsmock_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top  Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4vsmock/", bg = 'white', width = 25, height = 25)
+```
+
+```{r}
+GSEAres_muhv4vsmock <- GSEAres_muhv4vsmock %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_muhv4vsmock, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4vsmock/fgsea_results.xlsx")
+
+```
+
+# 7) GSEA PR8 vs Mock
+
+## 7.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+PR8_vs_Mock = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_PR8vsMock.xlsx")
+
+```
+
+```{r}
+PR8vsMock = ranker(PR8_vs_Mock)
+head(PR8vsMock)
+```
+
+## 7.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = PR8_vs_Mock$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 7.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_pr8vsmock <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = PR8vsMock,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+# #write.csv(GSEAres_pr8vsmock, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/PR8vsMock..csv")
+```
+
+## 7.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_pr8vsmock[order(pval), ])
+sum(GSEAres_pr8vsmock[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_pr8vsmock <- GSEAres_pr8vsmock[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_pr8vsmock <- GSEAres_pr8vsmock[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_pr8vsmock= c(topPathwaysUp_pr8vsmock, rev(topPathwaysDown_pr8vsmock))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_pr8vsmock], PR8vsMock, GSEAres_pr8vsmock, gseaParam = 1)
+ggsave("gsea_table_pr8vsmock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8vsmock/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_pr8vsmock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8vsmock/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_pr8vsmock) {
+  plot <- plotEnrichment(final_list[[i]], PR8vsMock) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8vsmock/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_pr8vsmock_p <- GSEAres_pr8vsmock %>% filter(pval < 0.05)
+
+
+
+# Create a bar plot
+ggplot(GSEAres_pr8vsmock_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8vsmock/", bg = 'white', width = 25, height = 25)
+```
+
+```{r}
+GSEAres_pr8vsmock <- GSEAres_pr8vsmock %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_pr8vsmock, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8vsmock//fgsea_results.xlsx")
+
+```
+
+# 8) GSEA PVM vs Mock
+
+## 8.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+PVM_vs_Mock = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_PVMvsMock.xlsx")
+
+```
+
+```{r}
+PVMvsMock = ranker(PVM_vs_Mock)
+head(PVMvsMock)
+```
+
+## 8.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = PVM_vs_Mock$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 8.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_pvm_vs_mock <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = PVMvsMock,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+# #write.csv(GSEAres_pvm_vs_mock, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/PVMvsMock..csv")
+```
+
+## 8.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_pvm_vs_mock[order(pval), ])
+sum(GSEAres_pvm_vs_mock[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_pvmvsmock <- GSEAres_pvm_vs_mock[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_pvmvsmock <- GSEAres_pvm_vs_mock[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_pvmvsmock= c(topPathwaysUp_pvmvsmock, rev(topPathwaysDown_pvmvsmock))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_pvmvsmock], PVMvsMock, GSEAres_pvm_vs_mock, gseaParam = 1)
+ggsave("gsea_table_pvmvsmock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmvsmock/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_pvmvsmock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmvsmock/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_pvmvsmock) {
+  plot <- plotEnrichment(final_list[[i]], PVMvsMock) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmvsmock/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_pvm_vs_mock_p <- GSEAres_pvm_vs_mock %>% filter(pval < 0.05)
+
+# Select the top 10 pathways based on NES
+
+# Create a bar plot
+ggplot(GSEAres_pvm_vs_mock_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmvsmock/", bg = 'white', width = 25, height = 25)
+```
+
+```{r}
+GSEAres_pvm_vs_mock <- GSEAres_pvm_vs_mock %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_pvm_vs_mock, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmvsmock/fgsea_results.xlsx")
+
+```
+
+# 9) GSEA MAV1 Ms4a3
+
+## 9.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+MAV1_Ms4a3 = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MAV1_Ms4a3.xlsx")
+
+```
+
+```{r}
+MAV1Ms4a3 = ranker(MAV1_Ms4a3)
+head(MAV1Ms4a3)
+```
+
+## 9.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = MAV1_Ms4a3$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 9.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_mav1ms4a3 <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = MAV1Ms4a3,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+# #write.csv(GSEAres_mav1ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/MAV1Ms4a3..csv")
+```
+
+## 9.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_mav1ms4a3[order(pval), ])
+sum(GSEAres_mav1ms4a3[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_mav1ms4a3 <- GSEAres_mav1ms4a3[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_mav1ms4a3 <- GSEAres_mav1ms4a3[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_mav1ms4a3= c(topPathwaysUp_mav1ms4a3, rev(topPathwaysDown_mav1ms4a3))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_mav1ms4a3], MAV1Ms4a3, GSEAres_mav1ms4a3, gseaParam = 1)
+ggsave("gsea_table_mav1ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1ms4a3/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_mav1ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1ms4a3/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_mav1ms4a3) {
+  plot <- plotEnrichment(final_list[[i]], MAV1Ms4a3) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1ms4a3/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_mav1ms4a3_p <- GSEAres_mav1ms4a3 %>% filter(pval < 0.05)
+
+
+# Create a bar plot
+ggplot(GSEAres_mav1ms4a3_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1ms4a3/", bg = 'white', width = 25, height = 25)
+```
+
+```{r}
+GSEAres_mav1ms4a3 <- GSEAres_mav1ms4a3 %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_mav1ms4a3, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/mav1ms4a3/fgsea_results.xlsx")
+
+```
+
+# 10) GSEA MuHV4 Ms4a3
+
+## 10.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+MuHV4_Ms4a3 = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4_Ms4a3.xlsx")
+
+```
+
+```{r}
+MuHV4Ms4a3 = ranker(MuHV4_Ms4a3)
+head(MuHV4Ms4a3)
+```
+
+## 10.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = MuHV4_Ms4a3$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 10.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_muhv4ms4a3 <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = MuHV4Ms4a3,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+# #write.csv(GSEAres_muhv4ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/MuHV4Ms4a3..csv")
+```
+
+## 10.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_muhv4ms4a3[order(pval), ])
+sum(GSEAres_muhv4ms4a3[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_muhv4ms4a3 <- GSEAres_muhv4ms4a3[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_muhv4ms4a3 <- GSEAres_muhv4ms4a3[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_muhv4ms4a3= c(topPathwaysUp_muhv4ms4a3, rev(topPathwaysDown_muhv4ms4a3))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_muhv4ms4a3], MuHV4Ms4a3, GSEAres_muhv4ms4a3, gseaParam = 1)
+ggsave("gsea_table_muhv4ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4ms4a3/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_muhv4ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4ms4a3/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_muhv4ms4a3) {
+  plot <- plotEnrichment(final_list[[i]], MuHV4Ms4a3) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4ms4a3/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_muhv4ms4a3_p <- GSEAres_muhv4ms4a3 %>% filter(pval < 0.05)
+
+
+
+# Create a bar plot
+ggplot(GSEAres_muhv4ms4a3_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4ms4a3/", bg = 'white', width = 18, height = 18)
+```
+
+```{r}
+GSEAres_muhv4ms4a3 <- GSEAres_muhv4ms4a3 %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_muhv4ms4a3, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/muhv4ms4a3//fgsea_results.xlsx")
+
+```
+
+# 11) GSEA PR8 Ms4a3
+
+## 11.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+PR8_Ms4a3 = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_PR8_Ms4a3.xlsx")
+
+```
+
+```{r}
+PR8Ms4a3 = ranker(PR8_Ms4a3)
+head(PR8Ms4a3)
+```
+
+## 11.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = PR8_Ms4a3$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 11.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_pr8ms4a3 <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = PR8Ms4a3,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+
+# #write.csv(GSEAres_pr8ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8Ms4a3..csv")
+```
+
+## 11.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_pr8ms4a3[order(pval), ])
+sum(GSEAres_pr8ms4a3[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_pr8ms4a3 <- GSEAres_pr8ms4a3[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_pr8ms4a3 <- GSEAres_pr8ms4a3[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_pr8ms4a3= c(topPathwaysUp_pr8ms4a3, rev(topPathwaysDown_pr8ms4a3))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_pr8ms4a3], PR8Ms4a3, GSEAres_pr8ms4a3, gseaParam = 1)
+ggsave("gsea_table_pr8ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8ms4a3/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_pr8ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8ms4a3/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_pr8ms4a3) {
+  plot <- plotEnrichment(final_list[[i]], PR8Ms4a3) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8ms4a3/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_pr8ms4a3_p <- GSEAres_pr8ms4a3 %>% filter(pval < 0.05)
+
+# Select the top 10 pathways based on NES
+
+# Create a bar plot
+ggplot(GSEAres_pr8ms4a3_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8ms4a3/", bg = 'white', width = 25, height = 25)
+```
+
+```{r}
+GSEAres_pr8ms4a3 <- GSEAres_pr8ms4a3 %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_pr8ms4a3, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/pr8ms4a3/fgsea_results.xlsx")
+
+```
+# 12) GSEA PVM Ms4a3
+
+## 12.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+PVM_Ms4a3 = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_PVM_Ms4a3.xlsx")
+
+```
+
+```{r}
+PVMMs4a3 = ranker(PVM_Ms4a3)
+head(PVMMs4a3)
+```
+
+## 12.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = PVM_Ms4a3$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 12.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_pvmms4a3 <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = PVMMs4a3,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1) # for parallelisation
+
+# #write.csv(GSEAres_pvmms4a3, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmMs4a3..csv")
+```
+
+## 12.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_pvmms4a3[order(pval), ])
+sum(GSEAres_pvmms4a3[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_pvmms4a3 <- GSEAres_pvmms4a3[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_pvmms4a3 <- GSEAres_pvmms4a3[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_pvmms4a3= c(topPathwaysUp_pvmms4a3, rev(topPathwaysDown_pvmms4a3))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_pvmms4a3], PVMMs4a3, GSEAres_pvmms4a3, gseaParam = 1)
+ggsave("gsea_table_pvmms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmms4a3/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_pvmms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmms4a3/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_pvmms4a3) {
+  plot <- plotEnrichment(final_list[[i]], PVMMs4a3) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmms4a3/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_pvmms4a3_p <- GSEAres_pvmms4a3 %>% filter(pval < 0.05)
+
+
+
+# Create a bar plot
+ggplot(GSEAres_pvmms4a3_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmms4a3/", bg = 'white', width = 25, height = 25)
+```
+
+```{r}
+GSEAres_pvmms4a3 <- GSEAres_pvmms4a3 %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_pvmms4a3, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/pvmms4a3/fgsea_results.xlsx")
+
+```
+
+# 13) GSEA Ms4a3
+
+## 13.1 Load in the genes to be analyzed for GSEA
+
+```{r}
+Ms4a3 = readxl::read_xlsx("../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_pos.xlsx")
+
+```
+
+```{r}
+MS4A3 = ranker(Ms4a3)
+head(MS4A3)
+```
+
+## 13.2 Subset to the genes that are present in our data to avoid bias
+
+```{r}
+matrix_to_list <- function(pws){
+  pws.l <- list()
+  for (pw in colnames(pws)) {
+    pws.l[[pw]] <- rownames(pws)[as.logical(pws[, pw])]
+  }
+  return(pws.l)
+}
+genes_in_data = Ms4a3$gene
+gmt_file <- "Background_genes/background.gmt"
+gmt <- gmtPathways(gmt_file)
+
+hidden <- unique(unlist(gmt))
+  
+# Convert gmt file to a matrix with the genes as rows and for each go annotation (columns) the values are 0 or 1
+mat <- matrix(NA, dimnames = list(hidden, names(gmt)),
+       nrow = length(hidden), ncol = length(gmt))
+for (i in 1:dim(mat)[2]){
+       mat[,i] <- as.numeric(hidden %in% gmt[[i]])
+}
+hidden1 <- intersect(genes_in_data, hidden)
+mat <- mat[hidden1, colnames(mat)[which(colSums(mat[hidden1,])>2)]] # filter for gene sets with more than 5 genes annotated
+# And get the list again using the function we previously defined
+final_list <- matrix_to_list(mat)
+```
+
+## 13.3 Run GSEA with fgsea
+
+```{r}
+
+GSEAres_ms4a3 <- fgsea(pathways = final_list, # List of gene sets to check
+                 stats = MS4A3,
+                 scoreType = 'std', # in this case we have both pos and neg rankings. 
+                 minSize = 1,
+                 maxSize = 500,
+                 nproc = 1,
+                 ) # for parallelisation
+# #write.csv(GSEAres_ms4a3, "../../Documents/machiels_lab_viral/CaseStudy_GSEA/ms4a3..csv")
+```
+
+## 13.4 Visualize results fgsea
+
+```{r}
+# Top  enriched pathways (ordered by p-val adjusted)
+head(GSEAres_ms4a3[order(pval), ])
+sum(GSEAres_ms4a3[, pval < 0.05])
+
+numberpathways = 25 # show the top 25 pathways that are up / down regulated
+```
+
+```{r}
+topPathwaysUp_ms4a3 <- GSEAres_ms4a3[ES > 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathwaysDown_ms4a3 <- GSEAres_ms4a3[ES < 0 & pval < 0.05][head(order(pval), n = 25), pathway]
+topPathways_ms4a3= c(topPathwaysUp_ms4a3, rev(topPathwaysDown_ms4a3))
+```
+
+```{r}
+#plot the gsea table plot
+plotGseaTable(final_list[topPathways_ms4a3], MS4A3, GSEAres_ms4a3, gseaParam = 1)
+ggsave("gsea_table_ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/ms4a3/", bg = 'white', width = 18, height = 18)
+ggsave("gsea_table_ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/ms4a3/", bg = 'white', width = 18, height = 18)
+
+```
+
+```{r}
+# plot enrichment score (ES) of most significantly enriched path
+for (i in topPathways_ms4a3) {
+  plot <- plotEnrichment(final_list[[i]], MS4A3) +
+  labs(title =  i)
+
+  # Generate filename with unique identifier
+  filename <- paste0("enrichment_plot", i, ".png") 
+  full_path <- paste0("../../Documents/machiels_lab_viral/CaseStudy_GSEA/ms4a3/", filename)
+  
+  # Save the plot
+  ggsave(plot, filename = full_path, width = 8, height = 6)  # Adjust dimensions
+}
+```
+
+```{r}
+GSEAres_ms4a3_p <- GSEAres_ms4a3 %>% filter(pval < 0.05)
+
+
+
+# Create a bar plot
+ggplot(GSEAres_ms4a3_p, aes(x = reorder(pathway, NES), y = NES)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top Enriched Pathways",
+       x = "Pathway",
+       y = "Normalized Enrichment Score (NES)") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 25),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20),
+        axis.text = element_text(size = 18))
+ggsave("gsea_barplot.png", path ="../../Documents/machiels_lab_viral/CaseStudy_GSEA/ms4a3/", bg = 'white', width = 25, height = 25)
+```
+
+```{r}
+GSEAres_ms4a3 <- GSEAres_ms4a3 %>%
+    as_tibble() %>%
+    rowwise() %>%
+    mutate(leadingEdge = paste(leadingEdge, collapse = ","))
+write_xlsx(GSEAres_ms4a3, path = "../../Documents/machiels_lab_viral/CaseStudy_GSEA/ms4a3/fgsea_results.xlsx")
+
+```

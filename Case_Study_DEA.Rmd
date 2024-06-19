@@ -13,6 +13,8 @@ execute:
 # 1) load in data and libraries + initialize custom functions
 
 ```{r, echo=FALSE}
+set.seed(2023)
+
 easypackages::libraries("Seurat","tidyverse","SingleR", "ggridges", "viridis", "ggh4x", "celldex", "scCustomize", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi", "clusterProfiler", "enrichplot", "ExperimentHub", "scuttle", 'scmap',"cowplot","msigdbr", "fgsea",
                         'clusterProfiler',
                         'org.Mm.eg.db',
@@ -216,7 +218,7 @@ write_xlsx(markers_neg,"../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tab
 write_xlsx(markers_negfiltered,"../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_neg_filtered.xlsx")
 ```
 
-## 2A) volcano plot noMock Ms4a3 positive infected
+## 2A) volcano plot Ms4a3 positive infected
 
 ```{r}
 # Assign "NO" to diffexpressed column
@@ -255,7 +257,7 @@ ggsave("volcano_Ms4a3pos.svg",
        path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/")
 ```
 
-## 2B) volcano plot noMock Ms4a3 negative infected
+## 2B) volcano plot Ms4a3 negative infected
 
 ```{r}
 markers_neg$diffexpressed <- "NO"
@@ -525,7 +527,7 @@ ggsave("volcano_PVMvsMock.png", path ="../../Documents/machiels_lab_viral/CaseSt
 ggsave("volcano_PVMvsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-# 4) Differential expression analysis
+# 4) Differential expression analysis Virus Ms4a3
 
 ```{r}
 Idents(seurat_d60) = "sampletag_name"
@@ -876,7 +878,7 @@ ggsave("volcano_RNAvsMock.png", path ="../../Documents/machiels_lab_viral/CaseSt
 ggsave("volcano_RNAvsMock.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ```
 
-# 6) Questions Béné Presentation 30/5 
+# 6) Questions Béné Presentation 30/5
 
 ## 6A) MuHV4 vs PVM
 
@@ -1053,7 +1055,7 @@ ggsave("sample_Embeddings_originalIntegratedSeuratObject.svg", path ="../../Docu
 ```{r}
 #| fig-width: 18
 #| fig-height: 18
-seurat_d60_bal_bal = seurat_d60_bal %>% filter(str_detect(sample_type, "bal"))
+seurat_d60_bal = seurat_d60 %>% filter(str_detect(sample_type, "bal"))
 
 # Convert obj.v5 to tibble once
 seurat_d60_bal_tibble <- as_tibble(seurat_d60_bal)

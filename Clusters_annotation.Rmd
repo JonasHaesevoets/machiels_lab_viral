@@ -13,6 +13,8 @@ execute:
 # 1) load in the data,packages and custom functions
 
 ```{r, echo=FALSE}
+set.seed(2023)
+
 easypackages::libraries("Seurat","tidyverse","SingleR", "ggridges", "viridis", "ggh4x", "celldex", "scCustomize", "SeuratWrappers", "ggExtra", "textTinyR", "patchwork", "pheatmap", "ggrepel", "tidyseurat", "ggpubr", "viridis", "writexl", "readxl", "presto", "scCustomize", "qs", "sctransform","glmGamPoi", "clusterProfiler", "enrichplot", "ExperimentHub", "scuttle", 'scmap',"cowplot",
                         'clusterProfiler',
                         'org.Mm.eg.db',
