@@ -21,8 +21,8 @@ easypackages::libraries("Seurat","tidyverse","SingleR", "ggridges", "viridis", "
                         'tidyseurat',
                         'enrichplot',
                         'xlsx',
-                        'Seurat.utils', "enrichR")
-obj.v5 = read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_reclustered.rds")
+                        'Seurat.utils', "enrichR", "writexl", "svglite")
+obj.v5 = read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_am.rds")
 DefaultAssay(obj.v5) <- "RNA"
 obj.v5@assays$RNA
 
@@ -46,13 +46,15 @@ seurat_d60@assays$RNA$data <- counts
 
 ```{r}
 process_markers <- function(data) {
+  # Replace p_val_adj of 0 with a small value
+  data$p_val_adj[data$p_val_adj == 0] <- 1e-300
   # Assign "NO" to diffexpressed column
   data$diffexpressed <- "NO"
   
   # Categorize genes as "UP" or "DOWN" based on avg_log2FC
   data$diffexpressed[data$avg_log2FC > 1] <- "UP"
   data$diffexpressed[data$avg_log2FC < -1] <- "DOWN"
-  data$diffexpressed[data$p_val_adj == 0] = "P value of 0"
+  data$diffexpressed[data$p_val_adj == 1e-300] = "P adjusted value transformed to 1e-350"
 
 
   
@@ -86,13 +88,15 @@ seurat_d60@assays$RNA <- RNA
 
 ```{r}
 process_markers2 <- function(data) {
+  # Replace p_val_adj of 0 with a small value
+  data$p_val_adj[data$p_val_adj == 0] <- 1e-300
   # Assign "NO" to diffexpressed column
   data$diffexpressed <- "NO"
   
   # Categorize genes as "UP" or "DOWN" based on avg_log2FC
   data$diffexpressed[data$avg_log2FC > 0.5] <- "UP"
   data$diffexpressed[data$avg_log2FC < -0.5] <- "DOWN"
-  data$diffexpressed[data$p_val_adj == 0] = "P value of 0"
+  data$diffexpressed[data$p_val_adj == 1e-300] = "P adjusted value transformed to 1e-350"
 
 
   
@@ -221,150 +225,64 @@ write_xlsx(markers_negfiltered,"../../Documents/machiels_lab_viral/CaseStudy_DEA
 ## 2A) volcano plot Ms4a3 positive infected
 
 ```{r}
-# Assign "NO" to diffexpressed column
-markers_pos$diffexpressed <- "NO"
-
-# Categorize genes as "UP" or "DOWN" based on avg_log2FC
-markers_pos$diffexpressed[markers_pos$avg_log2FC > 1] <- "UP"
-markers_pos$diffexpressed[markers_pos$avg_log2FC < -1] <- "DOWN"
-
-# Add a column for labels
-markers_pos$delabel <- NA
-
-# Assign gene names as labels for differentially expressed genes
-markers_pos$delabel[markers_pos$diffexpressed != "NO"] <-
-  markers_pos$gene[markers_pos$diffexpressed != "NO"]  # Ensure consistent variable names
-
-
-
-
-volcano_Ms4a3pos_noMock_sc <- ggplot(data = markers_pos,
-       aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+#| fig-width: 18
+#| fig-height: 9
+volcano_Ms4a3pos = process_markers(markers_pos)
+volcano_Ms4a3pos<- ggplot(data = volcano_Ms4a3pos,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
   geom_point() +
   theme_minimal() +
-  scale_x_continuous(breaks = seq(floor(min(markers_pos$avg_log2FC)),
-                                 ceiling(max(markers_pos$avg_log2FC)), by = 0.5)) +
-  geom_text_repel(max.overlaps = 100)
+  scale_x_continuous(breaks = seq(floor(min(volcano_Ms4a3pos$avg_log2FC)),
+                                  ceiling(max(volcano_Ms4a3pos$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
+  geom_text_repel(max.overlaps = 1000)
+volcano_Ms4a3pos
+ggsave("volcano_Ms4a3pos.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+ggsave("volcano_Ms4a3pos.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
+```
 
-volcano_Ms4a3pos_noMock_sc
+```{r}
+#| fig-width: 18
+#| fig-height: 9
+volcano_Ms4a3neg = process_markers(markers_neg)
+volcano_Ms4a3neg<- ggplot(data = volcano_Ms4a3neg,
+                                                aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) +
+  geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(floor(min(volcano_Ms4a3neg$avg_log2FC)),
+                                  ceiling(max(volcano_Ms4a3neg$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
+  geom_text_repel(max.overlaps = 1000)
+volcano_Ms4a3neg
 
-# Save the plot
-ggsave("volcano_Ms4a3pos.png",
-       width = 45, height = 20, units = "cm",
-       path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/")
-ggsave("volcano_Ms4a3pos.svg",
-       width = 45, height = 20, units = "cm",
-       path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/")
+print(volcano_Ms4a3neg)
+
+ggsave("volcano_Ms4a3neg.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = "white")
+ggsave("volcano_Ms4a3neg.svg",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = "white")
+
 ```
 
 ## 2B) volcano plot Ms4a3 negative infected
 
 ```{r}
-markers_neg$diffexpressed <- "NO"
-markers_neg$diffexpressed[markers_neg$avg_log2FC > 1] <- "UP"
-
-markers_neg$diffexpressed[markers_neg$avg_log2FC < -1] <- "DOWN"
-
-markers_neg$delabel <- NA
-
-markers_neg$delabel[markers_neg$diffexpressed != "NO"]<-markers_neg$gene[markers_neg$diffexpressed != "NO"]
-
-
-
-volcano_Ms4a3neg_noMock_sc <- ggplot(data=markers_neg,
-                           aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
-                           geom_point() + theme_minimal() +
-                           scale_x_continuous(breaks = seq(floor(min (markers_neg$avg_log2FC)), 
-                           ceiling(max(markers_neg$avg_log2FC)), by = 0.5)) +
-                           geom_text_repel(max.overlaps = 100)
-volcano_Ms4a3neg_noMock_sc
-ggsave("volcano_Ms4a3neg.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = "white")
-ggsave("volcano_Ms4a3neg.svg",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = "white")
-```
-
-```{r}
-Idents(seurat_d60) = "condition"
-markers_MuHV4vsMock<- FindMarkers(seurat_d60 ,
-                                 ident.1 =  "MuHV4",
-                                 ident.2 =  "Mock",
-                                 test.use = "wilcox", 
-                                 assay = "RNA",
-                                 min.pct = 0.2) |> 
-                                 as_tibble(rownames="gene")
-markers_MAV1vsMock <- FindMarkers(seurat_d60,
-                                 ident.1 =  "MAV1",
-                                 ident.2 =  "Mock",
-                                 test.use = "wilcox", 
-                                 assay = "RNA",
-                                 min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_PR8vsMock <- FindMarkers(seurat_d60,
-                                 ident.1 =  "PR8",
-                                 ident.2 =  "Mock",
-                                 test.use = "wilcox", 
-                                 assay = "RNA",
-                                 min.pct = 0.2) |> as_tibble(rownames="gene")
-markers_PVMvsMock <- FindMarkers(seurat_d60,
-                                 ident.1 =  "PVM",
-                                 ident.2 =  "Mock",
-                                 test.use = "wilcox", 
-                                 assay = "RNA",
-                                 min.pct = 0.2) |> as_tibble(rownames="gene")
-```
-
-```{r}
-markers_MuHV4vsMock_filtered = markers_MuHV4vsMock[abs(markers_MuHV4vsMock$avg_log2FC) > 0.5,]
-nonsignficant_p_adj_Mock <- which(markers_MuHV4vsMock_filtered$p_val_adj <= 0.05)
-markers_MuHV4vsMock_filtered <- markers_MuHV4vsMock_filtered[nonsignficant_p_adj_Mock, ]
-
-write_xlsx(markers_MuHV4vsMock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4vsMock.xlsx")
-write_xlsx(markers_MuHV4vsMock_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MuHV4vsMock_filtered.xlsx")
-```
-
-```{r}
-positive_MuHv4vsMock = markers_MuHV4vsMock_filtered[markers_MuHV4vsMock_filtered$avg_log2FC >= 0.5,]
-negative_MuHv4vsMock = markers_MuHV4vsMock_filtered[markers_MuHV4vsMock_filtered$avg_log2FC <= -0.5,]
-```
-
-```{r}
-markers_MAV1vsMock_filtered = markers_MAV1vsMock[abs(markers_MAV1vsMock$avg_log2FC) > 0.5,]
-nonsignficant_p_adj_Mock <- which(markers_MAV1vsMock_filtered$p_val_adj <= 0.05)
-markers_MAV1vsMock_filtered <- markers_MAV1vsMock_filtered[nonsignficant_p_adj_Mock, ]
-
-write_xlsx(markers_MAV1vsMock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MAV1vsMock.xlsx")
-write_xlsx(markers_MAV1vsMock_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_MAV1vsMock_filtered.xlsx")
-```
-
-```{r}
-positive_MAV1vsMock = markers_MAV1vsMock_filtered[markers_MAV1vsMock_filtered$avg_log2FC >= 0.5,]
-negative_MAV1vsMock = markers_MAV1vsMock_filtered[markers_MAV1vsMock_filtered$avg_log2FC <= -0.5,]
-```
-
-```{r}
-markers_PR8vsMock_filtered = markers_PR8vsMock[abs(markers_PR8vsMock$avg_log2FC) > 0.5,]
-nonsignficant_p_adj_Mock <- which(markers_PR8vsMock_filtered$p_val_adj <= 0.05)
-markers_PR8vsMock_filtered <- markers_PR8vsMock_filtered[nonsignficant_p_adj_Mock, ]
-
-write_xlsx(markers_PR8vsMock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_PR8vsMock.xlsx")
-write_xlsx(markers_PR8vsMock_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_PR8vsMock_filtered.xlsx")
-```
-
-```{r}
-positive_PR8vsMock = markers_PR8vsMock_filtered[markers_PR8vsMock_filtered$avg_log2FC >= 0.5,]
-negative_PR8vsMock = markers_PR8vsMock_filtered[markers_PR8vsMock_filtered$avg_log2FC <= -0.5,]
-```
-
-```{r}
-markers_PVMvsMock_filtered = markers_PVMvsMock[abs(markers_PVMvsMock$avg_log2FC) > 0.5,]
-nonsignficant_p_adj_Mock <- which(markers_PVMvsMock_filtered$p_val_adj <= 0.05)
-markers_PVMvsMock_filtered <- markers_PVMvsMock_filtered[nonsignficant_p_adj_Mock, ]
-
-write_xlsx(markers_PVMvsMock, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_PVMvsMock.xlsx")
-write_xlsx(markers_PVMvsMock_filtered, "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_tables/markers_PVMvsMock_filtered.xlsx")
-```
-
-```{r}
-positive_PVMvsMock = markers_PVMvsMock_filtered[markers_PVMvsMock_filtered$avg_log2FC >= 0.5,]
-negative_PVMvsMock = markers_PVMvsMock_filtered[markers_PVMvsMock_filtered$avg_log2FC <= -0.5,]
+# markers_neg$diffexpressed <- "NO"
+# markers_neg$diffexpressed[markers_neg$avg_log2FC > 1] <- "UP"
+# 
+# markers_neg$diffexpressed[markers_neg$avg_log2FC < -1] <- "DOWN"
+# 
+# markers_neg$delabel <- NA
+# 
+# markers_neg$delabel[markers_neg$diffexpressed != "NO"]<-markers_neg$gene[markers_neg$diffexpressed != "NO"]
+# 
+# 
+# 
+# volcano_Ms4a3neg_noMock_sc <- ggplot(data=markers_neg,
+#                            aes(x=avg_log2FC, y=-log10(p_val_adj), col = diffexpressed,                            label = delabel)) +
+#                            geom_point() + theme_minimal() +
+#                             
+#                            ceiling(max(markers_neg$avg_log2FC)), by = 0.5)) +
+#                            geom_text_repel(max.overlaps = 100)
+# volcano_Ms4a3neg_noMock_sc
+# ggsave("volcano_Ms4a3neg.png",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = "white")
+# ggsave("volcano_Ms4a3neg.svg",width = 45, height = 20, units = "cm", path = "../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = "white")
 ```
 
 # 3) Differential expression analysis Mock vs Virus
@@ -465,7 +383,7 @@ volcano_MAV1vsMock <- ggplot(data = volcano_MAV1vsMock,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_MAV1vsMock$avg_log2FC)),
-                                  ceiling(max(volcano_MAV1vsMock$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_MAV1vsMock$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 100) 
 volcano_MAV1vsMock
 ggsave("volcano_MAV1vsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -483,7 +401,7 @@ volcano_MuHV4vsMock <- ggplot(data = volcano_MuHV4vsMock,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_MuHV4vsMock$avg_log2FC)),
-                                  ceiling(max(volcano_MuHV4vsMock$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_MuHV4vsMock$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 100)
 volcano_MuHV4vsMock
 ggsave("volcano_MuHV4vsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -502,7 +420,7 @@ volcano_PR8vsMock <- ggplot(data = volcano_PR8vsMock,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_PR8vsMock$avg_log2FC)),
-                                  ceiling(max(volcano_PR8vsMock$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_PR8vsMock$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 100)
 volcano_PR8vsMock
 ggsave("volcano_PR8vsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -520,7 +438,7 @@ volcano_PVMvsMock <- ggplot(data = volcano_PVMvsMock,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_PVMvsMock$avg_log2FC)),
-                                  ceiling(max(volcano_PVMvsMock$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_PVMvsMock$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 1000)
 volcano_PVMvsMock
 ggsave("volcano_PVMvsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -649,7 +567,7 @@ volcano_MAV1_Ms4a3 <- ggplot(data = volcano_MAV1_Ms4a3,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_MAV1_Ms4a3$avg_log2FC)),
-                                  ceiling(max(volcano_MAV1_Ms4a3$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_MAV1_Ms4a3$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 100) 
 volcano_MAV1_Ms4a3
 ggsave("volcano_MAV1_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -667,7 +585,7 @@ volcano_MuHV4_Ms4a3 <- ggplot(data = volcano_MuHV4_Ms4a3,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_MuHV4_Ms4a3$avg_log2FC)),
-                                  ceiling(max(volcano_MuHV4_Ms4a3$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_MuHV4_Ms4a3$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 100)
 volcano_MuHV4_Ms4a3
 ggsave("volcano_MuHV4_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -685,7 +603,7 @@ volcano_PR8_Ms4a3 <- ggplot(data = volcano_PR8_Ms4a3,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_PR8_Ms4a3$avg_log2FC)),
-                                  ceiling(max(volcano_PR8_Ms4a3$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_PR8_Ms4a3$avg_log2FC)), by = 0.5)) +  scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 100)
 volcano_PR8_Ms4a3
 ggsave("volcano_PR8_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -703,8 +621,8 @@ volcano_PVM_Ms4a3 <- ggplot(data = volcano_PVM_Ms4a3,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_PVM_Ms4a3$avg_log2FC)),
-                                  ceiling(max(volcano_PVM_Ms4a3$avg_log2FC)), by = 0.5)) +
-  geom_text_repel(max.overlaps = 100)
+                                  ceiling(max(volcano_PVM_Ms4a3$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
+  geom_text_repel(max.overlaps = 100) 
 volcano_PVM_Ms4a3
 ggsave("volcano_PVM_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
 ggsave("volcano_PVM_Ms4a3.svg", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -721,7 +639,7 @@ volcano_Mock_Ms4a3 <- ggplot(data = volcano_Mock_Ms4a3,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_Mock_Ms4a3$avg_log2FC)),
-                                  ceiling(max(volcano_Mock_Ms4a3$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_Mock_Ms4a3$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400))
   geom_text_repel(max.overlaps = 100)
 volcano_Mock_Ms4a3
 ggsave("volcano_Mock_Ms4a3.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -837,7 +755,7 @@ volcano_DNAvsmock <- ggplot(data = volcano_DNAvsmock,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_DNAvsmock$avg_log2FC)),
-                                  ceiling(max(volcano_DNAvsmock$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_DNAvsmock$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 100)
 volcano_DNAvsmock
 ggsave("volcano_DNAvsMock.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -855,7 +773,7 @@ volcano_DNAvsRNA <- ggplot(data = volcano_DNAvsRNA,
   geom_point() +
   theme_minimal() +
   scale_x_continuous(breaks = seq(floor(min(volcano_DNAvsRNA$avg_log2FC)),
-                                  ceiling(max(volcano_DNAvsRNA$avg_log2FC)), by = 0.5)) +
+                                  ceiling(max(volcano_DNAvsRNA$avg_log2FC)), by = 0.5)) + scale_y_continuous(limits = c(0, 400)) +
   geom_text_repel(max.overlaps = 100)
 volcano_DNAvsRNA
 ggsave("volcano_DNAvsRNA.png", path ="../../Documents/machiels_lab_viral/CaseStudy_DEA/DEA_plots/", bg = 'white', width = 18, height = 9)
@@ -870,7 +788,7 @@ ggsave("volcano_DNAvsRNA.svg", path ="../../Documents/machiels_lab_viral/CaseStu
 
 volcano_RNAvsmock = process_markers2(markers_RNA_vs_mock)
 volcano_RNAvsmock <- ggplot(data = volcano_RNAvsmock, aes(x = avg_log2FC, y = -log10(p_val_adj), col = diffexpressed, label = delabel)) + geom_point() + theme_minimal() + scale_x_continuous(breaks = seq(floor(min(volcano_RNAvsmock$avg_log2FC)),
-                                  ceiling(max(volcano_RNAvsmock$avg_log2FC)), by = 0.5)) + geom_text_repel(max.overlaps = 100)
+                                  ceiling(max(volcano_RNAvsmock$avg_log2FC)), by = 0.5)) + geom_text_repel(max.overlaps = 100) + scale_y_continuous(limits = c(0, 400)) 
 
 volcano_RNAvsmock
 
