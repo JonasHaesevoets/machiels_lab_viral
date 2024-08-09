@@ -671,3 +671,36 @@ ggplot(bald60, aes(x = variable, y = value, fill = Sample)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_fill_brewer(palette = "Paired", name = "Samples")
 ggsave("barplot_d60_bal.png", bg = "white", height = 10, width = 15)
+
+
+
+
+
+
+
+
+markers = c("Chil3", "Fabp5", "Flt1", "Pparg", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79",
+            "C1qa", "C1qb", "C1qc", "Pf4", "C5ar1", "Apoe", "Cd14", "Csf1r", "Mafb", "Mrc1",
+            "Folr2", "Lyve1", "Timd4", "H2-Ab1", "Cx3cr1", "CD163", "Ly6c2", "Ccr2", "Cd14",
+            "Fn1", "Vcan", "IL1b", "S100a6", "S100a4", "Apoe", "Mafb", "C5ar1", "Ms4a4c", "Cd24a",
+            "Itgae", "Xcr1", "Batf3", "Cadm1", "Dpp4", "Zbtb46", "Id2", "Flt3", "Irf8", "Tlr3",
+            "Clec9a", "Cst3", "Wdfy4", "Cxcr3", "Rnase6", "Ccr7", "Ccl5", "Dpp4", "Zbtb46", "Clec10a",
+            "Ccl17", "Ccl22", "Fabp5", "S100a6", "S100a4", "Flt3", "Irf4", "H2-Ab1", "Cd209a", 
+            "Ccr7", "Ccl5", "Ifit1", "Ifit1bl1", "Ifit2", "Ifit", "Ifit3b", "Ifi205", "Ifi206",
+            "Rsad2", "Phf1 1d", "Mx1", "Cmpk2", "Helz2", "Siglech", "Ly6d", "Ccr9", "Cox6a2", 
+            "Plac8", "Ly6c2", "Tcf4", "Bst2", "Ly6c2", "Ccr2", "Cd14", "Fn1", "Vcan", "IL1b", 
+            "S100a6", "S100a4", "Apoe", "Mafb", "C5ar1", "Ms4a4c", "Lp1", "Mpeg1", "Clec4n", 
+            "Calr", "Siglec1")
+markers = unique(markers)
+
+
+
+
+# Add "Cell type" as metadata to Seurat object
+seurat_d60 = obj.v5 %>% filter(str_detect(day, "d60"))
+pallet = viridis(n = 10, option = "D")
+Idents(seurat_d60) =  "sampletag_name"
+dotplot_celltypes = DotPlot_scCustom(seurat_object = seurat_d60, features = markers, colors_use = pallet, group.by = "sampletag_name", flip_axes = FALSE)
+dotplot_celltypes = dotplot_celltypes + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 25))
+dotplot_celltypes
+
