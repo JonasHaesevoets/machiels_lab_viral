@@ -1756,7 +1756,7 @@ for (i in genes_AM) {
 cluster5 = subset(obj.v5, idents = c("5"))
 cluster5 |>
   join_features(c("Pparg", "Fabp4", "Itgax", "Mafb", "Ccr2"),assay="RNA", slot="scale.data")  |> 
-group_by(.feature,day_mock, condition) |>
+group_by(.feature,day_mock, condition, .cell) |>
   summarise(mean_scaled_dsb=mean(.abundance_RNA)) |>
   group_by(.feature) |> 
   mutate(zscore_mean_scaled_dsb=(mean_scaled_dsb-mean(mean_scaled_dsb))/sd(mean_scaled_dsb))|> na.omit() |> 
@@ -1825,6 +1825,51 @@ group_by(.feature,seurat_clusters) |>
 ggsave("heatmap_cd209a_rna_fullobject.png", path  = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final")
 ```
 
+## 9.29 PCA plot with each condition as a dot for sampletag_name
+
+```{r}
+library(Seurat)
+library(DESeq2)
+
+
+counts <- GetAssayData(obj.v5, slot = "counts")
+
+# Extract metadata
+metadata <- obj.v5@meta.data
+
+if (!all(rownames(metadata) == colnames(counts))) {
+  stop("Row names of metadata do not match column names of counts matrix.")
+}
+
+# Define the design formula (e.g., condition)
+design_formula <- ~ "sampletag_name"  # Replace with the actual metadata column name
+
+# Create a DESeqDataSet object
+dds <- DESeqDataSetFromMatrix(countData = counts,
+                              colData = metadata,
+                              design = design_formula)
+
+# Run the DESeq2 normalization
+dds <- DESeq(dds)
+
+# Variance stabilizing transformation
+vsd <- vst(dds, blind = FALSE)
+
+# Generate the PCA plot
+pca_data <- plotPCA(vsd, intgroup = "sampletag_name", returnData = TRUE)  # Replace with your metadata column
+percentVar <- round(100 * attr(pca_data, "percentVar"))
+
+p <- ggplot(pca_data, aes_string(x = "PC1", y = "PC2", color = "sampletag_name")) +  # Replace with your metadata column
+  geom_point(size = 3) +
+  xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+  ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+  labs(title = "PCA Plot") +
+  theme_minimal()
+
+# Print the PCA plot
+print(p)
+```
+
 # 10) find markers for the reclustered objects
 
 ```{r}
@@ -1880,7 +1925,7 @@ ggsave("AM_UMAP.png", path = "../../Documents/machiels_lab_viral/Case_study_anno
 AM |> write_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_am.rds")
 ```
 
-# 12) find markers for alveolar macrophages + analysis 
+# 12) find markers for alveolar macrophages + analysis
 
 ```{r}
 Idents(AM) = "seurat_clusters"
@@ -1937,6 +1982,7 @@ ggsave(filename = "top_degs_am_clusters.png", path = "../../Documents/machiels_l
 
 
 ```
+
 ```{r}
 
 markers = c("Chil3", "Fabp5", "Flt1", "Pparg", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79",
@@ -2030,29 +2076,28 @@ Idents(obj.v5) = "sampletag_Ms4a3"
 PC_Plotting(seurat_object = obj.v5, dim_number = 2)
 ```
 
-
-  6c) dimplots for Ms4a3 + -
+6c) dimplots for Ms4a3 + -
 
 ```{r}
 DimPlot_scCustom(AM, split.by = "condition", colors_use = c("purple", "cyan", "lightgreen", "red", "orange", "blue", "pink", "green"))
 ggsave("dimplot_virus.png", width = 20, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-  6d)dimplots for tissue
+6d)dimplots for tissue
 
 ```{r}
 DimPlot_scCustom(AM, split.by = "condition", group.by = "sample_type",colors_use = c("blue", "orange"))
 ggsave("dimplot_virusGroupedTissue.png", width = 40, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-  6e) dimplots for Ms4a3 + -
+6e) dimplots for Ms4a3 + -
 
 ```{r}
 DimPlot_scCustom(AM, split.by = "condition", group.by = "sampletag_Ms4a3", colors_use = c("darkgrey", "red") )
 ggsave("dimplot_virusGroupedMs4a3.png", width = 40, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-  6F) dimplots for Ms4a3 + - and virus
+6F) dimplots for Ms4a3 + - and virus
 
 ```{r}
 
@@ -2063,10 +2108,7 @@ DimPlot_scCustom(AM, split.by = "sampletag_name_factor", num_columns = 10, color
 ggsave("dimplot_virusGroupedMs4a3_virus.png", width = 49 , path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-
-
-
-  6h) dimplot Ms4a3
+6h) dimplot Ms4a3
 
 ```{r}
 
@@ -2082,22 +2124,21 @@ ggsave("dimplot_virus.png", width = 20, height = 30, units = "cm", path =  "../.
 
 ```
 
-
-  6d)dimplots for tissue
+6d)dimplots for tissue
 
 ```{r}
 DimPlot_scCustom(AM, split.by = "condition", group.by = "sample_type",colors_use = c("blue", "orange"))
 ggsave("dimplot_virusGroupedTissue.png", width = 40, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-  6e) dimplots for Ms4a3 + -
+6e) dimplots for Ms4a3 + -
 
 ```{r}
 DimPlot_scCustom(AM, split.by = "condition", group.by = "sampletag_Ms4a3", colors_use = c("darkgrey", "red") )
 ggsave("dimplot_virusGroupedMs4a3.png", width = 40, height = 30, units = "cm", path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-  6F) dimplots for Ms4a3 + - and virus
+6F) dimplots for Ms4a3 + - and virus
 
 ```{r}
 
@@ -2108,7 +2149,7 @@ DimPlot_scCustom(AM, split.by = "sampletag_name_factor", num_columns = 10, color
 ggsave("dimplot_virusGroupedMs4a3_virus.png", width = 49 , path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-  6g) heatmap celltypes
+6g) heatmap celltypes
 
 ```{r}
 # markers = c("Chil3", "Fabp5", "Flt1", "Pparg", "Fabp4", "Siglecf", "Car4", "Ear1", "Krt79",
@@ -2138,7 +2179,7 @@ ggsave("dimplot_virusGroupedMs4a3_virus.png", width = 49 , path =  "../../Docume
 # ggsave("heatmap_celltypes.png", width = 60, height = 50, units = "cm", bg = 'white',  path =  "../../Documents/machiels_lab_viral/28-03_Lucia_presentation_files/UMAP/seuratOG/")
 ```
 
-  6h) dimplot Ms4a3
+6h) dimplot Ms4a3
 
 ```{r}
 
@@ -2160,7 +2201,7 @@ DimPlot_All_Samples(AM, meta_data_column = 'sampletag_name', colors_use = pallet
 ggsave("umap_Ms4a3_virus.png", bg = 'white', width = 49 , path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-  6i) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+6i) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 # Setting the required parameters
@@ -2221,7 +2262,7 @@ for (i in genes_AM) {
 }
 ```
 
-  6j) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+6j) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 DefaultAssay(AM) = "RNA"
@@ -2274,7 +2315,7 @@ for (i in genes_AM) {
 }
 ```
 
-  6k) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+6k) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 DefaultAssay(AM) = "adt"
@@ -2329,7 +2370,7 @@ for (i in genes_AM) {
 # No need to call ggarrange as plots are saved individually
 ```
 
-  6l) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for sample type
+6l) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for sample type
 
 ```{r}
 umap_am_alveolar_d60 <- list()
@@ -2380,7 +2421,7 @@ for (i in genes_AM) {
 
 ```
 
-  **6m) Z-scores of cluster frequencies: heatmap**
+**6m) Z-scores of cluster frequencies: heatmap**
 
 ```{r}
 AM |> 
@@ -2414,7 +2455,7 @@ AM |>
 ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM",  height = 20, width = 30, units = "cm")
 ```
 
-  6n) PC plot showing Ms4a3 +/- distribution for all conditions for BAL
+6n) PC plot showing Ms4a3 +/- distribution for all conditions for BAL
 
 ```{r}
 AM_bal = AM %>% filter(str_detect(sample_type, "bal"))
@@ -2429,8 +2470,7 @@ DimPlot(AM_bal, reduction = "pca", group.by = "sampletag_name")
 ggsave("pcaplot_alveolar_bal_Ms4a3_virus.png", path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-
-  6o) PC plot showing Ms4a3 +/- distribution for all conditions for LUNG
+6o) PC plot showing Ms4a3 +/- distribution for all conditions for LUNG
 
 ```{r}
 AM_lung = AM %>% filter(str_detect(sample_type, "lung"))
@@ -2446,9 +2486,7 @@ DimPlot(AM_lung, reduction = "pca", group.by = "sampletag_name")
 ggsave("pcaplot_alveolar_lung_condition_Ms4a3.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-
-
-  6q) heatmap 4b but for AM
+6q) heatmap 4b but for AM
 
 ```{r}
 AM |> 
@@ -2486,7 +2524,7 @@ AM |>
 ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM",  height = 20, width = 30, units = "cm")
 ```
 
-  6r) obj.v5 (central object) featureplot adt cd11c siglecf
+6r) obj.v5 (central object) featureplot adt cd11c siglecf
 
 ```{r}
 DefaultAssay(obj.v5) = "adt"
@@ -2518,7 +2556,7 @@ DimPlot_All_Samples(AM, meta_data_column = 'sampletag_name', colors_use = pallet
 ggsave("umap_Ms4a3_virus.png", bg = 'white', width = 49 , path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final")
 ```
 
-  6i) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+6i) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 Idents(AM) = "seurat_clusters"
@@ -2571,7 +2609,7 @@ for (i in genes_AM) {
 }
 ```
 
-  6j) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+6j) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 DefaultAssay(AM) = "RNA"
@@ -2624,7 +2662,7 @@ for (i in genes_AM) {
 }
 ```
 
-  6k) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
+6k) AbSeq Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for Ms4a3 + -
 
 ```{r}
 DefaultAssay(AM) = "adt"
@@ -2679,7 +2717,7 @@ for (i in genes_AM) {
 # No need to call ggarrange as plots are saved individually
 ```
 
-  6l) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for sample type
+6l) RNA Featureplots of H2-ab1 Itgax Pparg SiglecF and CD274 for sample type
 
 ```{r}
 umap_am_alveolar_d60 <- list()
@@ -2730,7 +2768,7 @@ for (i in genes_AM) {
 
 ```
 
-  **6m) Z-scores of cluster frequencies: heatmap**
+**6m) Z-scores of cluster frequencies: heatmap**
 
 ```{r}
 AM |> 
@@ -2764,7 +2802,7 @@ AM |>
 ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM",  height = 20, width = 30, units = "cm")
 ```
 
-  6n) PC plot showing Ms4a3 +/- distribution for all conditions for BAL
+6n) PC plot showing Ms4a3 +/- distribution for all conditions for BAL
 
 ```{r}
 AM_bal = AM %>% filter(str_detect(sample_type, "bal"))
@@ -2779,8 +2817,7 @@ DimPlot(AM_bal, reduction = "pca", group.by = "sampletag_name")
 ggsave("pcaplot_alveolar_bal_Ms4a3_virus.png", path =  "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-
-  6o) PC plot showing Ms4a3 +/- distribution for all conditions for LUNG
+6o) PC plot showing Ms4a3 +/- distribution for all conditions for LUNG
 
 ```{r}
 AM_lung = AM %>% filter(str_detect(sample_type, "lung"))
@@ -2796,9 +2833,7 @@ DimPlot(AM_lung, reduction = "pca", group.by = "sampletag_name")
 ggsave("pcaplot_alveolar_lung_condition_Ms4a3.png", path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM")
 ```
 
-
-
-  6q) heatmap 4b but for AM
+6q) heatmap 4b but for AM
 
 ```{r}
 AM |> 
@@ -2836,7 +2871,7 @@ AM |>
 ggsave(filename = "proportions of cells from a given sample distributed across clusters.png",path = "../../Documents/machiels_lab_viral/Case_study_annotation/exploration/recluster/final/AM",  height = 20, width = 30, units = "cm")
 ```
 
-  6r) obj.v5 (central object) featureplot adt cd11c siglecf
+6r) obj.v5 (central object) featureplot adt cd11c siglecf
 
 ```{r}
 DefaultAssay(obj.v5) = "adt"

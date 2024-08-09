@@ -1,0 +1,268 @@
+---
+title: "Case Study Module Scores"
+format: 
+  html:
+    code-fold: true
+editor: visual
+toc: true
+execute:
+  warning: false
+  message: false
+---
+
+# Module scores
+
+```{r}
+easypackages::libraries("Seurat","tidyverse","tidyseurat", "ggridges", "viridis", "ggh4x", "data.table", "writexl")
+
+obj.v5 = read_rds("../../Documents/machiels_lab_viral/intermediate_data/seurat_obj_central_reclustered.rds")
+#helper for ggplot
+x_axis_text_90 <-  theme(axis.text.x = element_text(angle = 90))
+```
+
+```{r}
+
+```
+
+## Aergerter markers
+
+```{r}
+aergerter_markers <- "../../Documents/machiels_lab_viral/modulescorefiles/aergerter_2022_macs.xlsx" |> readxl::read_excel()
+colnames(aergerter_markers) <- colnames(aergerter_markers) |> paste("aergerter", sep="__")
+aergerter_markers_long <- aergerter_markers |> pivot_longer(cols=everything(), names_to = "module_score", values_to = ".feature")
+aergerter_markers_lst <- as.vector(aergerter_markers) 
+aergerter_markers_lst <- map(aergerter_markers_lst, na.omit)
+aergerter_combined_vector <- as.vector(aergerter_markers) |> unlist() |> na.omit()
+
+#names(aergerter_markers_lst) <- names(aergerter_markers_lst) |> paste("aergerter", sep="__")
+#check if genes are correct
+# length(aergerter_combined_vector)
+# rownames(obj.v5@assays$RNA) |> intersect(aergerter_combined_vector) |> length()
+# setdiff(aergerter_combined_vector, rownames(obj.v5@assays$RNA))
+```
+
+## Vanneste markers
+
+```{r}
+vanneste_markers <- readxl::read_excel("../../Documents/machiels_lab_viral/modulescorefiles/dataset_vanneste_et_al.xlsx")
+colnames(vanneste_markers) <- colnames(vanneste_markers) |> paste("vanneste", sep="__")
+vanneste_markers_long <- vanneste_markers |> pivot_longer(cols=everything(), names_to = "module_score", values_to = ".feature")
+vanneste_markers_lst <- as.vector(vanneste_markers)
+vanneste_markers_lst <- map(vanneste_markers_lst, na.omit)
+vanneste_combined_vector <- as.vector(vanneste_markers) |> unlist()|> na.omit()
+#check if genes are correct
+# length(combined_vector)
+# rownames(obj.v5@assays$RNA) |> intersect(combined_vector) |> length()
+# setdiff(combined_vector, rownames(obj.v5@assays$RNA))
+```
+
+## Add module scores
+
+```{r}
+DefaultAssay(obj.v5) <- "RNA"
+all_markers_lst <- c(aergerter_markers_lst,vanneste_markers_lst)
+
+
+obj.v5 <- AddModuleScore(object = obj.v5,all_markers_lst,
+                         name = names(all_markers_lst) )
+#obj.v5 <- AddModuleScore(object = obj.v5,aergerter_markers_lst, name = names(aergerter_markers_lst) )
+```
+
+## module score ridge plot
+
+```{r message=FALSE}
+#| fig-asp: 2
+#prepare long format for faceting and to remove the extraneous digits AddModuleScore added
+
+length(all_markers_lst)
+
+
+mod_score_names_w_numbers <- names(obj.v5@meta.data)[(ncol(obj.v5@meta.data)-length(all_markers_lst)+1):ncol(obj.v5@meta.data)]
+
+long_mod_score_tbl <- obj.v5 |>
+  as_tibble()|>
+  dplyr::select(.cell,
+         seurat_clusters,
+         all_of(mod_score_names_w_numbers)) |>
+  pivot_longer(cols = mod_score_names_w_numbers ,
+               names_to = "module_scores") |>  # Extract all characters except the last one
+  mutate(module_scores =
+           sub("\\d+$", "", module_scores))
+
+
+#change names pf module score meta data columns
+wide_mod_score_tbl <-  long_mod_score_tbl |> pivot_wider(names_from = module_scores)
+obj.v5 <- obj.v5 |> dplyr::select(!any_of(mod_score_names_w_numbers))
+just_mod_scores <- dplyr::select(wide_mod_score_tbl,cMo__vanneste:pDCs__aergerter)
+obj.v5[[names(just_mod_scores)]] <- just_mod_scores |> as_vector()
+
+# plot whatever
+long_mod_score_tbl |> 
+   mutate(module_scores=str_replace_all(module_scores,"__"," \n ")) |>
+ggplot(aes(value,seurat_clusters, fill=seurat_clusters))+
+  theme(legend.position = "none")+
+  geom_density_ridges()+facet_wrap(~module_scores, scales = "free", ncol = 4,
+             labeller = labeller(group = label_wrap_gen(width =5)))
+ggsave("ridgePlot.png", bg = "white", width = 10, height = 15, path = "../../Documents/machiels_lab_viral/Case_study_modulescore/")
+```
+
+```{r}
+#| fig-asp: 0.6
+
+modul_score_means_tbl <- long_mod_score_tbl |>
+  group_by(seurat_clusters, module_scores) |> 
+  summarise(mean_module_score=mean(value)) |>
+  group_by(module_scores) |> 
+  mutate(max_min_scaled_module_score=
+           (mean_module_score-min(mean_module_score))/(max(mean_module_score)-min(mean_module_score)),
+         z_score_module_score=
+           mean_module_score-mean(mean_module_score)/sd(mean_module_score)) |> 
+  separate(module_scores, sep = "__",remove = FALSE, c("mod_score_child", "mod_score_parent")) |> 
+  #mutate(mod_score_child=fct_reorder(mod_score_child,as.numeric(as.factor(mod_score_parent)) )) |> 
+  mutate(mod_score_parent=as_factor(mod_score_parent )) |> 
+  arrange(mod_score_parent ) |> 
+  mutate(module_scores=fct_reorder(module_scores,as.numeric(mod_score_parent)))
+
+
+modul_score_means_tbl$module_scores <- fct_reorder(modul_score_means_tbl$module_scores,modul_score_means_tbl$mod_score_parent |> as.numeric())
+
+modul_score_means_tbl |>  ggplot(aes( x=module_scores,                                                                          seurat_clusters,
+   fill=max_min_scaled_module_score))+
+  geom_tile()+
+  scale_fill_viridis() +
+  theme(legend.position = "bottom")+
+  x_axis_text_90+
+  #guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") +
+  #facet_nested(~ mod_score_child + mod_score_parent, nest_line = element_line(linetype = 2), scales = "free_x", space="free")
+  guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Mean module score of all cells per cluster ", "min-max_scaled") +
+  #theme(axis.text.x = element_text(colour = a))+
+  theme(panel.spacing = unit(0.02, "cm", data = NULL),strip.background = element_blank()#, strip.text = element_blank()
+        )
+
+
+modul_score_means_tbl |>  ggplot(aes( x=module_scores,                                                                          seurat_clusters,
+   fill=z_score_module_score))+
+  geom_tile()+
+  scale_fill_viridis() +
+theme(legend.position = "bottom")+
+  x_axis_text_90+
+  #guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+ # ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") +
+  #facet_nested(~ mod_score_child + mod_score_parent, nest_line = element_line(linetype = 2), scales = "free_x", space="free")
+  guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Z score of mean module score ", "") +
+  #theme(axis.text.x = element_text(colour = a))+
+  theme(panel.spacing = unit(0.02, "cm", data = NULL),strip.background = element_blank()#, strip.text = element_blank()
+        )
+ggsave("zscore of mean module score.png", bg = "white", width = 10, height = 15, path = "../../Documents/machiels_lab_viral/Case_study_modulescore/")
+
+```
+
+```{r}
+ggplot(obj.v5@meta.data, aes(seurat_clusters))+geom_bar(stat="count") +
+  theme(axis.text.x = element_text( size = 15), axis.text.y = element_text(size = 15), axis.title = element_text(size = 18) )
+ggsave("cellcounts.png", bg = "white", width = 10, height = 15, path = "../../Documents/machiels_lab_viral/Case_study_modulescore/")
+cellcounts = as.data.frame(table(obj.v5$seurat_clusters))
+write_xlsx(cellcounts, "cells_per_cluster.xlsx")
+
+```
+
+# Gene expression of gene sets
+
+```{r}
+#| fig-asp: 0.23
+#| fig-width: 17
+#| 
+#library(forcats)
+all_markers_vector <- c(aergerter_combined_vector, vanneste_combined_vector)
+
+all_markers_tbl_long <- vanneste_markers_long |> bind_rows(aergerter_markers_long)
+
+dat <- obj.v5 |>
+  join_features(features=all_markers_vector, shape = "long", assay="RNA", slot="scale.data") |>
+  group_by(.feature,seurat_clusters)|>
+  summarise(mean_feat=mean(.abundance_RNA)) |> 
+  group_by(.feature) |>
+  mutate(feat_zscore=(mean_feat-mean(mean_feat))/sd(mean_feat)) |> 
+  mutate(feat_max_min_scaled=(mean_feat-min(mean_feat))/(max(mean_feat)-min(mean_feat))) |> 
+  ungroup() |> 
+  mutate(feat_zscore=ifelse(feat_zscore>2,2,feat_zscore)) |> 
+  left_join(all_markers_tbl_long)
+
+#ordering the dat tibble for plot
+dat <- dat |>
+  separate(module_score, sep = "__",remove = FALSE, c("mod_score_child", "mod_score_parent")) |> 
+  mutate(mod_score_child=fct_reorder(mod_score_child,as.numeric(as.factor(mod_score_parent)) )) |> 
+  mutate(module_score=fct_reorder(module_score,as.numeric(mod_score_child)))|>  
+  mutate(.feature=fct_reorder(.feature, as.numeric(module_score))) |> 
+  mutate(feat_group=paste0(.feature, "__", module_score )) |> 
+  mutate(feat_group=fct_reorder(feat_group,as.numeric(module_score)))
+
+library(RColorBrewer)
+a <- brewer.pal(length(unique(dat$module_score)), "Set3") [dat$module_score |> as.numeric()]
+
+#plot Z-score
+dat |>  ggplot(aes( x=feat_group,                                                                          seurat_clusters,
+   fill=feat_zscore))+
+  geom_tile()+
+  scale_fill_viridis() +
+  x_axis_text_90+
+
+  guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") + facet_wrap(~module_score, nrow=1, scales = "free_x") +
+  theme(panel.spacing = unit(0.5, "lines"),
+        strip.background = element_blank(), strip.text = element_blank(),
+        legend.position = "bottom",
+        axis.text.x = element_text(vjust = 0.65))
+
+#plot min-max scaled
+
+dat |>  ggplot(aes( x=feat_group,                                                                          seurat_clusters,
+   fill=feat_max_min_scaled))+
+  geom_tile()+
+  scale_fill_viridis() +
+  theme(legend.position = "bottom")+
+  x_axis_text_90+
+  guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Mean module scores of published datasets", "min-max scaled") + facet_wrap(~module_score, nrow=1, scales = "free_x") +
+  theme(panel.spacing = unit(0.5, "lines"),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        legend.position = "bottom",
+        axis.text.x = element_text(vjust = 0.65))
+
+
+a <- c("darkgrey","black")[dat |> arrange (feat_group ) |> filter(seurat_clusters ==0) |> pull(module_score)  |> as.numeric() %% 2+1]
+
+#zscore facets marked by lines and color
+dat |>  ggplot(aes( x=feat_group,                                                                     seurat_clusters,
+   fill=feat_zscore))+
+  geom_tile()+
+  scale_fill_viridis() +
+  x_axis_text_90+
+  guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Mean expression of genes of published datasets", "Z-scores, trimmed at 2") +
+  theme(axis.text.x = element_text(colour = a),
+        legend.position = "bottom"#,axis.text.x = element_text(vjust = 0.65)
+        )
+                                                                                                                  
+                                                                                                                  
+                                                                           
+#nested facets
+dat |>  ggplot(aes( x=.feature,                                                                          seurat_clusters,
+   fill=feat_zscore))+
+  geom_tile()+
+  scale_fill_viridis() +
+  x_axis_text_90 +
+  #guides(x = ggh4x::guide_axis_nested(delim = "__")) +
+  ggtitle("Mean module scores of published datasets", "Z-scores, trimmed at 2") +
+  facet_nested(~ mod_score_child + mod_score_parent, nest_line = element_line(linetype = 2), scales = "free_x", space="free")+
+
+  theme(panel.spacing = unit(0.02, "cm", data = NULL),strip.background = element_blank(),
+        legend.position = "bottom",
+        axis.text.x = element_text(vjust = 0.65))
+ggsave("mean module score with Z scores.png", bg = "white", width = 10, height = 15, path = "../../Documents/machiels_lab_viral/Case_study_modulescore/")
+ggsave("mean module score with Z scores.svg", bg = "white", width = 10, height = 15, path = "../../Documents/machiels_lab_viral/Case_study_modulescore/")
+```
